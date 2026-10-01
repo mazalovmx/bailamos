@@ -4,7 +4,8 @@ import Link from 'next/link';
 import {currentUser} from '../../../../lib/session';
 import {catalogue} from '../../../../lib/catalogue';
 import {managedSchools} from '../../../../lib/schools/access';
-import {EventForm} from '../../../../components/forms';
+import {EventComposer} from '../../../../components/events/event-composer';
+import {parserEnabled} from '../../../../lib/events/parse/llm';
 import '../../../styles/events.css';
 export const metadata={robots:{index:false,follow:false}};
 export default async function NewEvent({params}:{params:Promise<{locale:string}>}) {
@@ -14,5 +15,5 @@ export default async function NewEvent({params}:{params:Promise<{locale:string}>
   if(!user.profile) return <main className="form-page"><h1>{t('newEvent')}</h1><p>{t('profileRequired')}</p><Link className="button" href={'/'+locale+'/profile'}>{t('editProfile')}</Link></main>;
   const [{cities,styles,tags},schools]=await Promise.all([catalogue(),managedSchools(user.schoolIds)]);
   return <main className="form-page event-editor"><h1>{t('createTitle')}</h1><p className="intro">{t('createText')}</p><p className="field-note">{x('createNext')}</p>
-    <EventForm cities={cities} styles={styles} tags={tags} schools={schools} initial={{cityId:user.profile.cityId||'',styleId:'lindy-hop'}}/></main>;
+    <EventComposer cities={cities} styles={styles} tags={tags} schools={schools} parser={parserEnabled()} initial={{cityId:user.profile.cityId||'',styleId:'lindy-hop'}}/></main>;
 }

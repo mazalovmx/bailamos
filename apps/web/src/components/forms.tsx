@@ -72,13 +72,13 @@ export function ProfileForm({cities,styles,initial}:{cities:Options;styles:Optio
     {s.feedback}<button className="button" disabled={s.busy}>{t(s.busy?'working':'saveProfile')}</button>
   </form>;
 }
-export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools=[]}:{cities:Options;styles:Options;initial:Fields;id?:string;tags:Options;selectedTags?:string[];schools?:Options}) {
+export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools=[],parseId}:{cities:Options;styles:Options;initial:Fields;id?:string;tags:Options;selectedTags?:string[];schools?:Options;parseId?:string}) {
   const t=useTranslations('App'),x=useTranslations('EventsX'),locale=useLocale(),router=useRouter(),s=useFormStatus();
   const [cityId,setCityId]=useState(initial.cityId||'');
   return <form className="editor-form" onSubmit={async e=>{e.preventDefault();s.setBusy(true);s.setError('');
     try{
       const data=new FormData(e.currentTarget);
-      const body={...values(e.currentTarget),pin:data.get('pin')?JSON.parse(String(data.get('pin'))):null,tagIds:data.getAll('tagIds'),recurrenceDays:data.getAll('recurrenceDays'),partnerRequired:data.get('partnerRequired')==='on'};
+      const body={...values(e.currentTarget),pin:data.get('pin')?JSON.parse(String(data.get('pin'))):null,tagIds:data.getAll('tagIds'),recurrenceDays:data.getAll('recurrenceDays'),partnerRequired:data.get('partnerRequired')==='on',parsedConfirmed:data.get('parsedConfirmed')==='on'};
       const result=await submit('/api/events'+(id?'/'+id:''),id?'PATCH':'POST',body);
       // A new event continues in the editor, where the team, the artists and single dates are managed.
       router.push('/'+locale+'/events/'+result.slug+(id?'':'/edit?created=1'));router.refresh();}
@@ -96,6 +96,8 @@ export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools
     <ScheduleFields initial={initial} zone={cities.find(c=>c.id===cityId)?.timezone}/>
     <div className="form-grid"><label>{x('attendeeVisibility')}<select name="attendeeVisibility" defaultValue={initial.attendeeVisibility||'PUBLIC'}>{['PUBLIC','ATTENDEES','ORGANIZERS'].map(value=><option key={value} value={value}>{x('visibility_'+value)}</option>)}</select><small>{x('attendeeVisibilityHint')}</small></label>
     <Select name="status" label={t('status')} value={initial.status||'DRAFT'} options={(id?['DRAFT','PUBLISHED','CANCELLED']:['DRAFT','PUBLISHED']).map(id=>({id,name:t(id)}))}/></div>
+    {/* Values suggested by the announcement parser are never saved without the organizer saying they were checked. */}
+    {parseId&&<><input type="hidden" name="parseId" value={parseId}/><label className="checkbox"><input type="checkbox" name="parsedConfirmed" required/>{x('parseConfirm')}</label></>}
     {s.feedback}<button className="button" disabled={s.busy}>{t(s.busy?'working':'saveEvent')}</button>
   </form>;
 }
