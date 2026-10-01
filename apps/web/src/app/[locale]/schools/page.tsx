@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import type {Metadata} from 'next';
 import {getTranslations} from 'next-intl/server';
+import {cityName} from '../../../lib/catalogue/city-name';
+import {cityLabeler} from '../../../lib/catalogue/data';
+
 import {allCities} from '../../../lib/catalogue/data';
 import {currentCitySlug} from '../../../lib/catalogue/current-city';
 import {siteUrl} from '../../../lib/mail';
@@ -16,11 +19,12 @@ export async function generateMetadata({params}: Props): Promise<Metadata> {
 export default async function Schools({params, searchParams}: Props) {
   const {locale} = await params, raw = (await searchParams).city, requested = (Array.isArray(raw) ? raw[0] : raw || '').slice(0, 80).trim();
   const [t, cities, cookieCity] = await Promise.all([getTranslations('Courses'), allCities(), currentCitySlug()]);
+  const label = await cityLabeler(locale);
   // No ?city= means the visitor's chosen city; "all" asks for every city explicitly.
   const slug = requested || cookieCity || 'all', city = slug === 'all' ? null : cities.find(item => item.slug === slug || item.id === slug) || null;
   const {schools, truncated} = await listSchools(city?.id), path = '/' + locale + '/schools';
   return <main className="courses-page">
-    <p className="eyebrow">{t('eyebrow')}</p><h1>{city ? t('schoolsIn', {city: city.name}) : t('schoolsTitle')}</h1>
+    <p className="eyebrow">{t('eyebrow')}</p><h1>{city ? t('schoolsIn', {city: cityName(city, locale)}) : t('schoolsTitle')}</h1>
     <p className="intro">{t('schoolsIntro')}</p>
     <form className="courses-filters courses-filters-short" action={path} role="search" aria-label={t('filters')}>
       <label>{t('city')}<select name="city" defaultValue={city ? city.slug : 'all'}><option value="all">{t('allCities')}</option>
@@ -33,11 +37,11 @@ export default async function Schools({params, searchParams}: Props) {
       <Link href={path + '/' + school.handle}>
         {school.avatarKey ? <img src={mediaUrl(school.avatarKey)} alt="" width={56} height={56} loading="lazy"/> : <span className="school-initial" aria-hidden="true">{school.name.slice(0, 1).toUpperCase()}</span>}
         <span className="school-card-text"><strong>{school.name}</strong>
-          <span>{[school.city?.name, school.district].filter(Boolean).join(' · ') || t('cityUnknown')}</span>
+          <span>{[label(school.city?.name), school.district].filter(Boolean).join(' · ') || t('cityUnknown')}</span>
           <span>{t('weeklyClasses', {count: school.classes})}</span>
           {school.unclaimed && <span className="school-badge">{t('unclaimed')}</span>}</span>
       </Link></li>)}</ul> :
-      <p className="notice" role="status">{city ? t('noSchoolsCity', {city: city.name}) : t('noSchools')}</p>}
+      <p className="notice" role="status">{city ? t('noSchoolsCity', {city: cityName(city, locale)}) : t('noSchools')}</p>}
     <p className="courses-links"><Link href={'/' + locale + '/classes' + (city ? '?city=' + encodeURIComponent(city.slug) : '')}>{t('openTimetable')}</Link></p>
   </main>;
 }

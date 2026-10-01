@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {currentUser} from '../../../../lib/session';
 import {eventAbility} from '../../../../lib/permissions';
 import {managesSchool} from '../../../../lib/schools/access';
+import {cityLabeler} from '../../../../lib/catalogue/data';
 import {isPublic} from '../../../../lib/events/access';
 import {loadEvent,pickOccurrence,eventLinks} from '../../../../lib/events/page-data';
 import {listAttendees} from '../../../../lib/events/attendees';
@@ -27,10 +28,10 @@ export async function generateMetadata({params}:Props):Promise<Metadata> {
   const {locale,slug}=await params,event=await loadEvent(slug);
   // Drafts and hidden events give nothing away, not even a title, and are never indexed.
   if(!event||!isPublic(event)) return {robots:{index:false,follow:false}};
-  const x=await getTranslations({locale,namespace:'EventsX'}),links=eventLinks(slug,locale,event.shortCode);
+  const x=await getTranslations({locale,namespace:'EventsX'}),links=eventLinks(slug,locale,event.shortCode),cityLabel=(await cityLabeler(locale))(event.city.name);
   const when=pickOccurrence(event),startsAt=when?.startsAt||event.startsAt;
   const date=new Intl.DateTimeFormat(locale,{dateStyle:'full',timeStyle:'short',timeZone:event.timezone}).format(startsAt);
-  const place=[event.venue&&!event.venue.hiddenAt?event.venue.name:'',event.city.name].filter(Boolean).join(', ');
+  const place=[event.venue&&!event.venue.hiddenAt?event.venue.name:'',cityLabel].filter(Boolean).join(', ');
   const title=event.status==='CANCELLED'?x('metaCancelled',{title:event.title}):event.title;
   const description=[date+' ('+event.timezone+')',place,(event.description||'').replace(/\s+/g,' ').slice(0,160)].filter(Boolean).join(' · ');
   return {title,description,metadataBase:new URL(links.origin),
@@ -45,7 +46,7 @@ export default async function EventPage({params,searchParams}:Props) {
   const user=await currentUser(),canManage=eventAbility(user?.profile?.id,event.members,managesSchool(user,event.schoolProfileId)).can('manage','Event');
   // Drafts and events hidden by moderation exist only for their organizers.
   if(!isPublic(event)&&!canManage) notFound();
-  const t=await getTranslations('App'),x=await getTranslations('EventsX');
+  const t=await getTranslations('App'),x=await getTranslations('EventsX'),cityLabel=(await cityLabeler(locale))(event.city.name);
   const date=(value:Date)=>new Intl.DateTimeFormat(locale,{dateStyle:'full',timeStyle:'short',timeZone:event.timezone}).format(value);
   const now=new Date(),nextDates=event.occurrences.filter(o=>!o.cancelled&&o.startsAt>=now);
   const selected=pickOccurrence(event,(await searchParams).date,now);
@@ -74,14 +75,14 @@ export default async function EventPage({params,searchParams}:Props) {
       <small>{x('eventZone',{zone:event.timezone,name:zoneName(startsAt,locale,event.timezone)})}</small>
       <ViewerTime startsAt={startsAt.toISOString()} endsAt={endsAt?.toISOString()} eventZone={event.timezone}/>
       {isPublic(event)&&<AddToCalendar eventId={event.id} title={event.title} startsAt={startsAt.toISOString()} endsAt={endsAt?.toISOString()} timezone={event.timezone}
-        location={[venue?.name,venue?.address,event.city.name].filter(Boolean).join(', ')} details={(event.description||'').slice(0,500)} url={links.canonical}/>}
+        location={[venue?.name,venue?.address,cityLabel].filter(Boolean).join(', ')} details={(event.description||'').slice(0,500)} url={links.canonical}/>}
     </div>
     <div><h2>{t('location')}</h2>
-      {venue?<><p><strong>{venue.name}</strong></p><p>{venue.address}</p><p>{event.city.name}</p></>:<p>{event.city.name}</p>}
+      {venue?<><p><strong>{venue.name}</strong></p><p>{venue.address}</p><p>{cityLabel}</p></>:<p>{cityLabel}</p>}
       {event.priceText&&<><h2>{x('price')}</h2><p>{event.priceText}</p></>}
     </div></div>
     {/* A venue is shown exactly; an event without one sits at the city's coordinates. */}
-    {event.lat!==null&&event.lng!==null&&<LocationMap lat={event.lat} lng={event.lng} label={venue?venue.name+', '+venue.address:event.city.name}/>}
+    {event.lat!==null&&event.lng!==null&&<LocationMap lat={event.lat} lng={event.lng} label={venue?venue.name+', '+venue.address:cityLabel}/>}
     <h2>{t('classification')}</h2><dl className="class-facts">
       <div><dt>{t('kind')}</dt><dd>{t('kind_'+event.kind)}</dd></div>
       <div><dt>{t('format')}</dt><dd>{t('format_'+event.format)}</dd></div>
@@ -118,8 +119,8 @@ export default async function EventPage({params,searchParams}:Props) {
       {isPublic(event)&&event.status==='PUBLISHED'&&(canManage||!!series||!!override)&&<RoomLink eventId={event.id} signedIn={!!user}/>}
     </section>
     {isPublic(event)&&<section className="share-panel" aria-labelledby="share-title"><h2 id="share-title">{x('shareTitle')}</h2>
-      <ShareButtons url={links.short} title={event.title} text={date(startsAt)+' · '+(venue?venue.name+', ':'')+event.city.name}/>
-      {event.status==='PUBLISHED'&&<details className="event-share"><summary>{t('shareEvent')} ↗</summary><p>{t('selectedDate')}</p><AnnouncementStudio key={startsAt.toISOString()} initial={{title:event.title,date:date(startsAt)+' · '+event.timezone,place:(venue?venue.name+', ':'')+event.city.name,text:event.styles.map(s=>s.style.name).join(' · ')+' · '+t('kind_'+event.kind)}} urlPath={'/'+locale+'/events/'+slug+'?date='+encodeURIComponent(startsAt.toISOString())}/></details>}
+      <ShareButtons url={links.short} title={event.title} text={date(startsAt)+' · '+(venue?venue.name+', ':'')+cityLabel}/>
+      {event.status==='PUBLISHED'&&<details className="event-share"><summary>{t('shareEvent')} ↗</summary><p>{t('selectedDate')}</p><AnnouncementStudio key={startsAt.toISOString()} initial={{title:event.title,date:date(startsAt)+' · '+event.timezone,place:(venue?venue.name+', ':'')+cityLabel,text:event.styles.map(s=>s.style.name).join(' · ')+' · '+t('kind_'+event.kind)}} urlPath={'/'+locale+'/events/'+slug+'?date='+encodeURIComponent(startsAt.toISOString())}/></details>}
     </section>}
     {isPublic(event)&&!canManage&&<ReportButton targetType="EVENT" targetId={event.id} signedIn={!!user}/>}
   </main>;

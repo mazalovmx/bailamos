@@ -1,3 +1,4 @@
+import {cityName} from './city-name';
 import {db, type Prisma} from '@dance/db';
 import {descendantIds, type StyleNode} from './tree';
 import {localizeCities} from './city-name';
@@ -23,4 +24,10 @@ export async function styleDescendantIds(id: string): Promise<string[]> {return 
 // Only what anonymous visitors may see: published, not hidden by moderation, not cancelled, still ahead.
 export function upcomingOccurrences(event: Prisma.EventWhereInput, now = new Date()): Prisma.EventOccurrenceWhereInput {
   return {cancelled: false, startsAt: {gte: now}, event: {...event, status: 'PUBLISHED', hiddenAt: null}};
+}
+// Pages that only have the stored city name (joined rows, payloads) translate it through this lookup:
+// the stored name is the local spelling, the result is the name in the reader's language.
+export async function cityLabeler(locale: string): Promise<(name: string | null | undefined) => string> {
+  const names = new Map((await allCities()).map(city => [city.name, cityName(city, locale)]));
+  return name => name ? names.get(name) ?? name : '';
 }

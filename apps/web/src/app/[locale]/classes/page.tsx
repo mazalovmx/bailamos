@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type {Metadata} from 'next';
 import {getTranslations} from 'next-intl/server';
+import {cityName} from '../../../lib/catalogue/city-name';
 import {allCities, allStyles} from '../../../lib/catalogue/data';
 import {currentCitySlug} from '../../../lib/catalogue/current-city';
 import {classLevels} from '../../../lib/swing';
@@ -30,7 +31,7 @@ export default async function Classes({params, searchParams}: Props) {
   const weekdayName = new Intl.DateTimeFormat(locale, {weekday: 'long', timeZone: 'UTC'}), path = '/' + locale + '/classes';
   const filtered = !!(style || level || weekday || dayPart), schoolsHref = '/' + locale + '/schools' + (city ? '?city=' + encodeURIComponent(city.slug) : '');
   return <main className="courses-page">
-    <p className="eyebrow">{t('eyebrow')}</p><h1>{city ? t('classesIn', {city: city.name}) : t('classesTitle')}</h1>
+    <p className="eyebrow">{t('eyebrow')}</p><h1>{city ? t('classesIn', {city: cityName(city, locale)}) : t('classesTitle')}</h1>
     <p className="intro">{t('classesIntro')}</p>
     <form className="courses-filters" action={path} role="search" aria-label={t('filters')}>
       <label>{t('city')}<select name="city" defaultValue={city ? city.slug : 'all'}><option value="all">{t('allCities')}</option>
@@ -49,7 +50,7 @@ export default async function Classes({params, searchParams}: Props) {
     </form>
     <WeekNav week={week} current={current} path={path} query={query} locale={locale}/>
     <p className="courses-meta" role="status">{t('classesCount', {count: timetable.total})}{' · '}
-      {city ? t('timesLocalCity', {city: city.name, zone: city.timezone}) : t('timesLocal')}</p>
+      {city ? t('timesLocalCity', {city: cityName(city, locale), zone: city.timezone}) : t('timesLocal')}</p>
     {timetable.truncated && <p className="notice">{t('truncated')}</p>}
     {timetable.total ? <WeekTimetable timetable={timetable} locale={locale} showCity={!city}/> :
       <p className="notice" role="status">{filtered ? t('noClassesFiltered') : t('noClasses')}</p>}

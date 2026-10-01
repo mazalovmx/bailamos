@@ -118,6 +118,7 @@ export function Thread({initial, initialPage}: {initial: ChatDetail; initialPage
   });
   const toInbox = () => {router.push('/' + locale + '/messages'); router.refresh();};
   const accept = () => run('accept', async () => {await chatCall(base, 'PATCH', {action: 'accept'}); await refreshDetail();});
+  const mute = () => run('mute', async () => {await chatCall(base, 'PATCH', {action: detail.muted ? 'unmute' : 'mute'}); await refreshDetail();});
   const leave = () => run('leave', async () => {await chatCall(base, 'DELETE', {}); toInbox();});
   const block = () => run('block', async () => {await chatCall('/api/chat/blocks', 'PUT', {profileId: detail.other?.id}); if (detail.accepted) await refreshDetail(); else toInbox();});
   const unblock = () => run('block', async () => {await chatCall('/api/chat/blocks', 'DELETE', {profileId: detail.other?.id}); await refreshDetail();});
@@ -153,6 +154,7 @@ export function Thread({initial, initialPage}: {initial: ChatDetail; initialPage
     <header className="chat-head">
       <Link className="chat-back" href={'/' + locale + '/messages'}><span aria-hidden="true">←</span> {t('back')}</Link>
       <h1>{title}</h1>
+      {detail.muted !== null && detail.accepted && <button type="button" className="report-link" aria-pressed={detail.muted} disabled={!!busy} onClick={mute}>{t(detail.muted ? 'unmute' : 'mute')}</button>}
       <p className="chat-sub">
         {room && <span className="chat-kind">{t('kind_' + detail.kind)}</span>}
         {room && <span>{t('memberCount', {count: detail.memberCount})}</span>}

@@ -121,5 +121,7 @@
   "error_GROUP_FULL": "El grupo ha alcanzado su límite de miembros.",
   "error_ATTACHMENT_NOT_ALLOWED": "Podrás enviar fotos cuando la otra persona acepte tu solicitud.",
   "error_EDIT_WINDOW_CLOSED": "Un mensaje se puede editar durante 15 minutos después de enviarlo. Aún puedes eliminarlo.",
-  "error_EDIT_UNAVAILABLE": "Este mensaje ya no se puede editar."
+  "error_EDIT_UNAVAILABLE": "Este mensaje ya no se puede editar.",
+  "mute": "Silenciar avisos",
+  "unmute": "Activar avisos"
 }

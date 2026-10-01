@@ -121,5 +121,7 @@
   "error_GROUP_FULL": "The group has reached its member limit.",
   "error_ATTACHMENT_NOT_ALLOWED": "Photos can be sent after the other person accepts your request.",
   "error_EDIT_WINDOW_CLOSED": "A message can be edited for 15 minutes after sending. You can still delete it.",
-  "error_EDIT_UNAVAILABLE": "This message can no longer be edited."
+  "error_EDIT_UNAVAILABLE": "This message can no longer be edited.",
+  "mute": "Mute notifications",
+  "unmute": "Unmute notifications"
 }

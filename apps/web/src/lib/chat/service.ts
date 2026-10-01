@@ -215,7 +215,7 @@ export async function sendMessage(me: Me, conversationId: string, rawBody: unkno
 // One unread CHAT_MESSAGE notification per conversation and recipient, and none for members who are watching the stream.
 async function notifyMembers(conversationId: string, kind: string, message: ChatMessage) {
   const sender = message.sender.id;
-  const members = await db.conversationMember.findMany({where: {conversationId, profileId: {not: sender}, profile: {userId: {not: null}},
+  const members = await db.conversationMember.findMany({where: {conversationId, profileId: {not: sender}, muted: false, profile: {userId: {not: null}},
     ...(kind === 'DIRECT' ? {} : {accepted: true})}, select: {profileId: true, lastReadAt: true, joinedAt: true, profile: {select: {userId: true}}}, take: 5000});
   if (!members.length) return;
   const profileIds = members.map(member => member.profileId);
@@ -246,6 +246,13 @@ export async function listMessages(me: Me, conversationId: string, input: z.inpu
     ...(cursorId ? {cursor: {id: cursorId}, skip: from ? 0 : 1} : {}), include: {sender: {select: profileSelect}}}), blockedByMe(me.profileId)]);
   const hasMore = rows.length > size, page = rows.slice(0, size);
   return {messages: (forward ? page : page.reverse()).map(row => toMessage(row, blocked)), hasMore};
+}
+// Mute is personal: it silences notifications for this member only. A school's shared conversation is muted per manager's own membership, so managers acting as the school cannot mute it.
+export async function setMuted(me: Me, conversationId: string, muted: boolean) {
+  await access(me, conversationId);
+  const changed = await db.conversationMember.updateMany({where: {conversationId, profileId: me.profileId}, data: {muted}});
+  if (!changed.count) throw notFound();
+  return {muted};
 }
 export async function markRead(me: Me, conversationId: string) {
   const {acting} = await access(me, conversationId);
@@ -552,7 +559,9 @@ export async function conversationDetail(me: Me, conversationId: string): Promis
     if (!other?.accepted) remaining = requestRemaining(await db.message.count({where: {conversationId, senderProfileId: acting}}), requestMessageLimit());
   }
   const closed = readOnly || (conversation.kind === 'DIRECT' && !row.summary.other);
+  const mine = await db.conversationMember.findUnique({where: {conversationId_profileId: {conversationId, profileId: me.profileId}}, select: {muted: true}});
   return {...row.summary, admin, members, readOnly: closed, canModerate, blockedByMe: row.blocked, requestRemaining: remaining, actingProfileId: acting,
+    muted: mine ? mine.muted : null,
     canAttach: row.summary.accepted && !closed && !row.blocked && remaining === null};
 }
 /** Ids of every conversation the member may follow live: their own and those of the schools they manage (read afresh, so a revoked grant stops at once). */

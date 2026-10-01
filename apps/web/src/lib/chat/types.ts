@@ -24,6 +24,8 @@ export type ChatSummary = {
 export type ChatMember = ChatProfile & {admin: boolean; accepted: boolean};
 export type ChatDetail = ChatSummary & {
   members: ChatMember[]; readOnly: boolean; canModerate: boolean; blockedByMe: boolean;
+  /** Whether the reader silenced notifications here; null when they have no membership of their own (school managers). */
+  muted: boolean | null;
   // Set for the sender of a direct request that is still waiting: messages left before the recipient answers.
   requestRemaining: number | null;
   /** The profile the reader writes as here: their own, or the school's when they manage it. */

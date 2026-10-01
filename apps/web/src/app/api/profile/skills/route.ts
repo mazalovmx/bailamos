@@ -2,6 +2,8 @@ import {db} from '@dance/db';
 import {actor, apiError, ApiError, jsonBody} from '../../../../lib/api';
 import {skillsSchema} from '../../../../lib/validation';
 import {canEditProfile} from '../../../../lib/account/permissions';
+import {logConsent} from '../../../../lib/account/consent';
+// Opting in to (or out of) partner search is recorded in the consent log.
 // Replaces the caller's skill list. lookingFor is stored exactly as sent and defaults to false: it is never inferred.
 export async function PUT(request: Request) {
   try {
@@ -15,6 +17,7 @@ export async function PUT(request: Request) {
       db.danceSkill.deleteMany({where: {profileId}}),
       db.danceSkill.createMany({data: skills.map(s => ({profileId, styleId: s.styleId, role: s.role, level: s.level, lookingFor: s.lookingFor === true}))})
     ]);
+    await logConsent(user.id, 'PARTNER_SEARCH', skills.some(s => s.lookingFor === true));
     return Response.json({skills: skills.length});
   } catch (error) {return apiError(error);}
 }

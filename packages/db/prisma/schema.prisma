@@ -582,6 +582,8 @@ model ConversationMember {
   admin Boolean @default(false)
   // DIRECT conversations from strangers stay pending until accepted.
   accepted Boolean @default(true)
+  // A muted conversation raises no notifications or push for this member; unread counters still work.
+  muted Boolean @default(false)
   lastReadAt DateTime? @db.Timestamptz(3)
   joinedAt DateTime @default(now()) @db.Timestamptz(3)
   @@id([conversationId, profileId])
