@@ -17,6 +17,7 @@ function contentSecurityPolicy(nonce: string) {
     "font-src 'self' data:",
     "connect-src 'self' " + tiles + ' ' + media + (dev ? ' ws:' : ''),
     "worker-src 'self' blob:",
+    "frame-src https://www.instagram.com",
     "manifest-src 'self'",
     "frame-ancestors 'none'",
     "form-action 'self'",

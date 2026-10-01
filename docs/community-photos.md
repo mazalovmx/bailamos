@@ -17,6 +17,12 @@ Regenerate variants after changing the PNG sources: `node apps/web/scripts/prepa
 
 Every section has its own image. The duplicate Vintage Swing Dance Lesson (1).png and the two street scenes remain unused in the source folder. Frames have fixed proportions set in home-actions.css and the images are cropped to fill them, so a tall source cannot stretch the page. Screen-reader descriptions are available in all three languages. To replace an image, update its public file and component proportions/description, then rebuild.
 
+## Homepage Instagram strip and school screenshots
+
+The homepage shows up to five Instagram posts through Instagram's own embed pages in frames (`apps/web/src/lib/home/instagram.ts`). Set `HOME_INSTAGRAM_URLS` to a comma- or space-separated list of post or reel links to replace the built-in list; profile links are ignored. The content security policy allows frames from www.instagram.com only.
+
+The two "run a school" pictures in `apps/web/public/images/guide/` are real screenshots of the profile editor and the new-event form. Regenerate them against a local build with `pnpm exec tsx scripts/guide-screenshots.ts` (see the header of that script); it creates and deletes a throwaway account in the local database.
+
 ## Prompts for future alternatives
 
 The following JPG names are suggestions, not the active automatic file mapping.

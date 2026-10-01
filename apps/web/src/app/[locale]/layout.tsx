@@ -32,8 +32,11 @@ export default async function Layout({children, params}: {
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
   const user = await currentUser(), t = await getTranslations('App'), account = await getTranslations('Account');
+  // Staff see a link to the admin panel, which is a separate application; school administrators land in their cabinet.
+  const adminBase = (process.env.ADMIN_URL || 'http://localhost:3001').replace(/\/+$/, '');
+  const adminUrl = user && user.role !== 'USER' ? adminBase + (user.role === 'SCHOOL_ADMIN' ? '/schools' : '') : undefined;
   return <html lang={locale}><body><NextIntlClientProvider>
-    <Header signedIn={!!user}/>{children}<footer className="app-footer"><span>dance community</span><p>{t('footer')}</p>
+    <Header signedIn={!!user} adminUrl={adminUrl}/>{children}<footer className="app-footer"><span>dance community</span><p>{t('footer')}</p>
       <a href={'/' + locale + '/privacy'}>{account('privacyLink')}</a></footer>
     <RegisterSw signedIn={!!user}/><InstallPrompt/>
   </NextIntlClientProvider></body></html>;
