@@ -79,6 +79,60 @@ enum MusicTempo {
   VARIED
   UNSPECIFIED
 }
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+enum AttendeeVisibility {
+  PUBLIC
+  ATTENDEES
+  ORGANIZERS
+}
+enum ReportTarget {
+  EVENT
+  PROFILE
+  POST
+  MEDIA
+  MESSAGE
+  VENUE
+}
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  INAPPROPRIATE
+  FAKE
+  COPYRIGHT
+  OTHER
+}
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+enum ConversationKind {
+  DIRECT
+  GROUP
+  EVENT
+  CITY
+}
+enum ImportKind {
+  RSS
+  ICAL
+  SCHEMA_ORG
+}
+enum ImportStatus {
+  PENDING
+  IMPORTED
+  DUPLICATE
+  REVIEW
+  REJECTED
+}
 model Profile {
   id String @id @default(cuid())
   userId String? @unique
@@ -88,12 +142,30 @@ model Profile {
   name String
   bio String?
   instagram String?
+  avatarKey String?
+  coverKey String?
   cityId String?
   city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  // Exact coordinates are never published: only city and district are shown.
+  district String?
+  lat Float?
+  lng Float?
+  geo Unsupported("geography(Point,4326)")?
+  hiddenAt DateTime? @db.Timestamptz(3)
+  lastActiveAt DateTime? @db.Timestamptz(3)
   skills DanceSkill[]
   memberships EventMembership[]
   rsvps Rsvp[]
   posts Post[]
+  uploads MediaItem[]
+  claims ProfileClaim[]
+  followers Follow[]
+  interestsSent PartnerInterest[] @relation("InterestFrom")
+  interestsReceived PartnerInterest[] @relation("InterestTo")
+  blocksMade Block[] @relation("Blocker")
+  blocksReceived Block[] @relation("Blocked")
+  conversations ConversationMember[]
+  messages Message[]
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
   @@index([cityId, type])
@@ -110,6 +182,10 @@ model City {
   venues Venue[]
   profiles Profile[]
   events Event[]
+  followers Follow[]
+  conversation Conversation?
+  importSources ImportSource[]
+  news NewsItem[]
 }
 model DanceStyle {
   id String @id @default(cuid())
@@ -120,6 +196,8 @@ model DanceStyle {
   children DanceStyle[] @relation("StyleTree")
   skills DanceSkill[]
   events EventStyle[]
+  followers Follow[]
+  interests PartnerInterest[]
   @@index([parentId])
 }
 model DanceSkill {
@@ -143,12 +221,15 @@ model Venue {
   lat Float
   lng Float
   geo Unsupported("geography(Point,4326)")?
+  hiddenAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
   events Event[]
   @@index([cityId])
 }
 model Event {
   id String @id @default(cuid())
   slug String @unique
+  shortCode String? @unique
   title String
   description String?
   startsAt DateTime @db.Timestamptz(3)
@@ -170,18 +251,27 @@ model Event {
   tempo MusicTempo @default(UNSPECIFIED)
   prerequisites String?
   partnerRequired Boolean?
+  priceText String?
+  attendeeVisibility AttendeeVisibility @default(PUBLIC)
+  hiddenAt DateTime? @db.Timestamptz(3)
   tags EventTag[]
   sourceUrl String?
+  dedupeKey String?
   styles EventStyle[]
   members EventMembership[]
+  invites EventInvite[]
   rsvps Rsvp[]
   media MediaItem[]
+  posts Post[]
   occurrences EventOccurrence[]
+  conversation Conversation?
+  importedItems ImportedItem[]
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
   @@index([cityId, startsAt])
   @@index([status, startsAt])
   @@index([kind, format, level])
+  @@index([dedupeKey])
 }
 model Tag {
   id String @id
@@ -211,6 +301,7 @@ model EventOccurrence {
   startsAt DateTime @db.Timestamptz(3)
   endsAt DateTime? @db.Timestamptz(3)
   cancelled Boolean @default(false)
+  reminderSentAt DateTime? @db.Timestamptz(3)
   @@unique([eventId, startsAt])
   @@index([startsAt])
 }
@@ -223,10 +314,28 @@ model EventMembership {
   @@id([eventId, profileId, role])
   @@index([profileId])
 }
+// Pending co-organizer invitation, addressed by profile or by email.
+model EventInvite {
+  id String @id @default(cuid())
+  eventId String
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  role EventRole @default(CO_ORGANIZER)
+  email String?
+  profileId String?
+  token String @unique
+  invitedByProfileId String
+  acceptedAt DateTime? @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([eventId])
+  @@index([email])
+  @@index([profileId])
+}
 model Rsvp {
   eventId String
   profileId String
   status RsvpStatus
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
   @@id([eventId, profileId])
@@ -234,13 +343,21 @@ model Rsvp {
 }
 model Post {
   id String @id @default(cuid())
+  slug String? @unique
   profileId String
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
   title String
+  excerpt String?
   content Json
+  eventId String?
+  event Event? @relation(fields: [eventId], references: [id], onDelete: SetNull)
   publishedAt DateTime? @db.Timestamptz(3)
+  hiddenAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
   media MediaItem[]
   @@index([profileId, publishedAt])
+  @@index([eventId])
 }
 model MediaItem {
   id String @id @default(cuid())
@@ -248,14 +365,247 @@ model MediaItem {
   post Post? @relation(fields: [postId], references: [id], onDelete: Cascade)
   eventId String?
   event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  uploaderProfileId String?
+  uploader Profile? @relation(fields: [uploaderProfileId], references: [id], onDelete: SetNull)
   kind String
   storageKey String?
+  mime String?
+  size Int?
+  width Int?
+  height Int?
+  alt String?
+  position Int @default(0)
   sourceUrl String?
   embedHtml String?
+  embedMeta Json?
   embedFetched DateTime? @db.Timestamptz(3)
+  hiddenAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@index([sourceUrl])
   @@index([postId])
   @@index([eventId])
+}
+// A subscription to exactly one of: city, style, profile.
+model Follow {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cityId String?
+  city City? @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  styleId String?
+  style DanceStyle? @relation(fields: [styleId], references: [id], onDelete: Cascade)
+  profileId String?
+  profile Profile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([userId, cityId])
+  @@unique([userId, styleId])
+  @@unique([userId, profileId])
+  @@index([cityId])
+  @@index([styleId])
+  @@index([profileId])
+}
+model ProfileClaim {
+  id String @id @default(cuid())
+  profileId String
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message String?
+  status ClaimStatus @default(PENDING)
+  decidedByUserId String?
+  decidedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([profileId, userId])
+  @@index([status])
+}
+model Report {
+  id String @id @default(cuid())
+  reporterUserId String?
+  reporter User? @relation(fields: [reporterUserId], references: [id], onDelete: SetNull)
+  targetType ReportTarget
+  targetId String
+  reason ReportReason
+  comment String?
+  status ReportStatus @default(OPEN)
+  resolution String?
+  resolvedByUserId String?
+  resolvedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+}
+// Append-only log of moderator and administrator actions.
+model AuditLog {
+  id String @id @default(cuid())
+  actorUserId String?
+  action String
+  targetType String
+  targetId String?
+  data Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([createdAt])
+  @@index([targetType, targetId])
+}
+model ConsentLog {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind String
+  granted Boolean
+  version String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([userId])
+}
+model Notification {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type String
+  data Json
+  url String?
+  readAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([userId, readAt, createdAt])
+}
+model NotificationPreference {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushReminders Boolean @default(true)
+  pushRsvp Boolean @default(true)
+  pushChat Boolean @default(true)
+  emailEvents Boolean @default(true)
+  emailDigest Boolean @default(false)
+  digestSentAt DateTime? @db.Timestamptz(3)
+}
+model PushSubscription {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint String @unique
+  p256dh String
+  auth String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([userId])
+}
+model GeocodeCache {
+  id String @id @default(cuid())
+  key String @unique
+  result Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+// One-directional interest; a match exists when both directions are present.
+model PartnerInterest {
+  fromProfileId String
+  toProfileId String
+  from Profile @relation("InterestFrom", fields: [fromProfileId], references: [id], onDelete: Cascade)
+  to Profile @relation("InterestTo", fields: [toProfileId], references: [id], onDelete: Cascade)
+  styleId String?
+  style DanceStyle? @relation(fields: [styleId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@id([fromProfileId, toProfileId])
+  @@index([toProfileId])
+}
+model Block {
+  blockerProfileId String
+  blockedProfileId String
+  blocker Profile @relation("Blocker", fields: [blockerProfileId], references: [id], onDelete: Cascade)
+  blocked Profile @relation("Blocked", fields: [blockedProfileId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@id([blockerProfileId, blockedProfileId])
+  @@index([blockedProfileId])
+}
+model Conversation {
+  id String @id @default(cuid())
+  kind ConversationKind
+  title String?
+  eventId String? @unique
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  cityId String? @unique
+  city City? @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  // Sorted "profileA:profileB" for DIRECT conversations, to keep them unique.
+  directKey String? @unique
+  members ConversationMember[]
+  messages Message[]
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+}
+model ConversationMember {
+  conversationId String
+  profileId String
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  admin Boolean @default(false)
+  // DIRECT conversations from strangers stay pending until accepted.
+  accepted Boolean @default(true)
+  lastReadAt DateTime? @db.Timestamptz(3)
+  joinedAt DateTime @default(now()) @db.Timestamptz(3)
+  @@id([conversationId, profileId])
+  @@index([profileId])
+}
+model Message {
+  id String @id @default(cuid())
+  conversationId String
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderProfileId String
+  sender Profile @relation(fields: [senderProfileId], references: [id], onDelete: Cascade)
+  body String
+  hiddenAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([conversationId, createdAt])
+}
+model ImportSource {
+  id String @id @default(cuid())
+  kind ImportKind
+  url String @unique
+  name String
+  cityId String?
+  city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  // News sources feed NewsItem; event sources feed ImportedItem and Event.
+  news Boolean @default(false)
+  enabled Boolean @default(true)
+  lastRunAt DateTime? @db.Timestamptz(3)
+  lastStatus String?
+  items ImportedItem[]
+  newsItems NewsItem[]
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+model ImportedItem {
+  id String @id @default(cuid())
+  sourceId String
+  source ImportSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  externalId String
+  dedupeKey String?
+  status ImportStatus @default(PENDING)
+  payload Json
+  eventId String?
+  event Event? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  note String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([sourceId, externalId])
+  @@index([status, createdAt])
+  @@index([dedupeKey])
+}
+model NewsItem {
+  id String @id @default(cuid())
+  sourceId String
+  source ImportSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  url String @unique
+  title String
+  summary String?
+  cityId String?
+  city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  publishedAt DateTime @db.Timestamptz(3)
+  hiddenAt DateTime? @db.Timestamptz(3)
+  @@index([cityId, publishedAt])
+}
+model TelegramChat {
+  chatId String @id
+  userId String? @unique
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  cityId String?
+  locale String @default("en")
+  notify Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model User {
@@ -266,11 +616,22 @@ model User {
   image String?
   ageConfirmed Boolean @default(false)
   locale String @default("en")
+  role UserRole @default(USER)
+  bannedAt DateTime? @db.Timestamptz(3)
+  banReason String?
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
   sessions Session[]
   accounts Account[]
   profile Profile?
+  follows Follow[]
+  claims ProfileClaim[]
+  reports Report[]
+  consents ConsentLog[]
+  notifications Notification[]
+  notificationPreference NotificationPreference?
+  pushSubscriptions PushSubscription[]
+  telegram TelegramChat?
 }
 model Session {
   id String @id

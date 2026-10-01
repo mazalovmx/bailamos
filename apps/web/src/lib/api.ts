@@ -10,7 +10,17 @@ export async function actor(request: Request) {
   const session = await auth.api.getSession({headers: request.headers});
   if (!session) throw new ApiError('UNAUTHORIZED', 401);
   if (!session.user.emailVerified) throw new ApiError('VERIFY_EMAIL', 403);
-  return {...session.user, profile: await db.profile.findUnique({where: {userId: session.user.id}})};
+  const account = await db.user.findUnique({where: {id: session.user.id}, select: {role: true, bannedAt: true, profile: true}});
+  // A banned user keeps read access but loses every mutation: publications, RSVP, chat.
+  if (!account || account.bannedAt) throw new ApiError('BANNED', 403);
+  return {...session.user, role: account.role, profile: account.profile};
+}
+// Reads the signed-in user for GET handlers, where a cross-site Origin header is not sent.
+export async function viewer(request: Request) {
+  const session = await auth.api.getSession({headers: request.headers});
+  if (!session) return null;
+  const account = await db.user.findUnique({where: {id: session.user.id}, select: {role: true, bannedAt: true, profile: true}});
+  return account ? {...session.user, role: account.role, bannedAt: account.bannedAt, profile: account.profile} : null;
 }
 export async function jsonBody(request: Request) {
   const text = await request.text();
