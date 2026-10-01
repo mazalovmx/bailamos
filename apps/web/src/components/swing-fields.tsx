@@ -2,8 +2,9 @@
 import {useState} from 'react';
 import {useTranslations} from 'next-intl';
 import {eventKinds,danceFormats,classLevels,intensities,tempos} from '../lib/swing';
+// Classification of a class or party. Dates and repetition live in events/schedule-fields.
 export function SwingFields({initial,tags,selectedTags}:{initial:Record<string,string>;tags:{id:string;name:string}[];selectedTags:string[]}) {
-  const t=useTranslations('App'),[format,setFormat]=useState(initial.format||'PARTNER'),[weekly,setWeekly]=useState(Number(initial.recurrenceWeeks)>1);
+  const t=useTranslations('App'),[format,setFormat]=useState(initial.format||'PARTNER');
   function options(name:string,label:string,prefix:string,items:readonly string[],fallback:string) {
     return <label>{t(label)}<select name={name} defaultValue={initial[name]||fallback}>{items.map(value=><option key={value} value={value}>{t(prefix+value)}</option>)}</select></label>;
   }
@@ -19,8 +20,5 @@ export function SwingFields({initial,tags,selectedTags}:{initial:Record<string,s
     <p className="field-note">{t('partnerHint')}</p>
     <label>{t('prerequisites')}<textarea name="prerequisites" defaultValue={initial.prerequisites} rows={3} maxLength={1000}/><small>{t('prerequisitesHint')}</small></label>
     <fieldset className="tag-picker"><legend>{t('topics')}</legend>{tags.map(tag=><label className="checkbox" key={tag.id}><input type="checkbox" name="tagIds" value={tag.id} defaultChecked={selectedTags.includes(tag.id)}/>{t.has('tag_'+tag.id)?t('tag_'+tag.id):tag.name}</label>)}</fieldset>
-    <div className="form-grid"><label>{t('schedule')}<select value={weekly?'WEEKLY':'ONCE'} onChange={e=>setWeekly(e.target.value==='WEEKLY')}><option value="ONCE">{t('ONCE')}</option><option value="WEEKLY">{t('WEEKLY')}</option></select></label>
-    {weekly?<label>{t('repeatWeeks')}<input name="recurrenceWeeks" type="number" min={2} max={52} required defaultValue={Number(initial.recurrenceWeeks)>1?initial.recurrenceWeeks:'8'}/></label>:<input type="hidden" name="recurrenceWeeks" value="1"/>}</div>
-    {weekly&&<p className="field-note">{t('repeatHint')}</p>}
   </>;
 }

@@ -1,16 +1,14 @@
-# Dance Community
+# Bailamos — Dance Community
 
-Рабочая локальная версия сообщества свинга и линди-хопа. Есть аккаунты, профили, афиша, события и регулярные классы. Это ещё не полный MVP из ТЗ.
+A multilingual social dance platform focused on swing, Lindy Hop and solo jazz. English is the default language, with Spanish and Russian available through the visible language switch.
 
-## Требования
+Repository: [mazalovmx/bailamos](https://github.com/mazalovmx/bailamos). See [implementation status](docs/implementation.md) for the epic audit. Source code, locally tested functionality and production acceptance are tracked separately.
 
-Node.js 22.18+, pnpm 10.15.1, Docker с Linux-контейнерами (на Windows — Docker Desktop).
+## Requirements and local setup
 
-## Первый запуск
+Node.js 22.18+, pnpm 10.15.1 and Docker with Linux containers (Docker Desktop on Windows). Run from the repository root:
 
-Из корня проекта:
-
-```powershell
+```sh
 pnpm install --frozen-lockfile
 node scripts/setup.mjs
 pnpm infra:up
@@ -20,70 +18,62 @@ pnpm db:seed
 pnpm dev
 ```
 
-- Веб: http://localhost:3000/ru — русский, http://localhost:3000/es — испанский, http://localhost:3000/en — английский.
-- Основа Refine-панели: http://localhost:3001 (пока без доступа к данным и без административных действий).
-- Проверка процесса: http://localhost:3000/api/health (liveness, не проверяет БД).
-- Postgres: localhost:54329; Redis: localhost:63799. Пароли в локальном `.env`.
-- Локальные письма подтверждения и сброса пароля: http://localhost:8025 (Mailpit). Письма наружу не отправляются.
-- `node scripts/setup.mjs` создаёт случайные локальные секреты и добавляет недостающие параметры, сохраняя существующие значения.
-- `pnpm infra:down` останавливает контейнеры, сохраняя данные в Docker volumes.
+- Web: http://localhost:3000/en, http://localhost:3000/es, http://localhost:3000/ru.
+- Admin: http://localhost:3001. Access requires an authorized account and administrative role.
+- Process health: http://localhost:3000/api/health (liveness, not a database check).
+- PostgreSQL/PostGIS: localhost:54329; Redis: localhost:63799. Credentials live in local `.env`.
+- Development email inbox: http://localhost:8025 (Mailpit). Local verification/recovery messages are intercepted rather than sent externally.
+- `scripts/setup.mjs` generates local secrets and fills missing settings while preserving existing values.
+- `pnpm infra:down` stops containers without deleting Docker volumes.
 
-Английский выбран языком по умолчанию: корневой маршрут открывает /en независимо от языка браузера. Переключатель EN / ES / RU виден на всех страницах и сохраняет текущий раздел. Seed содержит свинговые направления и подстили, тематические теги, Мехико, Мадрид и Москву. Это стартовый справочник, а не выбор города запуска.
+The root URL opens /en regardless of browser language. The language switch preserves the current section and query. Use localhost:3000, matching BETTER_AUTH_URL, to test authentication.
 
-## Что уже работает
+## Application areas
 
-- Регистрация 16+, подтверждение почты, вход, выход и сброс пароля через Better Auth. Ограничение частоты запросов хранится в БД.
-- Публичный профиль, город, основной стиль, роль и уровень. Текущая форма поддерживает один основной навык.
-- Создание, редактирование, публикация и отмена своих событий. CASL проверяет права организатора; черновики скрыты от остальных.
-- Классы, воркшопы, мастер-классы, интенсивы, практики, вечеринки и фестивали.
-- Соло/парный/смешанный формат, уровень, физическая нагрузка и темп музыки — отдельные поля.
-- Теги, требования к навыкам и признак необходимости своего партнёра.
-- Еженедельные серии из 2–52 занятий, реальные даты в БД, сохранение местного времени при DST. Изменение серии применяется ко всем датам. RSVP относится к серии целиком.
-- Афиша по датам с комбинируемыми фильтрами и пагинацией. Фильтр Swing включает его подстили.
-- «Иду / Интересно», смена и снятие отметки без дублирования счётчиков.
+The original verified baseline includes accounts, email verification, profiles, event CRUD, recurring classes, RSVP, multi-select discovery, a photographic homepage and PNG announcement export.
 
-Для проверки: откройте /en/register, зарегистрируйтесь, подтвердите письмо в Mailpit, заполните профиль и создайте событие. Предпросмотр работает через localhost:3000 — этот origin задан в BETTER_AUTH_URL.
+The current feature branch adds onboarding, multiple dance skills, a larger catalogue, venues, maps, calendars/iCal feeds, media, blogs, moderation, notifications, partner matching, chat, courses and event imports. See the epic audit for integration checks and external dependencies; a route's presence does not make the production integration complete.
 
-## Проверки
+To exercise the basic workflow, register at /en/register, verify the email in Mailpit, complete a profile, create an event and publish it. Seed data populates reference catalogues, not a fictitious public programme.
 
-```powershell
+## Checks
+
+```sh
 pnpm lint
 pnpm typecheck
 pnpm test
 pnpm --filter @dance/db test:integration
 pnpm build
-# При запущенных web, PostgreSQL и Mailpit:
+# With web, PostgreSQL and Mailpit running:
 pnpm --filter @dance/web test:e2e
 ```
 
-Тесты проверяют PostGIS, CASL, временные зоны и DST, перевод всех экранов, свинговые фильтры и сквозной путь двух пользователей. E2E создаёт временные аккаунты и события и удаляет их после проверки. GitHub Actions запускает проверки с отдельными PostgreSQL и Mailpit.
+Tests cover PostGIS, access control, time zones/DST, translations and feature modules, including the admin suite. The HTTP workflow creates temporary users/events and removes them afterward. GitHub Actions runs against isolated PostgreSQL, Redis and Mailpit.
 
-На Windows перед `pnpm db:generate` / `pnpm build` остановите web-сервер: запущенный Prisma может удерживать DLL и вызвать EPERM. Для повторной сборки только web используйте `pnpm --filter @dance/web build`.
+On Windows, stop web/admin processes before regenerating Prisma or running pnpm build: the Prisma DLL may be locked. When the generated client is current, pnpm -r build builds both applications without regeneration.
 
-## Структура
+## Structure and documentation
 
-- `apps/web` — Next.js 15 / React 19, next-intl, Better Auth, CASL, формы, афиша, manifest.
-- `apps/admin` — Next.js / Refine, основа будущей админ-панели.
-- `packages/db` — Prisma Client, доменная схема, SQL-миграции, начальные данные.
-- `compose.yaml` — локальная инфраструктура.
-- `docs/implementation.md` — решения, ограничения и следующие шаги.
-- `docs/swing-model.md` — модель свинговых занятий и источники.
+- `apps/web` — Next.js/React, next-intl, Better Auth, CASL, public UI/API and worker.
+- `apps/admin` — Next.js/Refine administration.
+- `packages/db` — Prisma, migrations, catalogues and database utilities.
+- `compose.yaml` — local infrastructure.
+- [Implementation and epic status](docs/implementation.md)
+- [Requirements in English](docs/requirements.md)
+- [Swing class model](docs/swing-model.md)
+- [Cities, styles and catalogue APIs](docs/catalogue.md)
+- [Photographs and announcement export](docs/community-photos.md)
+- [Git branches and Railway](docs/deployment.md)
+- [Background worker and readiness](docs/worker.md)
 
-## Хранилище медиа
+The original Russian requirements document is retained at the repository root as source material. Subsequent owner decisions override it: English by default, a swing/Lindy Hop focus, multi-select discovery filters and Railway releases from deploy.
 
-MinIO из ТЗ оставлен в **необязательном профиле `storage`**. Его публичные образы не удалось скачать: Docker Hub отказал в доступе, Quay вернул 401. Обычный `pnpm infra:up` запускает Postgres, Redis и Mailpit. Загрузка медиа пока не реализована.
+## Media and infrastructure
 
-Репозиторий MinIO архивирован: https://github.com/minio/minio. Перед E7 необходимо выбрать поддерживаемое S3-совместимое хранилище либо отдельно подготовить проверенную сборку. Не использовать эту конфигурацию MinIO в production без пересмотра.
+The supplied images are installed on the homepage; originals remain in images/. Announcement photos are processed in the browser. The separate media module includes local/S3 adapters; persistent production storage must be configured and tested.
 
-## Что дальше
+MinIO remains an optional Compose storage profile: its original registry downloads failed. Standard infra:up starts PostGIS, Redis and Mailpit. Select a maintained S3-compatible deployment before accepting the production media epic.
 
-Далее: площадки и адреса, карта и календарь, экспорт iCal, исключения из расписания, приглашения соорганизаторов, медиа и модерация. Google OAuth и magic link, экспорт/удаление аккаунта, несколько навыков профиля и полная админ-панель пока не реализованы.
+The promotion path is experiments → stable → deploy. Railway configuration is versioned, but services, PostGIS, SMTP, domains, backups and monitoring still require deployment setup. Additional integrations need their runtime credentials/services. The web Railway config does not automatically deploy admin or workers.
 
-Офлайн-режим, push и чат пока отсутствуют. Manifest — лишь начало PWA. Текущая админ-страница — русскоязычная техническая заглушка, её рабочие экраны также должны получить ru/es/en.
-
-Репозиторий: [mazalovmx/bailamos](https://github.com/mazalovmx/bailamos). Ветки `experiments`, `stable`, `deploy`; настройки запуска Railway и порядок подключения описаны в [docs/deployment.md](docs/deployment.md). Production-сервис, БД с PostGIS, SMTP, домен, бэкапы и мониторинг требуют отдельной настройки. Локальная конфигурация не предназначена для публичного развёртывания.
-# Обновление главной и объявлений
-
-Главная страница содержит разделы для свингового сообщества; каталог находится в `/en/events`. Фильтры каталога поддерживают мультивыбор. В `/en/share` доступен редактор объявления с локальной фотографией, экспортом PNG и системным меню отправки. Та же студия открывается на опубликованном событии с выбранной датой. Интерфейс переведён на английский, русский и испанский.
-
-На главной размещены фотографии пользователя из папки `images/`, с сохранением пропорций на мобильном экране. [Соответствие фотографий разделам и промпты для будущих вариантов](docs/community-photos.md).
+Ticket sales, payments, video hosting, federation and native app-store wrappers are outside this iteration.

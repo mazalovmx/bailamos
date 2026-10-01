@@ -1,0 +1,15 @@
+<!doctype html>
+<html><head>
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@graph": [
+  {"@type": "WebSite", "name": "Agenda", "url": "https://agenda.example.com/"},
+  {"@type": ["Event", "SocialEvent"], "name": "Tea dance", "startDate": "2099-04-20T17:00", "url": "https://agenda.example.com/tea",
+   "location": [{"@type": "VirtualLocation", "url": "https://stream.example"}, {"@type": "Place", "name": "Hotel Ritz", "address": "Plaza de la Lealtad 5, Madrid"}]},
+  {"@type": "ItemList", "itemListElement": [
+    {"@type": "ListItem", "position": 1, "item": {"@type": "Festival", "name": "Spring Festival", "startDate": "2099-05-01", "endDate": "2099-05-03", "location": "Barcelona"}},
+    {"@type": "ListItem", "position": 2, "item": {"@type": "MusicEvent", "name": "Cancelled concert", "startDate": "2099-05-04T20:00:00Z", "eventStatus": "https://schema.org/EventCancelled"}}
+  ]},
+  {"@type": "Organization", "name": "Not an event"}
+]}
+</script>
+</head><body></body></html>

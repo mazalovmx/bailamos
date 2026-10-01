@@ -7,6 +7,12 @@ import {eventSearch} from '../src/lib/event-search';
 import {queryParams} from '../src/lib/search-query';
 import {additionalCities,additionalStyles} from '../../../packages/db/prisma/catalogue-additions';
 import {DateTime} from 'luxon';
+import {workerHeartbeat} from '../src/worker/health';
+test('worker readiness rejects missing, malformed, stale and future heartbeats',()=>{
+  const now=Date.parse('2026-10-01T12:00:00Z');
+  for(const raw of [null,'broken','null','{}','{"at":42}',JSON.stringify({at:'invalid'}),JSON.stringify({at:'2026-10-01T11:58:30Z'}),JSON.stringify({at:'2026-10-01T12:01:00Z'})])assert.deepEqual(workerHeartbeat(raw,now),{status:'down'});
+  assert.deepEqual(workerHeartbeat(JSON.stringify({at:'2026-10-01T11:59:40Z'}),now),{status:'ok',at:'2026-10-01T11:59:40.000Z'});
+});
 test('only this event owner and co-organizer can manage it',()=>{
   const members=[{profileId:'owner',role:'OWNER'},{profileId:'co',role:'CO_ORGANIZER'},{profileId:'guest',role:'ATTENDEE'}];
   assert.equal(eventAbility('owner',members).can('manage','Event'),true);

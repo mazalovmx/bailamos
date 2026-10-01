@@ -1,22 +1,26 @@
-# Фотографии для главной страницы
+# Community photographs and announcement export
 
-На главной установлены изображения, предоставленные пользователем в папке `images/`. Оригиналы сохранены без изменений. Публичные копии находятся в `apps/web/public/images/community/`; соответствие разделам задано в `apps/web/src/components/community-photo.tsx`. Next Image выдаёт адаптивные версии для экрана, первый кадр загружается приоритетно, остальные — лениво. Контейнеры сохраняют исходные пропорции фотографий на телефоне и компьютере.
+## Installed photographs
 
-| Раздел | Исходник в images | Публичная копия |
+The homepage uses user-supplied images from images/. Originals are unchanged. Public copies live in apps/web/public/images/community/, with the section mapping in apps/web/src/components/community-photo.tsx. Next Image serves responsive versions: the hero is prioritized, other images load lazily, and containers preserve source proportions on desktop and mobile.
+
+| Section | Original file in images/ | Public copy |
 | --- | --- | --- |
-| Первый экран | 1950s Swing Dance Hall Jubilee.png | hero.png |
-| Регулярные занятия | Midcentury Swing Dance Hall.png | classes.png |
-| Соло-джаз и воркшопы | Vintage Swing Dance Lesson.png | lesson.png |
-| Линди-хоп | Swing Dance in the Park.png | lindy-hop.png |
-| Вечеринки | Swing Night at the Jazz Club.png | social.png |
+| Hero | 1950s Swing Dance Hall Jubilee.png | hero.png |
+| Regular classes | Midcentury Swing Dance Hall.png | classes.png |
+| Solo jazz and workshops | Vintage Swing Dance Lesson.png | lesson.png |
+| Lindy Hop | Swing Dance in the Park.png | lindy-hop.png |
+| Socials | Swing Night at the Jazz Club.png | social.png |
 
-Урок используется в двух разделах, поскольку на нём показана демонстрация сольного шага группе. Дубликат `Vintage Swing Dance Lesson (1).png` и остальные варианты оставлены в исходной папке. Описания изображений для экранных дикторов переведены на три языка. Для замены кадра обновите публичный файл и его пропорции/описание в компоненте; затем пересоберите сайт.
+The lesson image appears twice because it demonstrates a solo step to a group. The duplicate Vintage Swing Dance Lesson (1).png and other alternatives remain in the source folder. Screen-reader descriptions are available in all three languages. To replace an image, update its public file and component proportions/description, then rebuild.
 
-Ниже сохранены первоначальные промпты для будущих вариантов фотографий. Имена JPG из этой таблицы — предложения для генерации, а не действующее автоматическое сопоставление файлов.
+## Prompts for future alternatives
 
-Общий стиль для всех промптов: realistic editorial dance photography, contemporary welcoming swing community, diverse adult dancers, warm natural light, subtle film grain, sage green and warm cream palette, natural candid expressions, anatomically correct hands and feet, authentic grounded swing dance posture, no acrobatics, no text, no logos, no watermark. These are illustrative community images, not photos of an advertised real event.
+The following JPG names are suggestions, not the active automatic file mapping.
 
-| Имя файла | Размер | Сюжет — добавьте к общему промпту |
+Shared style: realistic editorial dance photography, contemporary welcoming swing community, diverse adult dancers, warm natural light, subtle film grain, sage green and warm cream palette, natural candid expressions, anatomically correct hands and feet, authentic grounded swing dance posture, no acrobatics, no text, no logos, no watermark. These are illustrative community images, not photographs of an advertised real event.
+
+| File | Size | Add to the shared prompt |
 | --- | --- | --- |
 | hero.jpg | 1600 × 2000 | A joyful adult couple dancing Lindy Hop in an airy wooden-floor dance hall, full bodies visible, relaxed bent knees, clear partner connection, a few softly blurred dancers behind them, main couple centered with generous space around them. |
 | classes.jpg | 1600 × 1200 | A small friendly weekly beginner swing class, an adult teacher explaining a simple step to a semicircle of adult students, full bodies, bright neighbourhood studio, candid learning moment. |
@@ -25,16 +29,20 @@
 | workshops.jpg | 1800 × 1100 | An adult swing teacher demonstrating footwork during a focused workshop, small group of attentive adult participants, inclusive modern studio, full bodies, documentary composition. |
 | social.jpg | 1800 × 1100 | A warm evening swing social with several adult couples dancing, small jazz band softly visible behind them, amber lighting, inviting community atmosphere, no staged crowd facing camera. |
 
-Для первых результатов достаточно `hero.jpg`, `solo-jazz.jpg` и `social.jpg`. Не добавляйте текст в изображения — заголовки переводятся на сайте. Для мобильного кадрирования оставьте около 15% свободного пространства по краям. Перед использованием проверьте анатомию и правдоподобие танцевальных поз.
+For an initial replacement set, prioritize hero.jpg, solo-jazz.jpg and social.jpg. Do not put text in images: website headings are translated independently. Leave about 15% breathing room around the edges for alternative crops, and inspect anatomy and plausible dance posture before use.
 
-# Экспорт объявлений
+## Announcement studio
 
-В редакторе есть быстрые переходы «Редактировать объявление» / «Предпросмотр и сохранение». На телефоне они закреплены сверху. После загрузки фото ползунок «Положение фото» позволяет изменить вертикальное кадрирование; размер и положение проверяются прямо в предпросмотре. Пустые поля не резервируют отдельные области на изображении.
+/en/share, /es/share and /ru/share open a freeform announcement editor. Published event pages offer Share this event, prefilled with the selected date and a link in the caption.
 
-`/en/share`, `/ru/share`, `/es/share` — редактор произвольного объявления. На опубликованном событии есть раздел «Поделиться событием» с выбранной датой и ссылкой в подписи. Фотография загружается только в браузер, не отправляется на сервер. Результат: PNG 1080×1350, 1080×1920 или 1080×1080. Формат выбирается один, поскольку это размер одного экспортируемого файла.
+Edit announcement / Preview & save links stay accessible on mobile. The Photo position slider adjusts vertical cropping after upload. The preview reflects export size and position. Empty text fields no longer reserve separate image blocks.
 
-Кнопка «Поделиться изображением» открывает системное меню только по действию пользователя. Наличие Instagram/WhatsApp в нём зависит от устройства и установленных приложений. Запасной способ: сохранить PNG, прикрепить вручную и скопировать подпись. Автопубликации и подключения аккаунтов нет. Возможности Web Share проверяются через `navigator.canShare`, см. [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share). Для размещённого сайта нужен HTTPS. Изображение не содержит активной ссылки; ссылка копируется отдельно в подписи.
+Photos stay in the browser and are not uploaded by this studio. PNG outputs are 1080×1350 (post), 1080×1920 (story/status) and 1080×1080 (square). Only one size is selected because each export is one file.
 
-Фильтры каталога допускают несколько городов, направлений, типов, уровней, форматов, интенсивностей, темпов и тегов. Внутри группы — любой вариант (OR), между группами — совместное условие (AND). Повторяющиеся URL-параметры сохраняются при пагинации и переключении языка. В формах создания события поля с единственным значением (например, город проведения) остаются одиночными.
+Share image opens the device share sheet following a user action. Available Instagram/WhatsApp targets depend on the device/apps. The fallback is to save the PNG, attach it manually and copy the caption. No automatic posting or social-account connection is performed. Feature detection uses navigator.canShare; public deployments require HTTPS. The bitmap has no clickable URL: the link is copied separately in the caption. [MDN Web Share](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share).
 
-Каждая группа фильтров содержит кнопки «Выбрать всё» и «Очистить выбор». Изменения вступают в силу после применения фильтров. На мобильном кнопки применения и полного сброса закрепляются у нижнего края области фильтров при прокрутке.
+## Mobile discovery controls
+
+City, style, event type, level, format, intensity, tempo and tag filters support multiple values. Matching uses OR within a group and AND across groups. Repeated query parameters survive pagination and locale switching. Event creation retains singular domain fields, such as one host city.
+
+Each group offers Select all / Clear selection; when an internal search is active, Select matching options adds only matching choices. Applying submits the filters. On mobile, apply/reset controls remain at the bottom of the filter area while scrolling.

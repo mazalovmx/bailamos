@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Balboa Blog</title>
+  <link href="https://blog.example.net/"/>
+  <updated>2026-09-20T12:00:00Z</updated>
+  <id>urn:uuid:60a76c80-d399-11d9-b93C-0003939e0af6</id>
+  <entry>
+    <title type="html">Pure Bal &amp;amp; friends</title>
+    <link rel="alternate" href="https://blog.example.net/pure-bal"/>
+    <id>urn:uuid:1225c695-cfb8-4ebb-aaaa-80da344efa6a</id>
+    <updated>2026-09-20T12:00:00Z</updated>
+    <summary type="html">&lt;p&gt;Why &lt;em&gt;pure&lt;/em&gt; balboa matters.&lt;/p&gt;</summary>
+  </entry>
+  <entry>
+    <title>Second entry</title>
+    <link href="https://blog.example.net/second"/>
+    <id>urn:uuid:1225c695-cfb8-4ebb-aaaa-80da344efa6b</id>
+    <updated>2026-09-18T08:00:00+02:00</updated>
+    <content type="html">&lt;div&gt;Body &lt;iframe src="https://evil.example"&gt;&lt;/iframe&gt;text&lt;/div&gt;</content>
+  </entry>
+</feed>
