@@ -158,6 +158,7 @@ model Profile {
   skills DanceSkill[]
   memberships EventMembership[]
   rsvps Rsvp[]
+  occurrenceRsvps OccurrenceRsvp[]
   posts Post[]
   uploads MediaItem[]
   claims ProfileClaim[]
@@ -190,6 +191,8 @@ model City {
   id String @id @default(cuid())
   slug String @unique
   name String
+  // Localized names keyed by locale (en, es, ru); `name` is the fallback.
+  names Json?
   countryCode String @db.Char(2)
   timezone String
   lat Float
@@ -323,7 +326,10 @@ model EventOccurrence {
   startsAt DateTime @db.Timestamptz(3)
   endsAt DateTime? @db.Timestamptz(3)
   cancelled Boolean @default(false)
+  // Set when a single date was moved: the start the series had originally scheduled for it.
+  originalStartsAt DateTime? @db.Timestamptz(3)
   reminderSentAt DateTime? @db.Timestamptz(3)
+  rsvps OccurrenceRsvp[]
   @@unique([eventId, startsAt])
   @@index([startsAt])
 }
@@ -361,6 +367,17 @@ model Rsvp {
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
   @@id([eventId, profileId])
+  @@index([profileId])
+}
+// An answer for one date of a series; it overrides the series-wide Rsvp for that date only.
+model OccurrenceRsvp {
+  occurrenceId String
+  profileId String
+  status RsvpStatus
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  occurrence EventOccurrence @relation(fields: [occurrenceId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  @@id([occurrenceId, profileId])
   @@index([profileId])
 }
 model Post {
@@ -577,6 +594,10 @@ model Message {
   senderProfileId String
   sender Profile @relation(fields: [senderProfileId], references: [id], onDelete: Cascade)
   body String
+  // One optional image: a processed storage key from the media pipeline.
+  attachmentKey String?
+  editedAt DateTime? @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3)
   hiddenAt DateTime? @db.Timestamptz(3)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@index([conversationId, createdAt])
