@@ -78,5 +78,11 @@
   "type_MODERATION": "Mensaje de moderación",
   "body_MODERATION": "Un moderador ha tomado medidas sobre tu contenido.",
   "mailOpen": "Abrir en Dance Community",
-  "mailFooter": "Recibes este correo por tu actividad en Dance Community. Puedes desactivar los correos sobre eventos en tus ajustes: {url}"
+  "mailFooter": "Recibes este correo por tu actividad en Dance Community. Puedes desactivar los correos sobre eventos en tus ajustes: {url}",
+  "telegramTitle": "Telegram",
+  "telegramHint": "Busca eventos y recibe recordatorios en Telegram sin abrir el sitio.",
+  "telegramConnect": "Conectar Telegram",
+  "telegramConnected": "Telegram está conectado.",
+  "telegramDisconnect": "Desconectar Telegram",
+  "telegramFailed": "No se pudo contactar con Telegram. Inténtalo de nuevo."
 }

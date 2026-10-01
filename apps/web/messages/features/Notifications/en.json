@@ -78,5 +78,11 @@
   "type_MODERATION": "Message from the moderators",
   "body_MODERATION": "A moderator took action on your content.",
   "mailOpen": "Open on Dance Community",
-  "mailFooter": "You receive this email because of your activity on Dance Community. You can switch event emails off in your settings: {url}"
+  "mailFooter": "You receive this email because of your activity on Dance Community. You can switch event emails off in your settings: {url}",
+  "telegramTitle": "Telegram",
+  "telegramHint": "Search events and get reminders in Telegram without opening the site.",
+  "telegramConnect": "Connect Telegram",
+  "telegramConnected": "Telegram is connected.",
+  "telegramDisconnect": "Disconnect Telegram",
+  "telegramFailed": "Could not reach Telegram. Please try again."
 }

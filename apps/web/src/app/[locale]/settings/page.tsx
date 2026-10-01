@@ -6,6 +6,7 @@ import {currentUser} from '../../../lib/session';
 import {googleEnabled} from '../../../lib/auth';
 import {DeleteAccount} from '../../../components/account/delete-account';
 import {NotificationPreferencesSection} from '../../../components/notifications/preferences-section';
+import {TelegramLink} from '../../../components/notifications/telegram-link';
 import '../../styles/account.css';
 export async function generateMetadata() {
   const t = await getTranslations('Account');
@@ -30,6 +31,7 @@ export default async function Settings({params}: {params: Promise<{locale: strin
       {hasPassword && <p><Link href={'/' + locale + '/forgot-password'}>{t('changePassword')}</Link></p>}
     </section>
     <NotificationPreferencesSection userId={user.id}/>
+    <TelegramLink/>
     <section className="account-section" aria-labelledby="consents-title"><h2 id="consents-title">{t('consentsTitle')}</h2>
       {consents.length ? <ul className="account-list">{consents.map(c => <li key={c.id}>
         {t.has('consent_' + c.kind) ? t('consent_' + c.kind) : c.kind} · {t(c.granted ? 'consentGranted' : 'consentWithdrawn')} · {date.format(c.createdAt)}{c.version ? ' · ' + t('policyVersion', {version: c.version}) : ''}</li>)}</ul> :

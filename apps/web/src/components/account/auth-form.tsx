@@ -6,11 +6,13 @@ import Link from 'next/link';
 import {send, useErrorText, useStatus} from './shared';
 import '../../app/styles/account.css';
 type Mode = 'login' | 'register' | 'forgot' | 'reset';
-export function AuthForm({mode, token, google = false, initialError}: {mode: Mode; token?: string; google?: boolean; initialError?: string}) {
+export function AuthForm({mode, token, google = false, initialError, next}: {mode: Mode; token?: string; google?: boolean; initialError?: string; next?: string}) {
   const t = useTranslations('Account'), app = useTranslations('App'), locale = useLocale(), router = useRouter(), s = useStatus(), errorText = useErrorText();
   const [done, setDone] = useState<'' | 'register' | 'forgot' | 'reset' | 'magic'>('');
   const [magic, setMagic] = useState(false);
   const home = '/' + locale;
+  // Where a successful sign-in lands: the page that asked for it (validated on the server), else the profile.
+  const after = next || home + '/profile';
   const title = {login: 'loginTitle', register: 'registerTitle', forgot: 'forgotTitle', reset: 'resetTitle'}[mode];
   const doneText = {register: app('checkEmail'), forgot: app('resetSent'), reset: app('passwordSaved'), magic: t('magicSent')};
   const usePassword = mode === 'register' || mode === 'reset' || (mode === 'login' && !magic);
@@ -19,12 +21,12 @@ export function AuthForm({mode, token, google = false, initialError}: {mode: Mod
     if (mode === 'register') await send('/api/auth/sign-up/email', 'POST', {name: data.name, email: data.email, password: data.password,
       ageConfirmed: data.consent === 'on', locale, callbackURL: origin + home + '/onboarding'});
     if (mode === 'login' && magic) {
-      await send('/api/auth/sign-in/magic-link', 'POST', {email: data.email, callbackURL: origin + home + '/profile', errorCallbackURL: origin + home + '/login'});
+      await send('/api/auth/sign-in/magic-link', 'POST', {email: data.email, callbackURL: origin + after, errorCallbackURL: origin + home + '/login'});
       setDone('magic'); return;
     }
     if (mode === 'login') {
       await send('/api/auth/sign-in/email', 'POST', {email: data.email, password: data.password});
-      router.push(home + '/profile'); router.refresh(); return;
+      router.push(after); router.refresh(); return;
     }
     if (mode === 'forgot') await send('/api/auth/request-password-reset', 'POST', {email: data.email, redirectTo: origin + home + '/reset-password'});
     if (mode === 'reset') await send('/api/auth/reset-password', 'POST', {newPassword: data.password, token});
@@ -32,7 +34,7 @@ export function AuthForm({mode, token, google = false, initialError}: {mode: Mod
   }
   async function withGoogle() {
     const origin = window.location.origin;
-    const result = await send('/api/auth/sign-in/social', 'POST', {provider: 'google', callbackURL: origin + home + '/profile',
+    const result = await send('/api/auth/sign-in/social', 'POST', {provider: 'google', callbackURL: origin + after,
       newUserCallbackURL: origin + home + '/onboarding', errorCallbackURL: origin + home + '/login'});
     if (typeof result.url === 'string') window.location.assign(result.url);
   }

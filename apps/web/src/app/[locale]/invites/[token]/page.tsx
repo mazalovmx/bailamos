@@ -11,7 +11,7 @@ export default async function InvitePage({params}:{params:Promise<{locale:string
   const user=await currentUser();
   const page=(body:React.ReactNode)=><main className="form-page narrow"><p className="eyebrow">{x('inviteEyebrow')}</p><h1>{x('inviteTitle')}</h1>{body}</main>;
   // Nothing about the invitation is shown before sign-in: the link alone proves nothing.
-  if(!user) return page(<><p className="intro">{x('inviteSignIn')}</p><Link className="button" href={'/'+locale+'/login'}>{t('signIn')}</Link>
+  if(!user) return page(<><p className="intro">{x('inviteSignIn')}</p><Link className="button" href={'/'+locale+'/login?next='+encodeURIComponent('/'+locale+'/invites/'+token)}>{t('signIn')}</Link>
     <p className="field-note">{x('inviteSignInHint')}</p></>);
   const invite=await findInvite(token);
   if(!invite||inviteState(invite)!=='PENDING') return page(<p className="notice" role="status">{x('error_INVITE_INVALID')}</p>);

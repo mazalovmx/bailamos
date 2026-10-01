@@ -78,5 +78,11 @@
   "type_MODERATION": "Сообщение от модераторов",
   "body_MODERATION": "Модератор принял меры в отношении вашего контента.",
   "mailOpen": "Открыть в Dance Community",
-  "mailFooter": "Вы получили это письмо из-за вашей активности в Dance Community. Отключить письма о событиях можно в настройках: {url}"
+  "mailFooter": "Вы получили это письмо из-за вашей активности в Dance Community. Отключить письма о событиях можно в настройках: {url}",
+  "telegramTitle": "Telegram",
+  "telegramHint": "Ищите события и получайте напоминания в Telegram, не заходя на сайт.",
+  "telegramConnect": "Подключить Telegram",
+  "telegramConnected": "Telegram подключён.",
+  "telegramDisconnect": "Отключить Telegram",
+  "telegramFailed": "Не удалось связаться с Telegram. Попробуйте ещё раз."
 }
