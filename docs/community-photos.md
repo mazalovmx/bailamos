@@ -10,11 +10,12 @@ Regenerate variants after changing the PNG sources: `node apps/web/scripts/prepa
 | --- | --- | --- |
 | Hero | 1950s Swing Dance Hall Jubilee.png | hero.png |
 | Regular classes | Midcentury Swing Dance Hall.png | classes.png |
-| Solo jazz and workshops | Vintage Swing Dance Lesson.png | lesson.png |
+| Solo jazz | 5356bd50-2311-4eb5-af38-c1502e585443.png | solo-jazz.png |
+| Workshops | Vintage Swing Dance Lesson.png | lesson.png |
 | Lindy Hop | Swing Dance in the Park.png | lindy-hop.png |
 | Socials | Swing Night at the Jazz Club.png | social.png |
 
-The lesson image appears twice because it demonstrates a solo step to a group. The duplicate Vintage Swing Dance Lesson (1).png and other alternatives remain in the source folder. Screen-reader descriptions are available in all three languages. To replace an image, update its public file and component proportions/description, then rebuild.
+Every section has its own image. The duplicate Vintage Swing Dance Lesson (1).png and the two street scenes remain unused in the source folder. Frames have fixed proportions set in home-actions.css and the images are cropped to fill them, so a tall source cannot stretch the page. Screen-reader descriptions are available in all three languages. To replace an image, update its public file and component proportions/description, then rebuild.
 
 ## Prompts for future alternatives
 

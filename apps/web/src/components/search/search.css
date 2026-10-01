@@ -35,3 +35,6 @@
 .search-more{display:flex;flex-wrap:wrap;gap:12px 24px;margin:20px 0}
 .search-more a{display:inline-flex;align-items:center;min-height:44px;font-weight:700}
 @media(max-width:560px){.search-page{padding-top:30px}.search-form .button{flex:1}.search-tabs a{padding:8px 12px}}
+
+/* In the narrow header the search field takes its own full-width row below the brand and the menu. */
+@media(max-width:900px){.app-header>.search-box{grid-column:1/-1;order:9;max-width:none}}
