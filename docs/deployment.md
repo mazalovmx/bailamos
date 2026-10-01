@@ -1,38 +1,43 @@
-# GitHub и Railway
+# GitHub and Railway
 
-Репозиторий: https://github.com/mazalovmx/bailamos
+Repository: https://github.com/mazalovmx/bailamos
 
-Три ветки:
+## Branches
 
-- `experiments` — текущая разработка и эксперименты.
-- `stable` — проверенная версия, основная ветка GitHub.
-- `deploy` — версия для публикации в Railway.
+- experiments — development and experiments.
+- stable — reviewed baseline and default GitHub branch.
+- deploy — release source for Railway.
 
-Первоначально все три указывают на один коммит. Переносить изменения через PR: `experiments → stable → deploy`. CI запускается для каждой ветки и для PR. Название stable обозначает этап работы, а не завершённость всех требований MVP.
+Promote through PRs: experiments → stable → deploy. Feature branches go into experiments first. CI runs on these branches and pull requests and supports manual dispatch. The stable name does not imply completion of every MVP requirement.
 
-## Сохранение конфигурации при merge
+## Preserve configuration when merging
 
-`railway.json`, скрипты запуска/релиза, CI, `pnpm-lock.yaml`, миграции Prisma, справочники и фотографии входят во **все три ветки**. Не держать настройки только в `deploy`: изменять их в `experiments` и переносить обычными merge через `stable`. Не заменять содержимое ветки отдельным копированием файлов и не использовать force push для продвижения релиза. При конфликте конфигурации разобрать его перед merge; Git не гарантирует сохранение обеих версий при ручном выборе «ours/theirs».
+railway.json, railway.worker.json, start/release scripts, CI, pnpm-lock.yaml, migrations, seed data and photographs belong in all three branches. Change configuration alongside application code and promote ordinary merges. Do not copy only selected files over a branch or force-push a release. Resolve configuration conflicts explicitly: choosing an entire side can discard changes.
 
-Секреты задаются в Railway Variables и не зависят от Git-ветки. Привязка репозитория, ветки `deploy`, домен, постоянный том БД и Wait for CI — настройки сервиса Railway; merge не должен пересоздавать этот сервис. В `.env.example` хранятся только примеры локального окружения.
+Secrets live in Railway Variables, outside Git. Repository/branch selection, domains, persistent volumes and Wait for CI are service settings. A code merge should not recreate the service. .env.example contains local examples only.
 
-Применённые миграции не редактировать и не удалять: изменения схемы добавлять новой миграцией. Release запускает `prisma migrate deploy`, не `reset` и не `db push`. Seed добавляет недостающие справочники и не удаляет данные. Перед изменениями production-схемы нужны резервная копия и проверка совместимости; возврат старого кода сам по себе не отменяет миграции.
+Never edit/delete applied migrations. Add new migrations. Release uses prisma migrate deploy, not reset or db push. Seed adds missing reference data without deleting user records. Back up production and check compatibility before schema changes; reverting code does not reverse migrations.
 
-## Подключение Railway
+## Connect the web service
 
-Конфигурация сборки и запуска хранится в корневом `railway.json`. Сам файл **не подключает GitHub и не выбирает ветку**. В сервисе Railway нужно выбрать репозиторий `mazalovmx/bailamos`, ветку `deploy` и корневую директорию `/`. Включить Wait for CI, чтобы автодеплой ожидал успешных проверок GitHub. Другие ветки к production-сервису не подключать.
+The root railway.json defines build/start settings but does not connect GitHub or select a branch. Choose mazalovmx/bailamos, branch deploy, root directory /, and enable Wait for CI. Do not connect other branches to the production web service.
 
-Сборка: `pnpm build:railway` (Prisma + только web). Перед запуском: `pnpm release:railway` (применение миграций, затем идемпотентный справочник городов, стилей и тегов). Запуск: `pnpm start`, слушает `0.0.0.0` и порт `PORT`, выданный Railway. `/api/health` проверяет живость процесса; применение схемы контролируется успешным pre-deploy.
+- Build: pnpm build:railway (Prisma generation and web build).
+- Pre-deploy: pnpm release:railway (migrations, then idempotent catalogue seeding).
+- Start: pnpm start, binding 0.0.0.0 and Railway's PORT.
+- Health: /api/health tests process liveness; pre-deploy checks schema application separately.
 
-## Обязательные переменные web-сервиса
+## Required configuration
 
-- `DATABASE_URL` — подключение к отдельной production PostgreSQL с установленным расширением **PostGIS**. Обычный образ PostgreSQL без PostGIS не подходит для существующих миграций. Использовать совместимый PostGIS-сервис с постоянным томом и резервным копированием; локальную БД не переносить автоматически.
-- `BETTER_AUTH_URL` — полный публичный HTTPS-адрес сайта.
-- `BETTER_AUTH_SECRET` — уникальный production-секрет не короче 32 символов.
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` — рабочая почта для подтверждения регистрации и восстановления пароля. Локальный Mailpit для production не подходит.
-- `NEXT_TELEMETRY_DISABLED=1` — по желанию.
-- `RAILPACK_PRUNE_DEPS=false` — сохранить инструменты миграции/seed (`prisma`, `tsx`, `dotenv-cli`) для pre-deploy. Не включать удаление dev-зависимостей, пока эти инструменты используются в release-команде. [Настройки Node.js в Railpack](https://railpack.com/languages/node/).
+| Variable | Purpose |
+| --- | --- |
+| DATABASE_URL | Dedicated PostgreSQL with **PostGIS**. Plain PostgreSQL without the extension cannot run these migrations. Use a persistent volume and backups. |
+| BETTER_AUTH_URL | Full public HTTPS URL. |
+| BETTER_AUTH_SECRET | Unique production secret, at least 32 characters. |
+| SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD, SMTP_FROM | Real verification, recovery and notification email delivery. Mailpit is development-only. |
+| RAILPACK_PRUNE_DEPS=false | Retain prisma, tsx and dotenv-cli for release commands. |
+| NEXT_TELEMETRY_DISABLED=1 | Optional telemetry setting. |
 
-`PORT` задаёт Railway. `.env` остаётся локальным и не хранится в Git. Redis и S3 текущему web-сценарию не требуются. Админ-приложение не публикуется этой конфигурацией. До подключения БД, SMTP, домена и production-переменных публичный запуск не считается настроенным.
+Railway supplies PORT. .env is local and ignored. The root config deploys web only, not admin or the background worker. Create a separate worker service with railway.worker.json following the [worker runbook](worker.md). Expanded modules require Redis, worker scheduling, persistent media storage and integration-specific configuration. Do not assume they are operational until exercised in the target environment.
 
-Источники: [Railway config as code](https://docs.railway.com/config-as-code/reference), [GitHub autodeploys и Wait for CI](https://docs.railway.com/deployments/github-autodeploys).
+Sources: [Railway configuration](https://docs.railway.com/config-as-code/reference), [GitHub autodeploys/Wait for CI](https://docs.railway.com/deployments/github-autodeploys), [Railpack Node.js settings](https://railpack.com/languages/node/).

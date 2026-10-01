@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:ev="http://purl.org/rss/1.0/modules/event/" xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#">
+  <channel>
+    <title>Agenda</title>
+    <link>https://agenda.example.org/</link>
+    <description>Events</description>
+    <item>
+      <title>Shag Night</title>
+      <link>https://agenda.example.org/shag-night</link>
+      <guid>shag-night-1</guid>
+      <description>Collegiate shag &lt;i&gt;all night&lt;/i&gt;</description>
+      <ev:startdate>2099-05-02T20:30:00+02:00</ev:startdate>
+      <ev:enddate>2099-05-02T23:30:00+02:00</ev:enddate>
+      <ev:location>Club Swing, Calle Mayor 1, Madrid</ev:location>
+      <geo:lat>40.4155</geo:lat>
+      <geo:long>-3.7074</geo:long>
+    </item>
+    <item>
+      <title>Floating time class</title>
+      <link>https://agenda.example.org/class</link>
+      <ev:startdate>2099-05-03T19:00</ev:startdate>
+    </item>
+    <item>
+      <title>Just a blog post without a date</title>
+      <link>https://agenda.example.org/post</link>
+      <pubDate>Mon, 14 Sep 2026 09:30:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

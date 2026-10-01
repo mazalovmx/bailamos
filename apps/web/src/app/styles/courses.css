@@ -1,0 +1,93 @@
+.courses-page{padding-top:55px;padding-bottom:70px}
+.courses-page h1{font-size:clamp(34px,5vw,56px);letter-spacing:-1.5px;overflow-wrap:anywhere}
+.courses-page h2{font-size:26px;letter-spacing:-.5px;margin:44px 0 12px}
+.courses-page .intro{max-width:680px}
+.courses-meta{font-size:14px;line-height:1.6;color:#516149;margin:12px 0}
+.courses-filters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;align-items:end;background:#e9edde;border-radius:16px;padding:20px;margin:28px 0 20px}
+.courses-filters-short{grid-template-columns:minmax(0,320px) auto;justify-content:start}
+.courses-filters label{display:flex;flex-direction:column;gap:8px;font-size:14px;font-weight:600;min-width:0}
+.courses-filters select{min-height:48px;width:100%;min-width:0;font-size:16px}
+.courses-filter-actions{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;grid-column:1/-1}
+.courses-filters-short .courses-filter-actions{grid-column:auto}
+.courses-filter-actions .button{margin:0;min-height:48px}
+.courses-filter-actions a{display:inline-flex;align-items:center;min-height:44px;padding:4px 6px;font-size:14px}
+.week-nav{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;margin:20px 0 8px}
+.week-nav p{margin:0;font-size:16px;line-height:1.4}
+.week-nav a{display:inline-flex;align-items:center;min-height:44px;padding:4px 10px;border:1px solid #718069;border-radius:22px;font-size:14px;text-decoration:none;color:#202822;background:#fffefa}
+.week-nav a:hover{background:#dafa7c}
+.timetable{list-style:none;margin:20px 0 0;padding:0;display:grid;gap:22px}
+.timetable ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.timetable-day{min-width:0}
+.timetable-day>h3{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font-size:18px;letter-spacing:0;margin:0 0 10px;padding-bottom:8px;border-bottom:2px solid #253b2f;text-transform:capitalize}
+.timetable-day>h3 time{font-size:14px;font-weight:400;color:#516149;text-transform:none}
+.timetable-day-empty{display:none}
+.timetable-none{margin:0;font-size:14px;color:#516149}
+.timetable-entry{background:#fffefa;border:1px solid #d5dbc9;border-radius:14px;padding:14px;min-width:0;overflow-wrap:anywhere}
+.timetable-time{margin:0;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.timetable-time span{font-weight:400;color:#516149}
+.timetable-title{display:inline-flex;align-items:center;min-height:44px;font-size:17px;font-weight:700;line-height:1.3;color:#202822}
+.timetable-entry dl{margin:4px 0 0;display:grid;gap:4px;font-size:14px;line-height:1.5}
+.timetable-entry dl div{display:flex;flex-wrap:wrap;gap:0 8px}
+.timetable-entry dt{color:#516149}
+.timetable-entry dt::after{content:":"}
+.timetable-entry dd{margin:0;min-width:0}
+.timetable-entry dd a{display:inline-block;padding:2px 0;color:#253b2f}
+.timetable-tags{margin:8px 0 0;font-size:13px;line-height:1.5;color:#516149}
+.courses-links{display:flex;flex-wrap:wrap;gap:8px 22px;margin:32px 0 0}
+.courses-links a{display:inline-flex;align-items:center;min-height:44px;font-size:15px}
+.courses-breadcrumbs{font-size:13px;margin:0 0 10px}
+.courses-breadcrumbs ol{display:flex;flex-wrap:wrap;gap:4px;align-items:center;list-style:none;margin:0;padding:0}
+.courses-breadcrumbs li{display:flex;align-items:center;gap:4px}
+.courses-breadcrumbs li+li::before{content:"/";color:#718069}
+.courses-breadcrumbs a{display:inline-flex;align-items:center;min-height:44px;padding:10px 6px;text-decoration:underline}
+.courses-breadcrumbs [aria-current=page]{padding:10px 6px;font-weight:700;overflow-wrap:anywhere}
+.school-list{list-style:none;margin:20px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.school-list a{display:flex;gap:14px;align-items:flex-start;height:100%;background:#fffefa;border:1px solid #d5dbc9;border-radius:16px;padding:16px;text-decoration:none;color:#202822;min-width:0}
+.school-list a:hover{border-color:#253b2f}
+.school-list img,.school-header img{border-radius:50%;object-fit:cover;flex:0 0 auto}
+.school-initial{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:50%;background:#253b2f;color:#fff;font-size:22px;font-weight:700}
+.school-initial-large{width:96px;height:96px;font-size:38px}
+.school-card-text{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.school-card-text strong{font-size:17px;line-height:1.3}
+.school-card-text>span{color:#516149}
+.school-badge{display:inline-block;align-self:flex-start;margin:6px 0 0;padding:4px 10px;border:1px solid #8a6d1f;border-radius:20px;background:#fdf3d3;color:#5c4708;font-size:12px;font-weight:700;line-height:1.4}
+.school-card-text>.school-badge{color:#5c4708}
+.school-header{display:flex;gap:22px;align-items:center;margin:6px 0 20px}
+.school-header>div{min-width:0}
+.school-header h1{margin:4px 0}
+.school-header .intro{margin:0}
+.school-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;margin:0 0 8px}
+.school-actions .button{margin-top:0;min-height:48px}
+.school-bio{max-width:720px;font-size:16px;line-height:1.7;white-space:pre-line;overflow-wrap:anywhere}
+.school-events,.school-venues{list-style:none;margin:0;padding:0;display:grid;gap:10px;max-width:760px}
+.school-events a,.school-venues a{display:flex;flex-direction:column;gap:4px;min-height:44px;background:#fffefa;border:1px solid #d5dbc9;border-radius:14px;padding:14px;text-decoration:none;color:#202822;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.school-events a:hover,.school-venues a:hover{border-color:#253b2f}
+.school-events strong,.school-venues strong{font-size:16px}
+.school-events span,.school-venues span{color:#516149}
+.unsubscribe-box{display:flex;flex-direction:column;gap:16px;align-items:flex-start;max-width:560px;margin-top:20px;font-size:16px;line-height:1.6}
+.unsubscribe-box p{margin:0}
+.unsubscribe-box .button{margin-top:0;min-height:48px;cursor:pointer}
+.unsubscribe-box a{display:inline-flex;align-items:center;min-height:44px}
+.courses-page a:focus-visible,.courses-page button:focus-visible,.courses-page select:focus-visible{outline:3px solid #253b2f;outline-offset:2px}
+@media(min-width:1100px){
+  .timetable{grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;align-items:start}
+  .timetable-day-empty{display:block}
+  .timetable-day>h3{flex-direction:column;gap:0;font-size:15px}
+  .timetable-day>h3 time{font-size:13px}
+  .timetable-entry{padding:10px;border-radius:10px}
+  .timetable-title{font-size:15px;min-height:0;padding:6px 0}
+  .timetable-entry dl,.timetable-time{font-size:13px}
+  .timetable-entry dl div{flex-direction:column}
+}
+@media(max-width:1099px){.courses-filters{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:900px){.school-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){
+  .courses-page{padding-top:30px}
+  .courses-filters,.courses-filters-short{grid-template-columns:1fr;padding:16px}
+  .courses-filter-actions .button{flex:1}
+  .school-list{grid-template-columns:1fr}
+  .school-header{flex-direction:column;align-items:flex-start;gap:12px}
+  .school-actions .button,.school-actions .follow,.school-actions .follow .button{width:100%}
+  .week-nav a{flex:1 1 auto;justify-content:center}
+  .week-nav p{flex:1 1 100%;order:-1}
+}

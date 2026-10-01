@@ -1,0 +1,48 @@
+.calendar-page{padding-top:40px;padding-bottom:70px}
+.calendar-page h1{font-size:clamp(38px,5vw,60px);letter-spacing:-2px}
+.calendar-page .intro{max-width:680px}
+.calendar-view{margin:30px 0;--fc-border-color:#c9d0bd;--fc-button-bg-color:#253b2f;--fc-button-border-color:#253b2f;--fc-button-hover-bg-color:#3b5746;--fc-button-hover-border-color:#3b5746;--fc-button-active-bg-color:#496149;--fc-button-active-border-color:#253b2f;--fc-event-bg-color:#253b2f;--fc-event-border-color:#253b2f;--fc-event-text-color:#fff;--fc-today-bg-color:#eef6d2;--fc-page-bg-color:#f6f4ee;--fc-neutral-bg-color:#e9edde;--fc-list-event-hover-bg-color:#e9edde;--fc-now-indicator-color:#a8321a}
+.calendar-zone{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:center;margin-bottom:12px}
+.calendar-zone .checkbox{align-items:center;min-height:44px;font-weight:600}
+.calendar-zone .checkbox input{margin-top:0}
+.calendar-zone p{margin:0;font-size:14px;line-height:1.5;color:#3f4b3c}
+.calendar-status p{margin:0 0 12px}
+.calendar-status button{background:none;border:0;text-decoration:underline;min-height:44px;padding:0 8px;color:inherit}
+.calendar-placeholder{min-height:420px;display:grid;place-items:center;border:1px dashed #a7b29f;border-radius:16px}
+.calendar-scroll{overflow-x:auto}
+.calendar-view .fc{font-size:14px}
+.calendar-view .fc .fc-toolbar{flex-wrap:wrap;gap:10px}
+.calendar-view .fc .fc-toolbar-title{font-size:22px;letter-spacing:-.5px}
+.calendar-view .fc .fc-button{min-height:44px;padding:8px 14px;font-size:14px}
+.calendar-view .fc .fc-button:focus-visible,.calendar-view .fc a:focus-visible{outline:3px solid #245ddd;outline-offset:2px;box-shadow:none}
+.calendar-view .fc a{text-decoration:none}
+.calendar-view .fc .fc-event{cursor:pointer}
+.calendar-view .fc .fc-daygrid-event,.calendar-view .fc .fc-timegrid-event{white-space:normal;padding:3px 5px;line-height:1.35;overflow:hidden}
+.calendar-view .cal-time{font-size:12px;font-weight:400}
+.calendar-view .cal-title{font-weight:700;overflow-wrap:anywhere}
+.calendar-view .cal-meta{font-size:12px}
+.calendar-view .fc-daygrid-event .cal-meta{display:none}
+.calendar-view .cal-cancelled{font-size:12px;font-weight:700;text-transform:uppercase}
+.calendar-view .is-cancelled .cal-title,.calendar-view .is-cancelled .cal-time{text-decoration:line-through}
+.calendar-view .fc .is-cancelled.fc-daygrid-event,.calendar-view .fc .is-cancelled.fc-timegrid-event{background:#5c665a;border-color:#5c665a}
+.calendar-view .fc .fc-list-event .cal-title{text-decoration:underline}
+.calendar-view .fc .fc-list-event.is-cancelled .cal-title{text-decoration:line-through}
+.calendar-view .fc .fc-list-event-time{white-space:nowrap}
+.calendar-view .fc .fc-list-day-cushion{background:#e9edde}
+.calendar-view .fc-timeGridWeek-view{min-width:640px}
+.add-to-calendar{display:flex;flex-wrap:wrap;gap:12px}
+.add-to-calendar .button{gap:6px;min-height:48px;padding:12px 20px}
+.subscribe-feed{background:#e9edde;border-radius:18px;padding:30px;margin-top:40px}
+.subscribe-feed h2{margin-top:0}
+.subscribe-feed p{line-height:1.6;max-width:720px}
+.subscribe-feed .subscribe-scope{font-weight:700}
+.subscribe-feed input{font-size:14px}
+@media(max-width:700px){
+.calendar-view .fc .fc-toolbar{flex-direction:column;align-items:stretch}
+.calendar-view .fc .fc-toolbar-chunk{display:flex;justify-content:center}
+.calendar-view .fc .fc-toolbar-title{font-size:19px;text-align:center}
+.calendar-view .fc .fc-list-event-time{white-space:normal}
+.calendar-view .fc .fc-list-event td{padding:10px 8px}
+.subscribe-feed{padding:20px}
+.add-to-calendar .button{flex:1 1 100%}
+}

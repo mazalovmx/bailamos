@@ -2,19 +2,43 @@ import {db} from '@dance/db';
 import {DateTime} from 'luxon';
 import {getTranslations} from 'next-intl/server';
 import {notFound,redirect} from 'next/navigation';
+import Link from 'next/link';
 import {currentUser} from '../../../../../lib/session';
 import {eventAbility} from '../../../../../lib/permissions';
 import {catalogue} from '../../../../../lib/catalogue';
+import {parseRecurrence} from '../../../../../lib/schedule';
+import {pendingInvites} from '../../../../../lib/events/invites';
 import {EventForm} from '../../../../../components/forms';
-export default async function Edit({params}:{params:Promise<{locale:string;slug:string}>}) {
+import {EventActions,TeamPanel,ArtistPanel,OccurrencePanel} from '../../../../../components/events/manage';
+import '../../../../styles/events.css';
+export const metadata={robots:{index:false,follow:false}};
+export default async function Edit({params,searchParams}:{params:Promise<{locale:string;slug:string}>;searchParams:Promise<{created?:string}>}) {
   const {locale,slug}=await params,user=await currentUser();
   if(!user) redirect('/'+locale+'/login');
-  const event=await db.event.findUnique({where:{slug},include:{members:true,styles:true,tags:true}});
-  if(!event||!eventAbility(user.profile?.id,event.members).can('manage','Event')) notFound();
-  const {cities,styles,tags}=await catalogue(),t=await getTranslations('App');
+  const event=await db.event.findUnique({where:{slug},include:{styles:true,tags:true,occurrences:{orderBy:{startsAt:'asc'}},
+    members:{include:{profile:{select:{id:true,handle:true,name:true,type:true,userId:true}}}}}});
+  const ability=eventAbility(user.profile?.id,event?.members||[]);
+  if(!event||!user.profile||!ability.can('manage','Event')) notFound();
+  const canTeam=ability.can('team','Event');
+  const [{cities,styles,tags},invites,t,x]=await Promise.all([catalogue(),
+    canTeam?pendingInvites(event.id):[],getTranslations('App'),getTranslations('EventsX')]);
   const local=(d:Date)=>DateTime.fromJSDate(d,{zone:event.timezone}).toFormat("yyyy-MM-dd'T'HH:mm");
-  return <main className="form-page"><h1>{t('editEvent')}</h1>{event.rrule&&<p className="notice">{t('editSeries')}</p>}<EventForm id={event.id} cities={cities} styles={styles} tags={tags} selectedTags={event.tags.map(t=>t.tagId)}
-    initial={{title:event.title,description:event.description||'',cityId:event.cityId,styleId:event.styles[0]?.styleId||'',status:event.status,startsLocal:local(event.startsAt),endsLocal:event.endsAt?local(event.endsAt):'',
-    kind:event.kind,format:event.format,level:event.level,intensity:event.intensity,tempo:event.tempo,prerequisites:event.prerequisites||'',partnerRequired:String(event.partnerRequired),
-    recurrenceWeeks:event.rrule?.match(/COUNT=(\d+)/)?.[1]||'1'}}/></main>;
+  const recurrence=parseRecurrence(event.rrule,event.timezone),now=new Date();
+  const person=(role:string)=>event.members.filter(m=>m.role===role).map(m=>({profileId:m.profile.id,handle:m.profile.handle,name:m.profile.name,type:m.profile.type,stub:!m.profile.userId}));
+  return <main className="form-page event-editor"><Link href={'/'+locale+'/events/'+slug}>← {x('viewEvent')}</Link><h1>{t('editEvent')}</h1>
+    {(await searchParams).created&&<p className="notice" role="status">{x('createdNext')}</p>}
+    {event.hiddenAt&&<p className="notice">{x('hiddenNotice')}</p>}
+    <EventActions eventId={event.id} status={event.status} canDelete={ability.can('delete','Event')}/>
+    <section aria-labelledby="details-title"><h2 id="details-title">{x('details')}</h2>
+    {event.rrule&&<p className="notice">{t('editSeries')}</p>}
+    <EventForm id={event.id} cities={cities} styles={styles} tags={tags} selectedTags={event.tags.map(t=>t.tagId)}
+      initial={{title:event.title,description:event.description||'',cityId:event.cityId,venueId:event.venueId||'',priceText:event.priceText||'',attendeeVisibility:event.attendeeVisibility,
+      styleId:event.styles[0]?.styleId||'',status:event.status,startsLocal:local(event.startsAt),endsLocal:event.endsAt?local(event.endsAt):'',
+      kind:event.kind,format:event.format,level:event.level,intensity:event.intensity,tempo:event.tempo,prerequisites:event.prerequisites||'',partnerRequired:String(event.partnerRequired),
+      recurrenceWeeks:String(recurrence.until?1:recurrence.count),recurrenceInterval:String(recurrence.interval),recurrenceDays:recurrence.byDay.join(','),recurrenceUntil:recurrence.until||''}}/></section>
+    {event.occurrences.length>1&&<OccurrencePanel eventId={event.id} timezone={event.timezone} occurrences={event.occurrences.map(o=>({id:o.id,startsAt:o.startsAt.toISOString(),cancelled:o.cancelled,past:o.startsAt<now}))}/>}
+    <TeamPanel eventId={event.id} owner={person('OWNER')} coOrganizers={person('CO_ORGANIZER')} invites={invites} canTeam={canTeam} selfProfileId={user.profile.id}/>
+    <ArtistPanel eventId={event.id} artists={person('ARTIST')}/>
+    <p className="field-note">{x('mediaOnPage')}</p>
+  </main>;
 }

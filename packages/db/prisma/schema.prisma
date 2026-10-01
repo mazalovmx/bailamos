@@ -83,6 +83,8 @@ enum UserRole {
   USER
   MODERATOR
   ADMIN
+  OWNER
+  SCHOOL_ADMIN
 }
 enum AttendeeVisibility {
   PUBLIC
@@ -166,9 +168,23 @@ model Profile {
   blocksReceived Block[] @relation("Blocked")
   conversations ConversationMember[]
   messages Message[]
+  schoolAdmins SchoolAdmin[]
+  schoolEvents Event[] @relation("SchoolEvents")
+  schoolPosts Post[] @relation("SchoolPosts")
+  schoolVenues Venue[] @relation("SchoolVenues")
+  schoolConversations Conversation[] @relation("SchoolConversations")
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
   @@index([cityId, type])
+}
+model SchoolAdmin {
+  userId String
+  schoolProfileId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school Profile @relation(fields: [schoolProfileId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@id([userId, schoolProfileId])
+  @@index([schoolProfileId])
 }
 model City {
   id String @id @default(cuid())
@@ -214,6 +230,9 @@ model DanceSkill {
 }
 model Venue {
   id String @id @default(cuid())
+  schoolProfileId String?
+  school Profile? @relation("SchoolVenues", fields: [schoolProfileId], references: [id], onDelete: SetNull)
+  @@index([schoolProfileId])
   name String
   address String
   cityId String
@@ -228,6 +247,9 @@ model Venue {
 }
 model Event {
   id String @id @default(cuid())
+  schoolProfileId String?
+  school Profile? @relation("SchoolEvents", fields: [schoolProfileId], references: [id], onDelete: SetNull)
+  @@index([schoolProfileId])
   slug String @unique
   shortCode String? @unique
   title String
@@ -343,6 +365,9 @@ model Rsvp {
 }
 model Post {
   id String @id @default(cuid())
+  schoolProfileId String?
+  school Profile? @relation("SchoolPosts", fields: [schoolProfileId], references: [id], onDelete: SetNull)
+  @@index([schoolProfileId])
   slug String? @unique
   profileId String
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
@@ -516,6 +541,9 @@ model Block {
 }
 model Conversation {
   id String @id @default(cuid())
+  schoolProfileId String?
+  school Profile? @relation("SchoolConversations", fields: [schoolProfileId], references: [id], onDelete: SetNull)
+  @@index([schoolProfileId])
   kind ConversationKind
   title String?
   eventId String? @unique
@@ -609,6 +637,7 @@ model TelegramChat {
 }
 
 model User {
+  schoolAdminships SchoolAdmin[]
   id String @id
   name String
   email String @unique

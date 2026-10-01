@@ -1,1 +1,22 @@
-{}
+{
+  "title": "Feed",
+  "introPersonal": "Nuevos eventos en las ciudades y estilos que sigues, publicaciones de la gente que sigues y noticias locales.",
+  "introCity": "Próximos eventos en {city} y las últimas publicaciones de la comunidad.",
+  "introGeneral": "Próximos eventos y las últimas publicaciones de la comunidad.",
+  "promptTitle": "Haz tuyo este feed",
+  "promptText": "Sigue ciudades, estilos de baile y personas, y sus eventos y publicaciones aparecerán aquí.",
+  "promptTextSignedOut": "Inicia sesión y sigue ciudades, estilos de baile y personas, y sus eventos y publicaciones aparecerán aquí.",
+  "browseCities": "Elegir ciudades",
+  "browseStyles": "Elegir estilos",
+  "signIn": "Iniciar sesión",
+  "kindEvent": "Evento",
+  "kindPost": "Publicación",
+  "kindNews": "Noticia",
+  "opensNewTab": "(se abre en una pestaña nueva)",
+  "empty": "Aquí todavía no hay nada. Los nuevos eventos y publicaciones aparecerán en cuanto se publiquen.",
+  "loadMore": "Mostrar más",
+  "loading": "Cargando…",
+  "loaded": "{count, plural, =0 {No hay nada más.} one {Se ha cargado # elemento más.} other {Se han cargado # elementos más.}}",
+  "loadError": "No se ha podido cargar el feed. Revisa tu conexión e inténtalo de nuevo.",
+  "end": "Eso es todo por ahora."
+}

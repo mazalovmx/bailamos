@@ -1,0 +1,60 @@
+/* Events: editor panels, date preview, event page details. Works from 360px. */
+.event-editor{display:flex;flex-direction:column;gap:28px}
+.event-editor>section>h2,.manage-panel>h2{margin:0 0 12px}
+.manage-panel{border:1px solid #acb79f;border-radius:16px;padding:24px;background:#fffefa;min-width:0}
+.manage-panel h3{font-size:16px;margin:22px 0 8px}
+.panel-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.panel-actions .button{margin-top:10px;min-height:48px;gap:10px}
+.button.danger{background:#7c2815;color:#fff}
+.button.secondary.danger{background:transparent;color:#7c2815;border-color:#a8452f}
+.confirm-box{border:1px solid #c88974;background:#fce8e1;border-radius:12px;padding:16px;margin-top:16px;line-height:1.6}
+.confirm-box p{margin:0}
+.action-status{font-size:14px;line-height:1.5;margin:12px 0 0;color:#2f4a33;min-height:1px}
+.action-status:empty{margin:0}
+.link-button{background:none;border:0;padding:8px;min-height:44px;font-size:14px;text-decoration:underline;color:#253b2f}
+.people-list,.attendee-list,.date-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.people-list li,.attendee-list li,.date-list li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;min-height:44px;padding:6px 0;border-bottom:1px solid #e1e6d6;overflow-wrap:anywhere}
+.people-list li:last-child,.attendee-list li:last-child,.date-list li:last-child{border-bottom:0}
+.people-list li>button,.date-list li>button{margin-left:auto}
+.people-list .badge,.attendee-list .badge,.date-list .badge,.session-list .badge{padding:3px 10px;margin-left:4px;white-space:nowrap}
+.attendee-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));column-gap:24px;max-height:420px;overflow:auto}
+.date-list{max-height:420px;overflow:auto}
+.inline-form{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;margin-top:20px}
+.form-page form.inline-form{flex-direction:row;gap:14px;margin-top:20px}
+.inline-form label{flex:1 1 240px;min-width:0}
+.inline-form .button{margin-top:27px;min-height:48px}
+.schedule-fields,.weekday-picker{border:1px solid #acb79f;border-radius:12px;padding:20px;margin:0;min-width:0;display:flex;flex-direction:column;gap:18px}
+.schedule-fields>legend,.weekday-picker>legend{padding:0 8px;font-size:14px;font-weight:600}
+.weekday-picker{flex-direction:row;flex-wrap:wrap;gap:6px 22px}
+.weekday-picker .checkbox{min-height:44px;align-items:center}
+.weekday-picker .checkbox input{margin-top:0}
+.weekday-picker .field-note{flex-basis:100%}
+.date-preview{background:#e9edde;border-radius:12px;padding:18px}
+.date-preview:empty{display:none}
+.date-preview h3{margin:0 0 6px;font-size:16px}
+.date-preview ol{margin:10px 0 0;padding-left:26px;line-height:1.9;font-size:14px}
+.venue-links{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}
+.venue-links a{display:inline-flex;align-items:center;min-height:44px}
+.event-page .people-list li{border-bottom:0}
+.event-page .people-list{flex-direction:row;flex-wrap:wrap;gap:4px 22px}
+.event-page .people-list a,.attendee-list a{display:inline-flex;align-items:center;min-height:44px}
+.event-page .event-facts h2{margin:0 0 10px}
+.event-page .event-facts h2:not(:first-child){margin-top:22px}
+.event-page .event-facts p{margin:4px 0;line-height:1.6;overflow-wrap:anywhere}
+.viewer-time{background:#e9edde;border-radius:10px;padding:12px 14px;margin-top:14px!important;font-size:15px}
+.struck{text-decoration:line-through}
+.cancelled-notice{background:#fce8e1;border-color:#c88974;color:#7c2815}
+.session-list li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.rsvp-count{font-weight:600}
+.rsvp-panel h3{margin:28px 0 8px;font-size:18px}
+.share-panel{margin-top:40px}
+.share-link label{max-width:560px}
+.share-link input{font-size:14px}
+@media(max-width:520px){
+  .manage-panel{padding:16px}
+  .schedule-fields,.weekday-picker{padding:14px}
+  .inline-form .button{margin-top:0;width:100%}
+  .panel-actions .button{flex:1 1 100%}
+  .people-list li>button,.date-list li>button{margin-left:0}
+  .attendee-list{grid-template-columns:1fr}
+}

@@ -6,16 +6,25 @@
     "dev": "next dev --hostname 127.0.0.1 --port 3001",
     "build": "next build",
     "start": "next start --hostname 127.0.0.1 --port 3001",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test --test-concurrency=1 tests/whitelist.test.ts tests/school-rbac.test.ts"
   },
   "dependencies": {
+    "@better-auth/prisma-adapter": "1.7.6",
+    "@better-auth/utils": "0.4.2",
+    "@dance/db": "workspace:*",
+    "@refinedev/core": "5.0.12",
+    "@refinedev/nextjs-router": "7.0.5",
+    "better-auth": "1.7.6",
+    "dotenv": "18.0.5",
     "next": "15.5.27",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "@refinedev/core": "5.0.12"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0"
+    "@types/react-dom": "^19.2.0",
+    "tsx": "4.23.15"
   }
 }

@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {db} from '@dance/db';
 import {actor, apiError, ApiError, jsonBody} from '../../../lib/api';
 import {prepareEvent} from '../../../lib/event-input';
+import {ensureShortCode} from '../../../lib/events/short-code';
 export async function POST(request: Request) {
   try {
     const user = await actor(request);
@@ -14,6 +15,8 @@ export async function POST(request: Request) {
       styles:{create:{styleId}}, members:{create:{profileId:user.profile.id,role:'OWNER'}},
       tags:{create:tagIds.map(tagId=>({tagId}))},occurrences:{create:occurrences}
     }});
-    return Response.json({slug:event.slug},{status:201});
+    // The short link exists from the first publication on and never changes afterwards.
+    const shortCode=event.status==='PUBLISHED'?await ensureShortCode(event.id):null;
+    return Response.json({id:event.id,slug:event.slug,shortCode},{status:201});
   } catch(error) {return apiError(error);}
 }
