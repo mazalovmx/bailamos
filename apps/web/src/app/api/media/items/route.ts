@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     if (parent.eventId) {
       const event = await db.event.findUnique({where: {id: parent.eventId}, select: {status: true, hiddenAt: true}});
       if (!event) throw new MediaError('NOT_FOUND', 404);
-      if ((event.status === 'DRAFT' || event.hiddenAt) && !staff && !await canManageEvent(profileId, parent.eventId)) throw new MediaError('NOT_FOUND', 404);
+      if ((event.status === 'DRAFT' || event.hiddenAt) && !staff && !await canManageEvent(profileId, parent.eventId, user?.schoolIds)) throw new MediaError('NOT_FOUND', 404);
     } else {
       const post = await db.post.findUnique({where: {id: parent.postId}, select: {publishedAt: true, hiddenAt: true, profileId: true}});
       if (!post) throw new MediaError('NOT_FOUND', 404);
@@ -59,7 +59,7 @@ async function editable(user: MediaUser, itemId: string) {
   if (!item) throw new MediaError('NOT_FOUND', 404);
   const profileId = user.profile?.id;
   const allowed = isStaff(user) || (!!profileId && item.uploaderProfileId === profileId) ||
-    (item.eventId ? await canManageEvent(profileId, item.eventId) : !!item.postId && await ownsPost(profileId, item.postId));
+    (item.eventId ? await canManageEvent(profileId, item.eventId, user.schoolIds) : !!item.postId && await ownsPost(profileId, item.postId, user.schoolIds));
   if (!allowed) throw new MediaError('FORBIDDEN', 403);
   return item;
 }

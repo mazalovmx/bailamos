@@ -2,6 +2,7 @@ import {db} from '@dance/db';
 import {apiError, ApiError, jsonBody, viewer} from '../../../../lib/api';
 import {prepareEvent, syncOccurrences} from '../../../../lib/event-input';
 import {eventAbility} from '../../../../lib/permissions';
+import {managesSchool} from '../../../../lib/schools/access';
 import {managedEvent, isPublic} from '../../../../lib/events/access';
 import {statusInput} from '../../../../lib/events/schema';
 import {ensureShortCode} from '../../../../lib/events/short-code';
@@ -14,7 +15,7 @@ export async function GET(request: Request, {params}: Context) {
     const event=await db.event.findUnique({where:{id},include:{members:{select:{profileId:true,role:true}},city:{select:{id:true,name:true,countryCode:true}},
       venue:{select:{id:true,name:true,address:true,lat:true,lng:true,hiddenAt:true}},styles:{select:{styleId:true}},tags:{select:{tagId:true}},
       occurrences:{orderBy:{startsAt:'asc'},select:{id:true,startsAt:true,endsAt:true,cancelled:true}}}});
-    if (!event || (!isPublic(event) && !eventAbility(user?.profile?.id,event.members).can('manage','Event'))) throw new ApiError('NOT_FOUND',404);
+    if (!event || (!isPublic(event) && !eventAbility(user?.profile?.id,event.members,managesSchool(user,event.schoolProfileId)).can('manage','Event'))) throw new ApiError('NOT_FOUND',404);
     const venue=event.venue&&!event.venue.hiddenAt?{id:event.venue.id,name:event.venue.name,address:event.venue.address,lat:event.venue.lat,lng:event.venue.lng}:null;
     return Response.json({id:event.id,slug:event.slug,shortCode:event.shortCode,title:event.title,description:event.description,status:event.status,
       startsAt:event.startsAt,endsAt:event.endsAt,timezone:event.timezone,rrule:event.rrule,city:event.city,venue,priceText:event.priceText,

@@ -1,5 +1,5 @@
 import {AbilityBuilder, createMongoAbility, subject} from '@casl/ability';
-type Viewer = {role?: string; profile?: {id: string} | null} | null | undefined;
+type Viewer = {role?: string; profile?: {id: string} | null; schoolIds?: string[]} | null | undefined;
 export type PostFacts = {profileId: string; publishedAt: Date | null; hiddenAt: Date | null};
 // Everyone reads published, non-hidden posts. The author alone edits, publishes and deletes; staff may additionally read
 // drafts and hidden posts (moderation itself goes through the admin panel, not through these routes).
@@ -7,6 +7,8 @@ export function postAbility(viewer: Viewer) {
   const {can, build} = new AbilityBuilder(createMongoAbility);
   can('read', 'Post', {published: true, hidden: false});
   if (viewer?.profile?.id) can(['read', 'update', 'publish', 'delete'], 'Post', {profileId: viewer.profile.id});
+  // Posts published in a school's name are edited by whoever manages that school.
+  if (viewer?.schoolIds?.length) can(['read', 'update', 'publish', 'delete'], 'Post', {profileId: {$in: viewer.schoolIds}});
   if (viewer?.role === 'OWNER' || viewer?.role === 'ADMIN' || viewer?.role === 'MODERATOR') can('read', 'Post');
   return build();
 }

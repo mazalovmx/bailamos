@@ -4,6 +4,7 @@ import {notFound} from 'next/navigation';
 import Link from 'next/link';
 import {currentUser} from '../../../../lib/session';
 import {eventAbility} from '../../../../lib/permissions';
+import {managesSchool} from '../../../../lib/schools/access';
 import {isPublic} from '../../../../lib/events/access';
 import {loadEvent,pickOccurrence,eventLinks} from '../../../../lib/events/page-data';
 import {listAttendees} from '../../../../lib/events/attendees';
@@ -40,7 +41,7 @@ export default async function EventPage({params,searchParams}:Props) {
   const {locale,slug}=await params;
   const event=await loadEvent(slug);
   if(!event) notFound();
-  const user=await currentUser(),canManage=eventAbility(user?.profile?.id,event.members).can('manage','Event');
+  const user=await currentUser(),canManage=eventAbility(user?.profile?.id,event.members,managesSchool(user,event.schoolProfileId)).can('manage','Event');
   // Drafts and events hidden by moderation exist only for their organizers.
   if(!isPublic(event)&&!canManage) notFound();
   const t=await getTranslations('App'),x=await getTranslations('EventsX');

@@ -1,9 +1,9 @@
-// Bootstraps staff access: pnpm --filter @dance/db exec dotenv -e ../../.env -- tsx prisma/grant-role.ts <email> <ADMIN|MODERATOR|USER>
+// Bootstraps staff access: pnpm --filter @dance/db exec dotenv -e ../../.env -- tsx prisma/grant-role.ts <email> <OWNER|ADMIN|MODERATOR|SCHOOL_ADMIN|USER>
 import {db, UserRole} from '../src/index';
 const [email, role] = process.argv.slice(2);
 async function main() {
   if (!email || !role || !(role in UserRole)) {
-    console.error('Usage: tsx prisma/grant-role.ts <email> <ADMIN|MODERATOR|USER>');
+    console.error('Usage: tsx prisma/grant-role.ts <email> <OWNER|ADMIN|MODERATOR|SCHOOL_ADMIN|USER>');
     return 1;
   }
   const user = await db.user.findUnique({where: {email: email.toLowerCase()}, select: {id: true, role: true, emailVerified: true, bannedAt: true}});

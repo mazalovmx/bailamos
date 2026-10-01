@@ -66,7 +66,7 @@ export async function createSchoolResource(userId:string,schoolId:string,input:u
       if(endsAt<=startsAt)throw new HttpError('INVALID_INPUT',400);
       const city=await tx.city.findUnique({where:{id:data.cityId}});
       if(!city||!await tx.danceStyle.count({where:{id:data.styleId}}))throw new HttpError('INVALID_REFERENCE',400);
-      const row=await tx.event.create({data:{title:data.title,description:data.description,slug:'school-'+randomUUID(),schoolProfileId:schoolId,cityId:city.id,timezone:city.timezone,startsAt,endsAt,kind:'CLASS',status:'DRAFT',styles:{create:{styleId:data.styleId}},members:{create:{profileId:schoolId,role:'OWNER'}},occurrences:{create:{startsAt,endsAt}}}});id=row.id;
+      const row=await tx.event.create({data:{title:data.title,description:data.description,slug:'school-'+randomUUID(),schoolProfileId:schoolId,cityId:city.id,timezone:city.timezone,lat:city.lat,lng:city.lng,startsAt,endsAt,kind:'CLASS',status:'DRAFT',styles:{create:{styleId:data.styleId}},members:{create:{profileId:schoolId,role:'OWNER'}},occurrences:{create:{startsAt,endsAt}}}});id=row.id;
     }else if(data.kind==='post'){
       const row=await tx.post.create({data:{schoolProfileId:schoolId,profileId:schoolId,title:data.title,slug:'school-'+randomUUID(),excerpt:data.body.slice(0,300),content:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text:data.body}]}]}}});id=row.id;
     }else if(data.kind==='venue'){

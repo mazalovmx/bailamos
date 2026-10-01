@@ -4,6 +4,7 @@ import {getTranslations} from 'next-intl/server';
 import {notFound,redirect} from 'next/navigation';
 import Link from 'next/link';
 import {currentUser} from '../../../../../lib/session';
+import {managesSchool} from '../../../../../lib/schools/access';
 import {eventAbility} from '../../../../../lib/permissions';
 import {catalogue} from '../../../../../lib/catalogue';
 import {parseRecurrence} from '../../../../../lib/schedule';
@@ -17,7 +18,7 @@ export default async function Edit({params,searchParams}:{params:Promise<{locale
   if(!user) redirect('/'+locale+'/login');
   const event=await db.event.findUnique({where:{slug},include:{styles:true,tags:true,occurrences:{orderBy:{startsAt:'asc'}},
     members:{include:{profile:{select:{id:true,handle:true,name:true,type:true,userId:true}}}}}});
-  const ability=eventAbility(user.profile?.id,event?.members||[]);
+  const ability=eventAbility(user.profile?.id,event?.members||[],managesSchool(user,event?.schoolProfileId));
   if(!event||!user.profile||!ability.can('manage','Event')) notFound();
   const canTeam=ability.can('team','Event');
   const [{cities,styles,tags},invites,t,x]=await Promise.all([catalogue(),

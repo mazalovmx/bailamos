@@ -127,5 +127,8 @@
   "error_INVITE_INVALID": "Esta invitación ya no es válida. Puede haber caducado, haber sido revocada o haberse usado.",
   "error_INVITE_MISMATCH": "Esta invitación se envió a otra cuenta. Inicia sesión con la cuenta a la que iba dirigida.",
   "error_ARTIST_LIMIT": "Un evento puede tener hasta 30 artistas.",
-  "mediaOnPage": "Las fotos y los enlaces de Instagram se gestionan en la galería de la página del evento."
+  "mediaOnPage": "Las fotos y los enlaces de Instagram se gestionan en la galería de la página del evento.",
+  "onBehalfOf": "Publicado por",
+  "onBehalfOfMe": "Yo",
+  "onBehalfOfHint": "Elige una escuela para añadir el evento a su horario. Quienes gestionan la escuela podrán editarlo."
 }

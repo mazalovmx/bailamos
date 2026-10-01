@@ -127,5 +127,8 @@
   "error_INVITE_INVALID": "This invitation is no longer valid. It may have expired, been revoked or already been used.",
   "error_INVITE_MISMATCH": "This invitation was sent to a different account. Sign in with the account it was addressed to.",
   "error_ARTIST_LIMIT": "An event can have up to 30 artists.",
-  "mediaOnPage": "Photos and Instagram links are managed in the gallery on the event page."
+  "mediaOnPage": "Photos and Instagram links are managed in the gallery on the event page.",
+  "onBehalfOf": "Published by",
+  "onBehalfOfMe": "Me",
+  "onBehalfOfHint": "Choose a school to add the event to its timetable. Everyone who manages the school can then edit it."
 }

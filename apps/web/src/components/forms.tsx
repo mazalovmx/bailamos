@@ -72,7 +72,7 @@ export function ProfileForm({cities,styles,initial}:{cities:Options;styles:Optio
     {s.feedback}<button className="button" disabled={s.busy}>{t(s.busy?'working':'saveProfile')}</button>
   </form>;
 }
-export function EventForm({cities,styles,initial,id,tags,selectedTags=[]}:{cities:Options;styles:Options;initial:Fields;id?:string;tags:Options;selectedTags?:string[]}) {
+export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools=[]}:{cities:Options;styles:Options;initial:Fields;id?:string;tags:Options;selectedTags?:string[];schools?:Options}) {
   const t=useTranslations('App'),x=useTranslations('EventsX'),locale=useLocale(),router=useRouter(),s=useFormStatus();
   const [cityId,setCityId]=useState(initial.cityId||'');
   return <form className="editor-form" onSubmit={async e=>{e.preventDefault();s.setBusy(true);s.setError('');
@@ -89,6 +89,7 @@ export function EventForm({cities,styles,initial,id,tags,selectedTags=[]}:{citie
     <div className="form-grid"><label>{t('city')}<select name="cityId" required value={cityId} onChange={e=>setCityId(e.target.value)}><option value="">{t('choose')}</option>{cities.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
     <Select name="styleId" label={t('style')} options={styles} value={initial.styleId}/></div>
     {/* The picker submits "venueId"; saving copies the venue's coordinates to the event, or the city's when there is none. */}
+    {!id&&schools.length>0&&<label>{x('onBehalfOf')}<select name="schoolProfileId" defaultValue=""><option value="">{x('onBehalfOfMe')}</option>{schools.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select><small>{x('onBehalfOfHint')}</small></label>}
     <VenuePicker name="venueId" cityId={cityId} initialVenueId={initial.venueId}/>
     <label>{x('price')}<input name="priceText" maxLength={120} defaultValue={initial.priceText} placeholder={x('pricePlaceholder')}/><small>{x('priceHint')}</small></label>
     <SwingFields initial={initial} tags={tags} selectedTags={selectedTags}/>

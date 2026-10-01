@@ -9,6 +9,8 @@ export const eventInput=z.object({
   title:z.string().trim().min(3).max(120),description:z.string().trim().min(10).max(5000),
   cityId:z.string().min(1).max(64),styleId:z.string().min(1).max(64),
   venueId:z.string().max(64).nullish().transform(value=>value||null),
+  // Set only on creation, and only for a school the author manages; checked in the route.
+  schoolProfileId:z.string().max(64).nullish().transform(value=>value||null),
   priceText:z.string().trim().max(120).nullish().transform(value=>value||null),
   attendeeVisibility:z.enum(attendeeVisibilities).default('PUBLIC'),
   startsLocal:local,endsLocal:local,

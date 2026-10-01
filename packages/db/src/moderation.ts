@@ -161,7 +161,7 @@ export async function decideClaim(claimId: string, approve: boolean, actorUserId
   try {
     return await db.$transaction(async tx => {
       const claim = await tx.profileClaim.findUnique({where: {id: claimId},
-        include: {profile: {select: {id: true, userId: true, handle: true, name: true}}, user: {select: {bannedAt: true}}}});
+        include: {profile: {select: {id: true, userId: true, handle: true, name: true, type: true}}, user: {select: {bannedAt: true, role: true}}}});
       if (!claim) throw new ModerationError('NOT_FOUND', 404);
       if (claim.status !== 'PENDING') throw new ModerationError('ALREADY_DECIDED', 409);
       const decided = {decidedByUserId: actorUserId, decidedAt: new Date()};
@@ -174,6 +174,12 @@ export async function decideClaim(claimId: string, approve: boolean, actorUserId
         const own = await tx.profile.findUnique({where: {userId: claim.userId}, select: {id: true}});
         if (own && own.id !== claim.profileId) throw new ModerationError('CLAIMANT_HAS_PROFILE', 409);
         await tx.profile.update({where: {id: claim.profileId}, data: {userId: claim.userId}});
+        // The verified owner of a school also gets its cabinet in the admin panel; staff roles are left as they are.
+        if (claim.profile.type === 'SCHOOL') {
+          const grant = {userId: claim.userId, schoolProfileId: claim.profileId};
+          await tx.schoolAdmin.upsert({where: {userId_schoolProfileId: grant}, create: grant, update: {}});
+          if (claim.user.role === 'USER') await tx.user.update({where: {id: claim.userId}, data: {role: 'SCHOOL_ADMIN'}});
+        }
         await tx.profileClaim.update({where: {id: claimId}, data: {status: 'APPROVED', ...decided}});
         rejected = await tx.profileClaim.findMany({where: {profileId: claim.profileId, status: 'PENDING', id: {not: claimId}}, select: {id: true, userId: true}});
         if (rejected.length) {

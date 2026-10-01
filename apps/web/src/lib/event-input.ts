@@ -31,7 +31,7 @@ export async function prepareEvent(body:unknown) {
     tempo:input.tempo,prerequisites:input.prerequisites,partnerRequired:input.partnerRequired,
     // The same key the importer computes, so an imported copy of this event is recognised as a duplicate.
     dedupeKey:eventDedupeKey({title:input.title,startsAt:when.startsAt,timezone:city.timezone,cityId:city.id,lat:venue?.lat??city.lat,lng:venue?.lng??city.lng,precise:!!venue})};
-  return {fields,occurrences,styleId:style.id,tagIds:tags.map(t=>t.id)};
+  return {fields,occurrences,styleId:style.id,tagIds:tags.map(t=>t.id),schoolProfileId:input.schoolProfileId};
 }
 // Replaces the dates of a series while keeping rows whose start did not move: a cancelled date stays cancelled
 // and a reminder that was already sent is not sent again.
