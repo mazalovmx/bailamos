@@ -23,7 +23,7 @@ export function Combobox<T extends ComboOption>({name, label, endpoint, initial 
     const timer = setTimeout(async () => {
       setState('loading');
       try {
-        const response = await fetch(endpoint + '?q=' + encodeURIComponent(text.trim()), {signal: controller.signal});
+        const response = await fetch(endpoint + (endpoint.includes('?') ? '&' : '?') + 'q=' + encodeURIComponent(text.trim()), {signal: controller.signal});
         if (!response.ok) throw new Error('FAILED');
         setOptions((await response.json()).items);
         setActive(-1);

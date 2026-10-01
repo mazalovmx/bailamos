@@ -2,16 +2,19 @@ import {db} from '@dance/db';
 import {notify} from '../notify';
 import {mailLocale,sendMail,siteUrl,type MailLocale} from '../mail';
 import {mailText,mailDate} from './mail-text';
+import {attendeeProfileIds,eventAudience} from './attendees';
 // Tells everyone who answered "going" or "interested" that the event (or one date of a series) is cancelled:
 // an in-app notification for all of them and an email unless they switched event emails off.
-// Callers invoke it once, on the transition into the cancelled state.
+// For a single date the answer that counts is the effective one: whoever said "not this date" hears nothing,
+// whoever comes to that date only does. Callers invoke it once, on the transition into the cancelled state.
 export async function announceCancellation(eventId:string,options:{occurrence?:{id:string;startsAt:Date};exceptUserId?:string;link?:boolean}={}) {
-  const event=await db.event.findUnique({where:{id:eventId},select:{id:true,slug:true,title:true,timezone:true,startsAt:true,
-    rsvps:{where:{status:{in:['GOING','INTERESTED']}},select:{profile:{select:{user:{select:{id:true,email:true,locale:true,bannedAt:true,
-      notificationPreference:{select:{emailEvents:true}}}}}}}}}});
+  const event=await db.event.findUnique({where:{id:eventId},select:{id:true,slug:true,title:true,timezone:true,startsAt:true}});
   if(!event) return {notified:0,mailed:0};
-  const users=event.rsvps.flatMap(r=>r.profile.user?[r.profile.user]:[]).filter(u=>u.id!==options.exceptUserId&&!u.bannedAt);
-  const {occurrence}=options,path='/events/'+event.slug+(occurrence?'?date='+encodeURIComponent(occurrence.startsAt.toISOString()):'');
+  const {occurrence}=options;
+  const profileIds=occurrence?await attendeeProfileIds(eventId,occurrence.id,['GOING','INTERESTED']):await eventAudience(eventId);
+  const users=(await db.user.findMany({where:{profile:{id:{in:profileIds}},bannedAt:null},
+    select:{id:true,email:true,locale:true,notificationPreference:{select:{emailEvents:true}}}})).filter(u=>u.id!==options.exceptUserId);
+  const path='/events/'+event.slug+(occurrence?'?date='+encodeURIComponent(occurrence.startsAt.toISOString()):'');
   const data={eventId:event.id,slug:event.slug,title:event.title,
     ...(occurrence?{occurrenceId:occurrence.id,date:occurrence.startsAt.toISOString(),timezone:event.timezone}:{})};
   const locales=new Map<MailLocale,typeof users>();

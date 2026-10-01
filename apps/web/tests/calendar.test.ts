@@ -88,6 +88,36 @@ test('weekly Madrid class stays at 19:00 on its Sunday across the October and Ma
     assert.deepEqual(parsed.map(p => new Date(p.start).toISOString()).sort(), series.occurrences.map(o => o.startsAt.toISOString()));
   }
 });
+test('a moved date is exported at its new time under the same UID with a SEQUENCE that grows with every change', () => {
+  const at = (iso: string) => new Date(iso);
+  const series = (updatedAt: string, movedTo: string) => sample('es', 'Europe/Madrid', 'Madrid', '2026-10-20T17:00:00Z', '2026-10-20T19:00:00Z', {updatedAt: at(updatedAt), occurrences: [
+    {id: 'es-o1', startsAt: at('2026-10-20T17:00:00Z'), endsAt: at('2026-10-20T19:00:00Z'), cancelled: false, originalStartsAt: null},
+    // Planned for Tuesday 27 October 19:00 (already winter time), moved to another day and hour.
+    {id: 'es-o2', startsAt: at(movedTo), endsAt: new Date(at(movedTo).getTime() + 5400000), cancelled: false, originalStartsAt: at('2026-10-27T18:00:00Z')},
+    {id: 'es-o3', startsAt: at('2026-11-04T19:00:00Z'), endsAt: null, cancelled: true, originalStartsAt: at('2026-11-03T18:00:00Z')},
+    {id: 'es-o4', startsAt: at('2026-11-10T18:00:00Z'), endsAt: null, cancelled: true}]});
+  const vevents = (body: string) => Object.fromEntries(body.replace(/\r\n[ \t]/g, '').split('BEGIN:VEVENT').slice(1).map(block => {
+    const value = (name: string) => block.split('\r\n').find(l => l.startsWith(name))?.split(':').slice(1).join(':');
+    return [value('UID'), {start: block.split('\r\n').find(l => l.startsWith('DTSTART')), sequence: Number(value('SEQUENCE')), status: value('STATUS'), url: value('URL')}];
+  }));
+  const body = buildCalendar({name: 'x', origin, events: [series('2026-09-01T10:00:00Z', '2026-10-28T19:30:00Z')]}), first = vevents(body);
+  assert.deepEqual(Object.keys(first), ['es-o1@dance.example', 'es-o2@dance.example', 'es-o3@dance.example', 'es-o4@dance.example']);
+  assert.equal(first['es-o2@dance.example'].start, 'DTSTART;TZID=Europe/Madrid:20261028T203000');
+  assert.ok(!body.includes('20261027T190000'), 'the original time is not exported');
+  assert.equal(first['es-o2@dance.example'].url, 'https://dance.example/en/events/es?date=2026-10-28T19%3A30%3A00.000Z');
+  const revision = first['es-o2@dance.example'].sequence;
+  assert.ok(Number.isInteger(revision) && revision > 1 && revision < 2 ** 31);
+  assert.deepEqual([first['es-o1@dance.example'].sequence, first['es-o3@dance.example'].sequence, first['es-o4@dance.example'].sequence], [0, revision + 1, 1],
+    'untouched 0, moved and cancelled one above moved, cancelled only 1');
+  assert.deepEqual([first['es-o2@dance.example'].status, first['es-o3@dance.example'].status], ['CONFIRMED', 'CANCELLED']);
+  // Moving it again advances the event's timestamp, and with it the SEQUENCE.
+  const again = vevents(buildCalendar({name: 'x', origin, events: [series('2026-09-01T10:05:00Z', '2026-10-29T19:00:00Z')]}));
+  assert.equal(again['es-o2@dance.example'].start, 'DTSTART;TZID=Europe/Madrid:20261029T200000');
+  assert.equal(again['es-o2@dance.example'].sequence, revision + 300);
+  assert.equal(again['es-o1@dance.example'].sequence, 0);
+  const parsed = Object.values(nodeIcal.sync.parseICS(body)).filter(e => e && e.type === 'VEVENT') as {uid: string; start: Date}[];
+  assert.equal(new Date(parsed.find(p => p.uid === 'es-o2@dance.example')!.start).toISOString(), '2026-10-28T19:30:00.000Z');
+});
 test('zone helpers: transitions, labels, a party over the fall-back night and zones without DST', () => {
   const madrid = transitions('Europe/Madrid', Date.parse('2026-01-01T00:00:00Z'), Date.parse('2027-01-01T00:00:00Z'));
   assert.deepEqual(madrid.map(t => [new Date(t.at).toISOString(), t.before, t.after]), [['2026-03-29T01:00:00.000Z', 60, 120], ['2026-10-25T01:00:00.000Z', 120, 60]]);

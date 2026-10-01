@@ -6,6 +6,8 @@ import {DateTime, IANAZone} from 'luxon';
 import {styleTree} from '../../../packages/db/prisma/data/styles';
 import {cities} from '../../../packages/db/prisma/data/cities';
 import {normalize, rankMatches} from '../src/lib/catalogue/search';
+import {cityAliases, cityLocale, cityName, localizeCities} from '../src/lib/catalogue/city-name';
+import {catalogue} from '../src/lib/catalogue';
 import {ancestors, buildTree, countBranch, descendantIds, hasCycle} from '../src/lib/catalogue/tree';
 import {db} from '@dance/db';
 import {allStyles, allCities, styleDescendantIds, upcomingOccurrences} from '../src/lib/catalogue/data';
@@ -119,6 +121,79 @@ test('autocomplete endpoints: prefix and substring matches, at most 10 items, ca
   assert.equal((await get(citiesRoute, '/api/catalogue/cities?q=moscow'))[0].name, 'Москва');
   assert.ok((await get(citiesRoute, '/api/catalogue/cities?q=' + encodeURIComponent('петербург'))).some(city => city.slug === 'saint-petersburg'));
   assert.ok((await get(citiesRoute, '/api/catalogue/cities?q=a')).length <= 10);
+});
+test('seed data: every city has distinct, non-empty en, es and ru names', () => {
+  assert.equal(cities.length, 97);
+  for (const city of cities) {
+    assert.deepEqual(Object.keys(city.names).sort(), ['en', 'es', 'ru'], city.slug);
+    for (const value of Object.values(city.names)) assert.ok(value.trim() === value && value.length >= 2 && value.length <= 40, city.slug + ': ' + value);
+    assert.match(city.names.ru, /^[А-Яа-яЁё .,-]+$/, city.slug + ' needs a Cyrillic name');
+    assert.match(city.names.en + city.names.es, /^[\p{Script=Latin} .,'-]+$/u, city.slug + ' needs Latin names');
+  }
+  for (const locale of ['en', 'es', 'ru'] as const) assert.equal(new Set(cities.map(city => normalize(city.names[locale]))).size, cities.length, 'names are unique in ' + locale);
+  const names = (slug: string) => Object.values(cities.find(city => city.slug === slug)!.names);
+  assert.deepEqual(names('moscow'), ['Moscow', 'Moscú', 'Москва']);
+  assert.deepEqual(names('cologne'), ['Cologne', 'Colonia', 'Кёльн']);
+  assert.deepEqual(names('mexico-city'), ['Mexico City', 'Ciudad de México', 'Мехико']);
+  assert.deepEqual(names('new-york'), ['New York', 'Nueva York', 'Нью-Йорк']);
+});
+test('cityName: the interface language wins, anything missing or malformed falls back to the local spelling', () => {
+  const cologne = {name: 'Köln', names: {en: 'Cologne', es: 'Colonia', ru: 'Кёльн'}};
+  assert.deepEqual(['en', 'es', 'ru', 'de', 'en-GB', 'RU', ''].map(locale => cityName(cologne, locale)), ['Cologne', 'Colonia', 'Кёльн', 'Köln', 'Cologne', 'Кёльн', 'Köln']);
+  for (const names of [null, undefined, 'Cologne', ['Cologne'], 42, {}, {en: ''}, {en: '  '}, {en: 7}, {en: null}]) assert.equal(cityName({name: 'Köln', names}, 'en'), 'Köln', JSON.stringify(names));
+  assert.deepEqual(cityAliases(cologne), ['Köln', 'Cologne', 'Colonia', 'Кёльн']);
+  assert.deepEqual(cityAliases({name: 'Madrid', names: {en: 'Madrid', es: 'Madrid', ru: 'Мадрид'}}), ['Madrid', 'Мадрид']);
+  assert.deepEqual(cityAliases({name: 'Madrid', names: null}), ['Madrid']);
+  assert.deepEqual([cityLocale('ru'), cityLocale('de'), cityLocale(null), cityLocale('__proto__')], ['ru', null, null, null]);
+  const sorted = localizeCities([{slug: 'vienna', name: 'Wien', names: {ru: 'Вена'}}, {slug: 'athens', name: 'Athens', names: {ru: 'Афины'}}, {slug: 'x', name: 'Яя', names: null}], 'ru');
+  assert.deepEqual(sorted.map(city => [city.slug, city.name, city.localName]), [['athens', 'Афины', 'Athens'], ['vienna', 'Вена', 'Wien'], ['x', 'Яя', 'Яя']]);
+  // Aliases widen the search, the result keeps its own order by name.
+  const items = [{slug: 'cologne', ...cologne}, {slug: 'colombo', name: 'Colombo', names: null}];
+  assert.deepEqual(rankMatches(items, 'colon', 10, cityAliases).map(item => item.slug), ['cologne']);
+  assert.deepEqual(rankMatches(items, 'кёль', 10, cityAliases).map(item => item.slug), ['cologne']);
+  assert.deepEqual(rankMatches(items, 'colon').map(item => item.slug), []);
+});
+test('database: all seeded cities carry en/es/ru names, and re-seeding only refreshes those names', async () => {
+  const rows = await db.city.findMany({where: {slug: {in: cities.map(city => city.slug)}}});
+  assert.equal(rows.length, cities.length, 'run pnpm db:seed first');
+  for (const city of cities) assert.deepEqual(rows.find(row => row.slug === city.slug)?.names, city.names, city.slug);
+  // The same upsert as prisma/seed.ts, on a scratch city: an edited row keeps everything but `names`.
+  const slug = 'zz-test-' + randomUUID().slice(0, 8), seeded = {slug, name: 'Seeded', countryCode: 'ES', timezone: 'Europe/Madrid', lat: 1, lng: 2, names: {en: 'A', es: 'B', ru: 'В'}};
+  const upsert = () => db.city.upsert({where: {slug}, create: {id: slug, ...seeded}, update: {names: seeded.names}});
+  try {
+    assert.deepEqual((await upsert()).names, seeded.names);
+    await db.city.update({where: {slug}, data: {name: 'Edited by an admin', timezone: 'Europe/Lisbon', lat: 9, names: {en: 'stale'}}});
+    const again = await upsert(), third = await upsert();
+    assert.deepEqual([again.name, again.timezone, again.lat, again.lng, again.names], ['Edited by an admin', 'Europe/Lisbon', 9, 2, seeded.names]);
+    assert.deepEqual(third, again);
+    assert.equal(await db.city.count({where: {slug}}), 1);
+  } finally {await db.city.deleteMany({where: {slug}});}
+});
+test('city autocomplete and catalogue: found by any of the three names or the slug, shown in the requested language', async () => {
+  const get = async (query: string) => (await (await citiesRoute.GET(new Request(base + '/api/catalogue/cities?' + query))).json()).items as {id: string; slug: string; name: string; localName: string}[];
+  const q = (text: string, locale?: string) => get('q=' + encodeURIComponent(text) + (locale ? '&locale=' + locale : ''));
+  for (const [text, slug] of [['Moscow', 'moscow'], ['mosc', 'moscow'], ['Moscú', 'moscow'], ['moscu', 'moscow'], ['Москва', 'moscow'], ['моск', 'moscow'], ['Cologne', 'cologne'], ['colonia', 'cologne'],
+    ['Кёльн', 'cologne'], ['кельн', 'cologne'], ['Köln', 'cologne'], ['koln', 'cologne'], ['Мюнхен', 'munich'], ['munchen', 'munich'], ['Múnich', 'munich'], ['Londres', 'london'], ['Лондон', 'london'],
+    ['Нью-Йорк', 'new-york'], ['nueva york', 'new-york'], ['new york', 'new-york'], ['Мехико', 'mexico-city'], ['ciudad de mex', 'mexico-city'], ['Варшава', 'warsaw'], ['varsovia', 'warsaw'],
+    ['warszawa', 'warsaw'], ['Estocolmo', 'stockholm'], ['Киев', 'kyiv'], ['Київ', 'kyiv'], ['habana', 'havana'], ['Гавана', 'havana'], ['saint-petersburg', 'saint-petersburg'], ['San Petersburgo', 'saint-petersburg']])
+    for (const locale of [undefined, 'en', 'es', 'ru']) assert.equal((await q(text, locale))[0]?.slug, slug, text + ' in ' + locale);
+  const shown = async (text: string) => Promise.all(['en', 'es', 'ru'].map(async locale => (await q(text, locale))[0].name));
+  assert.deepEqual(await shown('moscow'), ['Moscow', 'Moscú', 'Москва']);
+  assert.deepEqual(await shown('köln'), ['Cologne', 'Colonia', 'Кёльн']);
+  assert.deepEqual(await shown('lisboa'), ['Lisbon', 'Lisboa', 'Лиссабон']);
+  const [cologne] = await q('cologne', 'ru');
+  assert.deepEqual([cologne.id, cologne.name, cologne.localName], ['cologne', 'Кёльн', 'Köln']);
+  // Without a locale (older callers) the name stays in local spelling; an unknown locale is treated the same way.
+  assert.deepEqual([(await q('cologne'))[0].name, (await q('cologne', 'de'))[0].name, (await q('cologne'))[0].localName], ['Köln', 'Köln', 'Köln']);
+  // The browse list (empty query) is alphabetical in the reader's language.
+  const browse = (await q('', 'ru')).map(city => city.name);
+  assert.deepEqual(browse, [...browse].sort((a, b) => a.localeCompare(b, 'ru')));
+  assert.match(browse[0], /^[А-Яа-яЁё]/);
+  const byLocale = await Promise.all([catalogue(), catalogue('en'), catalogue('es'), catalogue('ru')]);
+  assert.deepEqual(byLocale.map(data => data.cities.find(city => city.id === 'moscow')?.name), ['Москва', 'Moscow', 'Moscú', 'Москва']);
+  assert.equal('names' in byLocale[1].cities[0], false);
+  const ru = byLocale[3].cities.map(city => city.name);
+  assert.deepEqual(ru, [...ru].sort((a, b) => a.localeCompare(b, 'ru')));
 });
 test('follows API refuses anonymous and cross-site callers', async () => {
   const route = followsRoute;

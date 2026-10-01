@@ -4,14 +4,18 @@ import {reminderJobs} from '../lib/jobs/reminders';
 import {mediaJobs} from '../lib/jobs/media';
 import {maintenanceJobs} from '../lib/jobs/maintenance';
 import {importJobs} from '../lib/import/jobs';
+import {embedJobs} from '../lib/embeds/refresh';
+import {opsJobs} from '../lib/jobs/ops';
 // Every background job of the platform. A feature exports JobDef[] and is added here; the worker entrypoint
 // (src/worker/index.ts) registers each definition as a repeatable job and removes schedules that left this list.
 export const jobs: JobDef[] = [
   ...digestJobs,       // digest.weekly      — Monday 07:00 UTC
   ...reminderJobs,     // reminders.events   — every 5 minutes
-  ...mediaJobs,        // media.sweep        — daily 04:15 UTC
+  ...mediaJobs,        // media.sweep        — daily 04:15 UTC; media.purge — every 15 minutes; media.orphans — daily 04:45 UTC
   ...maintenanceJobs,  // ratelimit.cleanup  — daily 03:30 UTC
   ...importJobs,       // import.sources     — every 30 minutes; import.news.prune — daily
+  ...embedJobs,        // embeds.refresh     — every 30 minutes
+  ...opsJobs,          // ops.watchdog       — every minute; backup.database — daily 02:40 UTC (BACKUP_ENABLED=true)
 ];
 const PART = /^(?:\*|(\d+)(?:-(\d+))?)(?:\/(\d+))?$/;
 /** Five-field cron ("m h dom mon dow"), numbers only — the subset the registry allows. */

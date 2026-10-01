@@ -4,14 +4,16 @@ import {geocode} from '../geo/geocode';
 import {withRedis} from '../redis';
 import {MAX_DATES, schedule} from '../schedule';
 import {ensureShortCode} from '../events/short-code';
-import {createEvent, importApproved, payloadKey, readyPayload, type Payload, type ReadyPayload} from './create';
+import {createEvent, importApproved, payloadKey, readyPayload, stampItem, type Payload, type ReadyPayload} from './create';
 import {dedupeKey, distanceM, fuzzyMatch, type Keyed} from './dedupe';
 import {ImportFetchError, safeFetch} from './fetch';
 import {parseIcal} from './parse-ical';
 import {parseNews, parseRssEvents} from './parse-rss';
 import {parseSchemaOrg} from './parse-schema';
+import {assertRobots} from './robots';
+import {sweepMissing, syncImported} from './sync';
 import {STAMP} from './text';
-import type {ParsedEvent} from './types';
+import {MAX_ITEMS, type ParsedEvent} from './types';
 // Fetch → parse → resolve (timezone, city, coordinates) → de-duplicate → Event. One source at a time; nothing in here
 // throws to the caller: a broken source ends up as `ok: false` in ImportSource.lastStatus and nowhere else.
 export type SourceState = {ok?: boolean; at?: string; http?: number; etag?: string | null; lastModified?: string | null;
@@ -35,11 +37,12 @@ async function loadCities() {
 }
 type Resolved = {payload: Payload; reject?: string; review?: string};
 // Fills in what the feed left out. Never throws: a geocoder outage only means the city stands in for the address.
-export async function resolveItem(source: Pick<ImportSource, 'cityId'>, item: ParsedEvent, context: Context): Promise<Resolved> {
+// `known` is the answer of an earlier run for the same address (null: nothing was found): the geocoder is not asked again.
+export async function resolveItem(source: Pick<ImportSource, 'cityId'>, item: ParsedEvent, context: Context, known?: {point: {lat: number; lng: number} | null}): Promise<Resolved> {
   const sourceCity = source.cityId ? context.cities.get(source.cityId) : undefined;
-  let point = item.lat !== undefined && item.lng !== undefined ? {lat: item.lat, lng: item.lng} : null;
+  let point = item.lat !== undefined && item.lng !== undefined ? {lat: item.lat, lng: item.lng} : known?.point ?? null;
   const query = item.address || (item.venueName && sourceCity ? item.venueName + ', ' + sourceCity.name : '');
-  if (!point && query && context.geocodes < MAX_GEOCODES) {
+  if (!point && !known && query && context.geocodes < MAX_GEOCODES) {
     context.geocodes++;
     const hit = await geocode(query, {countryCode: sourceCity?.countryCode}).catch(() => null);
     // A hit far from the source's own city is more likely a wrong match than a real address.
@@ -111,10 +114,12 @@ export async function findMatch(payload: ReadyPayload, key: string, context: Pic
   return fuzzy;
 }
 const where = (sourceId: string, externalId: string) => ({sourceId_externalId: {sourceId, externalId}});
-// Decides the fate of one parsed item. Items already decided (imported, duplicate, rejected, waiting for review) are left alone.
-export async function processItem(source: Pick<ImportSource, 'id' | 'url' | 'cityId'>, item: ParsedEvent, context: Context): Promise<ImportStatus | 'SKIPPED'> {
+// Decides the fate of one parsed item. Items already decided (duplicate, rejected, waiting for review) are left alone;
+// an imported one keeps following its source (sync.ts).
+export async function processItem(source: Pick<ImportSource, 'id' | 'url' | 'cityId'>, item: ParsedEvent, context: Context): Promise<ImportStatus | 'SKIPPED' | 'UPDATED' | 'CANCELLED'> {
   if (!item.externalId) return 'SKIPPED';
   const existing = await db.importedItem.findUnique({where: where(source.id, item.externalId)});
+  if (existing?.status === 'IMPORTED') return syncImported(source, existing, item, known => resolveItem(source, item, context, known), context.now);
   if (existing && existing.status !== 'PENDING') return 'SKIPPED';
   // Confirmed in the admin panel: PENDING with note APPROVED means "create it, do not compare again".
   if (existing?.note === 'APPROVED') return (await importApproved({...existing, source}, null, context.now)).status;
@@ -130,7 +135,7 @@ export async function processItem(source: Pick<ImportSource, 'id' | 'url' | 'cit
   if (match?.kind === 'exact') {await save('DUPLICATE', 'SAME_AS ' + match.title, match.eventId); return 'DUPLICATE';}
   if (match) {await save('REVIEW', 'SIMILAR_TO ' + match.title, match.eventId); return 'REVIEW';}
   if (review) {await save('REVIEW', review); return 'REVIEW';}
-  const eventId = await db.$transaction(async tx => {
+  const created = await db.$transaction(async tx => {
     const event = await createEvent(tx, ready.data, source.url, context.now);
     if (!event) return null;
     const data = {status: 'IMPORTED' as const, note: null, eventId: event.id, payload: json(payload), dedupeKey: event.dedupeKey};
@@ -138,11 +143,14 @@ export async function processItem(source: Pick<ImportSource, 'id' | 'url' | 'cit
     if (existing) {
       const changed = await tx.importedItem.updateMany({where: {id: existing.id, status: 'PENDING'}, data});
       if (!changed.count) throw new Error('IMPORT_RACE');
-    } else await tx.importedItem.create({data: {sourceId: source.id, externalId: item.externalId, ...data}});
-    return event.id;
+      return {eventId: event.id, itemId: existing.id};
+    }
+    return {eventId: event.id, itemId: (await tx.importedItem.create({data: {sourceId: source.id, externalId: item.externalId, ...data}})).id};
   });
-  if (!eventId) {await save('REJECTED', 'PAST'); return 'REJECTED';}
-  await ensureShortCode(eventId).catch(() => null);
+  if (!created) {await save('REJECTED', 'PAST'); return 'REJECTED';}
+  await ensureShortCode(created.eventId).catch(() => null);
+  // The content hash and the time of this last write: what later runs compare the feed and the event against.
+  await stampItem(created.itemId, created.eventId, payload).catch(() => null);
   return 'IMPORTED';
 }
 async function importNews(source: Pick<ImportSource, 'id' | 'cityId'>, body: string, now: Date) {
@@ -170,12 +178,16 @@ export async function runSource(sourceId: string, options: {now?: Date; force?: 
   const previous = readState(source.lastStatus);
   let state: SourceState, result: RunResult;
   try {
-    const response = await safeFetch(source.url, {accept: ACCEPT[source.kind], ...(options.force ? {} : {etag: previous.etag, lastModified: previous.lastModified})});
+    // A web page is read the way a crawler reads it, so robots.txt applies (also to where it redirects). Feeds that a
+    // site publishes for syndication are fetched regardless; both stay behind the per-host pause.
+    const response = await safeFetch(source.url, {accept: ACCEPT[source.kind], ...(source.kind === 'SCHEMA_ORG' ? {check: assertRobots} : {}),
+      ...(options.force ? {} : {etag: previous.etag, lastModified: previous.lastModified})});
     if (!response.notModified) {
       if (source.news) Object.assign(counts, await importNews(source, response.body, now));
       else {
         const context: Context = {now, cities: await loadCities(), geocodes: 0};
-        for (const item of await parseSource(source, response.body, response.url, now)) {
+        const parsed = await parseSource(source, response.body, response.url, now);
+        for (const item of parsed) {
           let status: string;
           // One malformed item (or a lost race for it) does not stop the rest of the feed.
           try {status = await processItem(source, item, context);} catch (error) {
@@ -183,6 +195,15 @@ export async function runSource(sourceId: string, options: {now?: Date; force?: 
             log('warn', 'import_item_failed', {sourceId, message: error instanceof Error ? error.message.slice(0, 200) : 'unknown'});
           }
           counts[status] = (counts[status] || 0) + 1;
+        }
+        // Only a complete listing can tell that an item is gone: a calendar or a page, not cut off by the per-run
+        // limit and read without a failure. An RSS feed is a window of the latest entries and proves nothing.
+        if (source.kind !== 'RSS' && parsed.length > 0 && parsed.length < MAX_ITEMS && !counts.FAILED) {
+          const missing = await sweepMissing(source.id, parsed.map(item => item.externalId).filter(Boolean), now).catch(error => {
+            log('warn', 'import_missing_failed', {sourceId, message: error instanceof Error ? error.message.slice(0, 200) : 'unknown'});
+            return {} as Record<string, number>;
+          });
+          for (const [status, count] of Object.entries(missing)) counts[status] = (counts[status] || 0) + count;
         }
       }
     }

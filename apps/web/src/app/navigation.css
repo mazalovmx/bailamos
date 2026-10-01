@@ -6,7 +6,7 @@
   .header-menu{display:block;grid-column:1/-1;order:4}
   .header-menu .menu-toggle{position:absolute;right:0;top:14px;list-style:none}
   .header-menu .menu-toggle::-webkit-details-marker{display:none}
-  .app-header .brand{font-size:19px;min-width:0}
+  .app-header .brand{font-size:19px;min-width:0;min-height:44px;display:flex;align-items:center}
   .menu-toggle{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 10px;border:1px solid #9fa897;border-radius:12px;background:#fffefa;color:inherit;font:inherit;font-size:14px;cursor:pointer}
   .menu-toggle span{font-size:20px}
   .app-header .language-nav{grid-column:1/-1;order:3;margin:0;justify-self:start}

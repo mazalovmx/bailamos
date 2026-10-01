@@ -13,7 +13,14 @@ export const limits = {
   newDirect: {limit: 20, windowSec: 3600},
   newGroup: {limit: 5, windowSec: 3600},
   invite: {limit: 30, windowSec: 3600},
-  stream: {limit: 30, windowSec: 60}
+  stream: {limit: 30, windowSec: 60},
+  // An image costs storage and processing, so attachments have their own hourly budget on top of the upload limits.
+  attach: {limit: 30, windowSec: 3600},
+  attachmentRead: {limit: 600, windowSec: 60},
+  edit: {limit: 30, windowSec: 60},
+  manage: {limit: 30, windowSec: 3600},
+  // A message may be corrected for a quarter of an hour; after that only deleting it is possible.
+  editWindowMs: 15 * 60_000
 } as const;
 export const directKey = (a: string, b: string) => [a, b].sort().join(':');
 export const directPeer = (key: string, profileId: string) => key.split(':').find(id => id !== profileId) ?? null;

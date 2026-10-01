@@ -75,15 +75,30 @@ export function ArtistPanel({eventId,artists}:{eventId:string;artists:Artist[]})
     {a.feedback}
   </section>;
 }
-// Single dates of a series: cancel one or bring it back without touching the others.
-export function OccurrencePanel({eventId,timezone,occurrences}:{eventId:string;timezone:string;occurrences:{id:string;startsAt:string;cancelled:boolean;past:boolean}[]}) {
+type ManagedDate={id:string;startsAt:string;startsLocal:string;endsLocal:string;cancelled:boolean;past:boolean;original:string|null};
+// Single dates of a series: cancel one, bring it back, or move it to another time without touching the others.
+export function OccurrencePanel({eventId,timezone,occurrences}:{eventId:string;timezone:string;occurrences:ManagedDate[]}) {
   const x=useTranslations('EventsX'),t=useTranslations('App'),locale=useLocale(),router=useRouter(),a=useAction();
+  const [moving,setMoving]=useState<string|null>(null);
   const label=new Intl.DateTimeFormat(locale,{dateStyle:'full',timeStyle:'short',timeZone:timezone});
+  const target=occurrences.find(o=>o.id===moving&&!o.past&&!o.cancelled);
   return <section className="manage-panel" aria-labelledby="dates-title"><h2 id="dates-title">{x('singleDates')}</h2><p className="field-note">{x('singleDatesHint')}</p>
     <ol className="date-list">{occurrences.map(o=>{const text=label.format(new Date(o.startsAt));return <li key={o.id}>
       <time dateTime={o.startsAt}>{o.cancelled?<s>{text}</s>:text}</time>{o.cancelled&&<span className="badge">{t('CANCELLED')}</span>}
+      {o.original&&<span className="badge" title={x('movedFrom',{date:label.format(new Date(o.original))})}>{x('movedBadge')}</span>}
+      {!o.past&&!o.cancelled&&<button type="button" className="link-button" disabled={a.busy} aria-expanded={moving===o.id} aria-controls="move-date-form" aria-label={x('moveDateNamed',{date:text})}
+        onClick={()=>setMoving(moving===o.id?null:o.id)}>{x('moveDate')}</button>}
       {!o.past&&<button type="button" className="link-button" disabled={a.busy} aria-label={x(o.cancelled?'restoreDateNamed':'cancelDateNamed',{date:text})}
         onClick={()=>a.run(async()=>{await api('/api/events/'+eventId+'/occurrences/'+o.id,'PATCH',{cancelled:!o.cancelled});router.refresh();},x(o.cancelled?'dateRestored':'dateCancelled'))}>{x(o.cancelled?'restoreDate':'cancelDate')}</button>}</li>;})}</ol>
+    <div id="move-date-form">{target&&<form key={target.id} className="inline-form" aria-label={x('moveDateNamed',{date:label.format(new Date(target.startsAt))})} onSubmit={async e=>{e.preventDefault();
+        const data=new FormData(e.currentTarget),body={startsLocal:String(data.get('startsLocal')),endsLocal:String(data.get('endsLocal'))};
+        if(await a.run(async()=>{await api('/api/events/'+eventId+'/occurrences/'+target.id,'PATCH',body);router.refresh();},x('dateMoved'))) setMoving(null);}}>
+      <p className="field-note">{x('moveDateHint',{date:label.format(new Date(target.startsAt)),zone:timezone})}{target.original&&<> {x('movedFrom',{date:label.format(new Date(target.original))})}</>}</p>
+      <label>{x('moveStarts')}<input name="startsLocal" type="datetime-local" required defaultValue={target.startsLocal} autoFocus/></label>
+      <label>{x('moveEnds')}<input name="endsLocal" type="datetime-local" required defaultValue={target.endsLocal}/></label>
+      <button className="button secondary" disabled={a.busy}>{x('moveSave')}</button>
+      <button type="button" className="button secondary" disabled={a.busy} onClick={()=>setMoving(null)}>{x('moveCancel')}</button>
+    </form>}</div>
     {a.feedback}
   </section>;
 }

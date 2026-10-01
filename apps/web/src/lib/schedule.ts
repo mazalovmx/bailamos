@@ -55,3 +55,8 @@ export function parseRecurrence(rrule:string|null|undefined,zone:string):Require
 export function previewDates(start:string,end:string,zone:string,recurrence:number|Recurrence,limit=10) {
   return schedule(start,end,zone,recurrence).occurrences.slice(0,limit).map(o=>o.startsAt);
 }
+// One date on its own (a single date of a series that is moved): wall-clock times in the event's zone.
+// A local time that DST skips or repeats is refused, exactly as for a whole series.
+export function singleDate(start:string,end:string,zone:string) {return eventTimes(start,end,zone);}
+// The wall-clock reading of an instant in a zone, in the format of <input type="datetime-local">.
+export const localStamp=(date:Date,zone:string)=>DateTime.fromJSDate(date,{zone}).toFormat(stamp);

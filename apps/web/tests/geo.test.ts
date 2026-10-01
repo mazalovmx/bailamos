@@ -154,7 +154,15 @@ test('geocoding caches answers in the database and survives provider failures', 
     if (url.pathname === '/reverse') return Response.json({lat: '40.4168', lon: '-3.7038', display_name: 'Calle Mayor 1, Madrid', address: {city: 'Madrid', suburb: 'Sol', country_code: 'es'}});
     return Response.json([{lat: '40.4168', lon: '-3.7038', display_name: 'Calle Mayor 1, Madrid, España', address: {city: 'Madrid', suburb: 'Sol', country_code: 'es'}}, {lat: 'x', lon: 'y', display_name: 'broken'}]);
   }) as typeof fetch;
+  // Coordinates of this run only, placed exactly on the 5-decimal grid the cache key is rounded to. A random point
+  // with more decimals sat next to a rounding boundary one time in ten: "the same building" then became another cache
+  // key, the provider was asked twice and the test failed (and left an untagged row behind).
+  const grid = (value: number) => Number(value.toFixed(5));
+  const nowhere = {lat: grid(10.5 + Math.random() / 10), lng: grid(20.5 + Math.random() / 10)};
+  const lat = grid(-48.8767 + Math.random() / 100), lng = -123.3933;
+  const reverseKeys = [nowhere, {lat, lng}].map(point => cacheKey('reverse', point.lat.toFixed(5) + ',' + point.lng.toFixed(5)));
   try {
+    await db.geocodeCache.deleteMany({where: {key: {in: reverseKeys}}});
     const query = 'Calle Mayor 1 ' + tag;
     const first = await geocode(query, {countryCode: 'ES'});
     assert.deepEqual(first, {lat: 40.4168, lng: -3.7038, label: 'Calle Mayor 1, Madrid, España', city: 'Madrid', district: 'Sol', countryCode: 'ES'});
@@ -171,9 +179,9 @@ test('geocoding caches answers in the database and survives provider failures', 
     for (const failure of ['down', 'http500', 'garbage'] as const) {
       mode = failure;
       assert.equal(await geocode('Unknown street ' + tag), null, failure);
-      assert.equal(await reverseGeocode(10.5, 20.5), null, failure);
+      assert.equal(await reverseGeocode(nowhere.lat, nowhere.lng), null, failure);
     }
-    assert.equal(await db.geocodeCache.count({where: {key: cacheKey('forward', 'Unknown street ' + tag)}}), 0);
+    assert.equal(await db.geocodeCache.count({where: {key: {in: [cacheKey('forward', 'Unknown street ' + tag), reverseKeys[0]]}}}), 0);
     mode = 'ok';
     assert.equal((await geocode('Unknown street ' + tag))?.city, 'Madrid');
     // An expired entry is refreshed, but still served if the provider is unavailable.
@@ -183,12 +191,15 @@ test('geocoding caches answers in the database and survives provider failures', 
     assert.deepEqual(await geocode(query, {countryCode: 'ES'}), first);
     assert.equal(calls.length, before + 1);
     mode = 'ok';
-    const lat = -48.8767 + Math.random() / 100, lng = -123.3933;
     assert.equal((await reverseGeocode(lat, lng))?.label, 'Calle Mayor 1, Madrid');
     before = calls.length;
-    assert.equal((await reverseGeocode(lat + 0.000001, lng))?.district, 'Sol');
+    // 4 m away at most (well inside the rounding cell of 5 decimals): the same key, no second request.
+    assert.equal((await reverseGeocode(lat + 0.000004, lng - 0.000004))?.district, 'Sol');
     assert.equal(calls.length, before, 'reverse lookups are cached by rounded coordinates');
-    await db.geocodeCache.deleteMany({where: {key: cacheKey('reverse', lat.toFixed(5) + ',' + lng.toFixed(5))}});
+    // The next cell is another key.
+    assert.equal((await reverseGeocode(lat + 0.00002, lng))?.district, 'Sol');
+    assert.equal(calls.length, before + 1);
+    reverseKeys.push(cacheKey('reverse', (lat + 0.00002).toFixed(5) + ',' + lng.toFixed(5)));
     assert.equal(await reverseGeocode(95, 0), null);
     assert.deepEqual(await geocode('ab'), null);
     // Autocomplete goes to Photon when it is configured.
@@ -206,7 +217,7 @@ test('geocoding caches answers in the database and survives provider failures', 
     for (const [name, value] of [['GEOCODER_URL', saved.url], ['PHOTON_URL', saved.photon], ['GEOCODER_USER_AGENT', saved.agent]] as const) {
       if (value === undefined) delete process.env[name]; else process.env[name] = value;
     }
-    await db.geocodeCache.deleteMany({where: {key: {contains: tag}}});
+    await db.geocodeCache.deleteMany({where: {OR: [{key: {contains: tag}}, {key: {in: reverseKeys}}]}});
   }
 });
 test('the shared public geocoder is never used for autocomplete', async () => {

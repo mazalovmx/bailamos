@@ -2,7 +2,9 @@
 
 ## Installed photographs
 
-The homepage uses user-supplied images from images/. Originals are unchanged. Public copies live in apps/web/public/images/community/, with the section mapping in apps/web/src/components/community-photo.tsx. Next Image serves responsive versions: the hero is prioritized, other images load lazily, and containers preserve source proportions on desktop and mobile.
+The homepage uses user-supplied images from images/. Originals are unchanged. Public copies live in apps/web/public/images/community/, with the section mapping in apps/web/src/components/community-photo.tsx. Static WebP variants at 640 and 1280 pixels are served through srcset without the runtime image optimizer. The hero is prioritized, other images load lazily, and containers preserve source proportions on desktop and mobile. The current variants are approximately 43–163 KB each.
+
+Regenerate variants after changing the PNG sources: `node apps/web/scripts/prepare-community-images.mjs`. Commit the generated WebP assets with the component changes so branch promotions retain the photographs.
 
 | Section | Original file in images/ | Public copy |
 | --- | --- | --- |

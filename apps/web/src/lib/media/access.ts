@@ -25,6 +25,13 @@ export async function authorizeTarget(user: MediaUser, target: UploadTarget, tar
   const profileId = profileOf(user);
   if (target === 'avatar' || target === 'cover') return {};
   if (!targetId) throw new MediaError('INVALID_INPUT', 400);
+  if (target === 'chat') {
+    // The chat's own gate decides: an accepted member who may write, and never inside a request that is still pending.
+    // Loaded on demand so the media libraries stay usable without the chat module.
+    const {attachmentAccess} = await import('../chat/service');
+    await attachmentAccess({userId: user.id, profileId, role: user.role, name: '', schoolIds: user.schoolIds}, targetId);
+    return {};
+  }
   if (!await (target === 'event' ? canManageEvent(profileId, targetId, user.schoolIds) : ownsPost(profileId, targetId, user.schoolIds))) throw new MediaError('FORBIDDEN', 403);
   return target === 'event' ? {eventId: targetId} : {postId: targetId};
 }

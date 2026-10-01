@@ -34,7 +34,7 @@ export function renderNotification(localeValue: string | null | undefined, type:
   const zone = field(data, 'timezone');
   const values = {
     title: field(data, 'title', 'eventTitle') || noteText(locale, 'fallback_title'),
-    name: field(data, 'name', 'inviter', 'followerName', 'senderName', 'fromName') || noteText(locale, 'fallback_name'),
+    name: field(data, 'name', 'inviter', 'inviterName', 'followerName', 'senderName', 'fromName') || noteText(locale, 'fallback_name'),
     profile: field(data, 'name', 'handle') || noteText(locale, 'fallback_name'),
     place: field(data, 'place', 'venue'),
     time: moment(field(data, 'startsAt', 'date'), zone, locale, {hour: '2-digit', minute: '2-digit', timeZoneName: 'short'}),
@@ -47,6 +47,8 @@ export function renderNotification(localeValue: string | null | undefined, type:
   let body = has(locale, key) ? noteText(locale, key, values) : '';
   // Free text written by a person replaces or extends the stock sentence.
   if (type === 'CHAT_MESSAGE') body = field(data, 'preview', 'text', 'body') || body;
+  // A new post of a followed profile: the heading names the author, the body is the title of the post.
+  if (type === 'NEW_POST') body = field(data, 'title');
   if (type === 'MODERATION') body = field(data, 'note', 'reason', 'message') || body;
   if (type === 'CLAIM_DECIDED' && field(data, 'reason')) body += ' ' + field(data, 'reason');
   if (type === 'EVENT_REMINDER' && !values.time) body = values.place;

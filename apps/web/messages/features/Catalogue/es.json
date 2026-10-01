@@ -62,5 +62,6 @@
   "error_INVALID_INPUT": "No se entendió la solicitud. Recarga la página e inténtalo de nuevo.",
   "error_TARGET_NOT_FOUND": "Esta página ya no está disponible.",
   "error_CANNOT_FOLLOW_SELF": "No puedes seguir tu propio perfil.",
-  "error_SERVER_ERROR": "El servidor no pudo completar la solicitud. Inténtalo más tarde."
+  "error_SERVER_ERROR": "El servidor no pudo completar la solicitud. Inténtalo más tarde.",
+  "localCityName": "Nombre local: {name}"
 }

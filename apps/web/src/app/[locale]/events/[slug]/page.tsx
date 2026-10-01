@@ -13,6 +13,7 @@ import {zoneName} from '../../../../lib/events/time';
 import {RsvpButtons} from '../../../../components/forms';
 import {AnnouncementStudio} from '../../../../components/announcement-studio';
 import {ViewerTime} from '../../../../components/events/viewer-time';
+import {DateRsvp} from '../../../../components/events/date-rsvp';
 import {ShareButtons} from '../../../../components/events/share-buttons';
 import {LocationMap} from '../../../../components/geo/location-map';
 import {AddToCalendar} from '../../../../components/calendar/add-to-calendar';
@@ -45,10 +46,13 @@ export default async function EventPage({params,searchParams}:Props) {
   // Drafts and events hidden by moderation exist only for their organizers.
   if(!isPublic(event)&&!canManage) notFound();
   const t=await getTranslations('App'),x=await getTranslations('EventsX');
-  const {going,interested,visible,own,attendees}=await listAttendees(event,user?.profile?.id);
   const date=(value:Date)=>new Intl.DateTimeFormat(locale,{dateStyle:'full',timeStyle:'short',timeZone:event.timezone}).format(value);
   const now=new Date(),nextDates=event.occurrences.filter(o=>!o.cancelled&&o.startsAt>=now);
   const selected=pickOccurrence(event,(await searchParams).date,now);
+  // A series is answered twice: for all its dates and, optionally, for the selected one. Counters and names
+  // follow the selected date; a one-off event has just the one answer.
+  const isSeries=event.occurrences.length>1;
+  const {going,interested,visible,series,override,attendees}=await listAttendees(event,user?.profile?.id,isSeries?selected?.id:null);
   const startsAt=selected?.startsAt||event.startsAt,endsAt=selected?.endsAt||event.endsAt;
   const isPast=(endsAt||startsAt)<now,dateCancelled=!!selected?.cancelled&&event.status!=='CANCELLED';
   const venue=event.venue&&!event.venue.hiddenAt?event.venue:null;
@@ -63,6 +67,7 @@ export default async function EventPage({params,searchParams}:Props) {
     <h1>{event.title}</h1>
     {event.status==='CANCELLED'&&<p className="notice cancelled-notice" role="status">{t('cancelledText')}</p>}
     {dateCancelled&&<p className="notice cancelled-notice" role="status">{x('dateCancelledText')}</p>}
+    {selected?.originalStartsAt&&!selected.cancelled&&event.status!=='CANCELLED'&&<p className="notice" role="status">{x('dateMovedText',{date:date(selected.originalStartsAt)})}</p>}
     {isPast&&event.status!=='CANCELLED'&&<p className="notice">{t('pastText')}</p>}
     <div className="event-facts"><div><h2>{t('time')}</h2>
       <p className={event.status==='CANCELLED'||dateCancelled?'struck':undefined}><time dateTime={startsAt.toISOString()}>{date(startsAt)}</time>{endsAt&&<> — <time dateTime={endsAt.toISOString()}>{date(endsAt)}</time></>}</p>
@@ -90,7 +95,7 @@ export default async function EventPage({params,searchParams}:Props) {
     {event.prerequisites&&<><h2>{t('prerequisites')}</h2><p className="prose">{event.prerequisites}</p></>}
     {event.rrule&&<details className="session-list" open><summary>{t('nextSessions')} · {t('sessionCount',{count:event.occurrences.length})}</summary><ol>{event.occurrences.map(o=><li key={o.id}>
       <Link aria-current={o.id===selected?.id?'date':undefined} href={'?date='+encodeURIComponent(o.startsAt.toISOString())}>{o.cancelled?<s>{date(o.startsAt)}</s>:date(o.startsAt)}</Link>
-      {o.cancelled&&<span className="badge">{t('CANCELLED')}</span>}</li>)}</ol></details>}
+      {o.cancelled&&<span className="badge">{t('CANCELLED')}</span>}{o.originalStartsAt&&!o.cancelled&&<span className="badge">{x('movedBadge')}</span>}</li>)}</ol></details>}
     <h2>{x('organizers')}</h2>
     <ul className="people-list">{organizers.map(p=><li key={p.id}><Link href={'/'+locale+'/@'+p.handle}>{p.name}</Link></li>)}</ul>
     {artists.length>0&&<><h2>{x('artists')}</h2>
@@ -99,14 +104,18 @@ export default async function EventPage({params,searchParams}:Props) {
     {isPublic(event)&&<EventPosts eventId={event.id}/>}
     {canManage&&<Link className="button secondary" href={'/'+locale+'/events/'+slug+'/edit'}>{x('manageEvent')}</Link>}
     <section className="rsvp-panel" aria-labelledby="rsvp-title"><h2 id="rsvp-title">{t('rsvpTitle')}</h2>
+      {isSeries&&<p className="field-note">{x('countsForDate',{date:date(startsAt)})}</p>}
       <p className="rsvp-count">{t('goingCount',{count:going})} · {t('interestedCount',{count:interested})}</p>
-      {event.rrule&&<p>{t('seriesRsvp')}</p>}
-      {event.status==='PUBLISHED'&&!event.hiddenAt&&nextDates.length>0&&(user?.profile?<RsvpButtons eventId={event.id} initial={own||''}/>:<Link className="button" href={'/'+locale+(user?'/profile':'/login')}>{t(user?'profileRequired':'signInRsvp')}</Link>)}
-      <h3>{x('attendees')}</h3>
+      {event.status==='PUBLISHED'&&!event.hiddenAt&&nextDates.length>0&&(user?.profile?<>
+        {isSeries&&<><h3>{x('rsvpSeries')}</h3><p className="field-note">{x('rsvpSeriesHint')}</p></>}
+        <RsvpButtons eventId={event.id} initial={series||''}/>
+        {isSeries&&selected&&!selected.cancelled&&selected.startsAt>=now&&<DateRsvp key={selected.id} eventId={event.id} occurrenceId={selected.id} date={date(startsAt)} series={series||''} override={override||''}/>}
+      </>:<Link className="button" href={'/'+locale+(user?'/profile':'/login')}>{t(user?'profileRequired':'signInRsvp')}</Link>)}
+      <h3>{isSeries?x('attendeesOnDate',{date:date(startsAt)}):x('attendees')}</h3>
       {!visible?<p className="field-note">{x('attendeesHidden_'+event.attendeeVisibility)}</p>:attendees.length===0?<p className="field-note">{x('noAttendees')}</p>:
         <ul className="attendee-list">{attendees.map(a=><li key={a.handle}><Link href={'/'+locale+'/@'+a.handle}>{a.name}</Link><span className="badge">{t(a.status==='GOING'?'going':'interested')}</span></li>)}</ul>}
       {visible&&event.attendeeVisibility!=='PUBLIC'&&<p className="field-note">{x('attendeesNote_'+event.attendeeVisibility)}</p>}
-      {isPublic(event)&&event.status==='PUBLISHED'&&(canManage||!!own)&&<RoomLink eventId={event.id} signedIn={!!user}/>}
+      {isPublic(event)&&event.status==='PUBLISHED'&&(canManage||!!series||!!override)&&<RoomLink eventId={event.id} signedIn={!!user}/>}
     </section>
     {isPublic(event)&&<section className="share-panel" aria-labelledby="share-title"><h2 id="share-title">{x('shareTitle')}</h2>
       <ShareButtons url={links.short} title={event.title} text={date(startsAt)+' · '+(venue?venue.name+', ':'')+event.city.name}/>

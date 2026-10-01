@@ -78,5 +78,8 @@
   "error_VENUE_TOO_FAR": "Este sitio está demasiado lejos de la ciudad seleccionada. Revisa la ciudad y el marcador.",
   "error_CITY_NOT_FOUND": "Elige una ciudad de la lista.",
   "error_GEOLOCATION_DENIED": "Se ha denegado el acceso a la ubicación. Elige una ciudad o permite el acceso a la ubicación en el navegador.",
-  "error_GEOLOCATION_UNAVAILABLE": "No se ha podido determinar tu ubicación. Elige una ciudad."
+  "error_GEOLOCATION_UNAVAILABLE": "No se ha podido determinar tu ubicación. Elige una ciudad.",
+  "eventLocation": "Dónde será",
+  "pinToggle": "Indicar un punto exacto en lugar de un local",
+  "pinHint": "Para lugares que no son un local, como un parque o una plaza. El punto debe estar en la ciudad elegida o cerca."
 }

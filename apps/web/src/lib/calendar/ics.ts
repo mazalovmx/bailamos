@@ -1,7 +1,9 @@
 import ical, {ICalCalendarMethod, ICalEventStatus} from 'ical-generator';
 import {createHash} from 'node:crypto';
 import {inZone, vtimezone} from './time';
-export type IcsOccurrence = {id: string; startsAt: Date; endsAt: Date | null; cancelled: boolean};
+export type IcsOccurrence = {id: string; startsAt: Date; endsAt: Date | null; cancelled: boolean; originalStartsAt?: Date | null};
+// SEQUENCE of a moved date counts seconds from here, which keeps it far inside the 32-bit range.
+const SEQUENCE_EPOCH = Date.UTC(2020, 0, 1) / 1000;
 export type IcsEvent = {id: string; slug: string; title: string; description: string | null; timezone: string; status: string; updatedAt: Date;
   startsAt: Date; endsAt: Date | null; city: {name: string}; venue?: {name: string; address: string; hiddenAt: Date | null} | null; occurrences: IcsOccurrence[]};
 export function eventLocation(event: Pick<IcsEvent, 'city' | 'venue'>) {
@@ -22,6 +24,9 @@ export function buildCalendar(input: {name: string; origin: string; locale?: str
     for (const occurrence of rows) {
       const url = input.origin + '/' + (input.locale || 'en') + '/events/' + event.slug + '?date=' + encodeURIComponent(occurrence.startsAt.toISOString());
       const cancelled = event.status === 'CANCELLED' || occurrence.cancelled;
+      // A moved date keeps its UID and is exported at its new time. Its SEQUENCE follows the event's timestamp, which
+      // every move advances, so each revision outranks the copy a client already holds (RFC 5545 §3.8.7.4).
+      const revision = occurrence.originalStartsAt ? Math.max(1, Math.floor(event.updatedAt.getTime() / 1000) - SEQUENCE_EPOCH) : 0;
       calendar.createEvent({id: occurrence.id + '@' + host,
         // Luxon DateTime in the event zone + `timezone` makes ical-generator write DTSTART;TZID=<zone>:<wall clock>.
         start: inZone(occurrence.startsAt, event.timezone), ...(occurrence.endsAt ? {end: inZone(occurrence.endsAt, event.timezone)} : {}),
@@ -29,7 +34,7 @@ export function buildCalendar(input: {name: string; origin: string; locale?: str
         description: [event.description?.trim(), url].filter(Boolean).join('\n\n'),
         status: cancelled ? ICalEventStatus.CANCELLED : ICalEventStatus.CONFIRMED,
         // DTSTAMP/LAST-MODIFIED come from the data, not from the clock: identical data gives an identical body and ETag.
-        stamp: event.updatedAt, lastModified: event.updatedAt, sequence: cancelled ? 1 : 0});
+        stamp: event.updatedAt, lastModified: event.updatedAt, sequence: revision + (cancelled ? 1 : 0)});
     }
   }
   return calendar.toString();

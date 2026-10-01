@@ -5,8 +5,8 @@ import {useState} from 'react';
 import Link from 'next/link';
 import {SwingFields} from './swing-fields';
 import {ScheduleFields} from './events/schedule-fields';
-import {VenuePicker} from './geo/venue-picker';
-type Options={id:string;name:string;timezone?:string}[];
+import {EventLocation} from './geo/event-location';
+type Options={id:string;name:string;timezone?:string;lat?:number;lng?:number}[];
 type Fields=Record<string,string>;
 async function submit(url:string,method:string,body:unknown) {
   const response=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -78,7 +78,7 @@ export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools
   return <form className="editor-form" onSubmit={async e=>{e.preventDefault();s.setBusy(true);s.setError('');
     try{
       const data=new FormData(e.currentTarget);
-      const body={...values(e.currentTarget),tagIds:data.getAll('tagIds'),recurrenceDays:data.getAll('recurrenceDays'),partnerRequired:data.get('partnerRequired')==='on'};
+      const body={...values(e.currentTarget),pin:data.get('pin')?JSON.parse(String(data.get('pin'))):null,tagIds:data.getAll('tagIds'),recurrenceDays:data.getAll('recurrenceDays'),partnerRequired:data.get('partnerRequired')==='on'};
       const result=await submit('/api/events'+(id?'/'+id:''),id?'PATCH':'POST',body);
       // A new event continues in the editor, where the team, the artists and single dates are managed.
       router.push('/'+locale+'/events/'+result.slug+(id?'':'/edit?created=1'));router.refresh();}
@@ -90,7 +90,7 @@ export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools
     <Select name="styleId" label={t('style')} options={styles} value={initial.styleId}/></div>
     {/* The picker submits "venueId"; saving copies the venue's coordinates to the event, or the city's when there is none. */}
     {!id&&schools.length>0&&<label>{x('onBehalfOf')}<select name="schoolProfileId" defaultValue=""><option value="">{x('onBehalfOfMe')}</option>{schools.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select><small>{x('onBehalfOfHint')}</small></label>}
-    <VenuePicker name="venueId" cityId={cityId} initialVenueId={initial.venueId}/>
+    <EventLocation key={cityId} city={cities.find(c=>c.id===cityId)} initial={cityId===initial.cityId?initial:{}}/>
     <label>{x('price')}<input name="priceText" maxLength={120} defaultValue={initial.priceText} placeholder={x('pricePlaceholder')}/><small>{x('priceHint')}</small></label>
     <SwingFields initial={initial} tags={tags} selectedTags={selectedTags}/>
     <ScheduleFields initial={initial} zone={cities.find(c=>c.id===cityId)?.timezone}/>

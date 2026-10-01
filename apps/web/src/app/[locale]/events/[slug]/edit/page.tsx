@@ -1,5 +1,4 @@
 import {db} from '@dance/db';
-import {DateTime} from 'luxon';
 import {getTranslations} from 'next-intl/server';
 import {notFound,redirect} from 'next/navigation';
 import Link from 'next/link';
@@ -7,7 +6,7 @@ import {currentUser} from '../../../../../lib/session';
 import {managesSchool} from '../../../../../lib/schools/access';
 import {eventAbility} from '../../../../../lib/permissions';
 import {catalogue} from '../../../../../lib/catalogue';
-import {parseRecurrence} from '../../../../../lib/schedule';
+import {localStamp,parseRecurrence} from '../../../../../lib/schedule';
 import {pendingInvites} from '../../../../../lib/events/invites';
 import {EventForm} from '../../../../../components/forms';
 import {EventActions,TeamPanel,ArtistPanel,OccurrencePanel} from '../../../../../components/events/manage';
@@ -23,7 +22,7 @@ export default async function Edit({params,searchParams}:{params:Promise<{locale
   const canTeam=ability.can('team','Event');
   const [{cities,styles,tags},invites,t,x]=await Promise.all([catalogue(),
     canTeam?pendingInvites(event.id):[],getTranslations('App'),getTranslations('EventsX')]);
-  const local=(d:Date)=>DateTime.fromJSDate(d,{zone:event.timezone}).toFormat("yyyy-MM-dd'T'HH:mm");
+  const local=(d:Date)=>localStamp(d,event.timezone);
   const recurrence=parseRecurrence(event.rrule,event.timezone),now=new Date();
   const person=(role:string)=>event.members.filter(m=>m.role===role).map(m=>({profileId:m.profile.id,handle:m.profile.handle,name:m.profile.name,type:m.profile.type,stub:!m.profile.userId}));
   return <main className="form-page event-editor"><Link href={'/'+locale+'/events/'+slug}>← {x('viewEvent')}</Link><h1>{t('editEvent')}</h1>
@@ -33,11 +32,12 @@ export default async function Edit({params,searchParams}:{params:Promise<{locale
     <section aria-labelledby="details-title"><h2 id="details-title">{x('details')}</h2>
     {event.rrule&&<p className="notice">{t('editSeries')}</p>}
     <EventForm id={event.id} cities={cities} styles={styles} tags={tags} selectedTags={event.tags.map(t=>t.tagId)}
-      initial={{title:event.title,description:event.description||'',cityId:event.cityId,venueId:event.venueId||'',priceText:event.priceText||'',attendeeVisibility:event.attendeeVisibility,
+      initial={{lat:event.lat===null?'':String(event.lat),lng:event.lng===null?'':String(event.lng),title:event.title,description:event.description||'',cityId:event.cityId,venueId:event.venueId||'',priceText:event.priceText||'',attendeeVisibility:event.attendeeVisibility,
       styleId:event.styles[0]?.styleId||'',status:event.status,startsLocal:local(event.startsAt),endsLocal:event.endsAt?local(event.endsAt):'',
       kind:event.kind,format:event.format,level:event.level,intensity:event.intensity,tempo:event.tempo,prerequisites:event.prerequisites||'',partnerRequired:String(event.partnerRequired),
       recurrenceWeeks:String(recurrence.until?1:recurrence.count),recurrenceInterval:String(recurrence.interval),recurrenceDays:recurrence.byDay.join(','),recurrenceUntil:recurrence.until||''}}/></section>
-    {event.occurrences.length>1&&<OccurrencePanel eventId={event.id} timezone={event.timezone} occurrences={event.occurrences.map(o=>({id:o.id,startsAt:o.startsAt.toISOString(),cancelled:o.cancelled,past:o.startsAt<now}))}/>}
+    {event.occurrences.length>1&&<OccurrencePanel eventId={event.id} timezone={event.timezone} occurrences={event.occurrences.map(o=>({id:o.id,startsAt:o.startsAt.toISOString(),startsLocal:local(o.startsAt),endsLocal:o.endsAt?local(o.endsAt):'',
+      cancelled:o.cancelled,past:o.startsAt<now,original:o.originalStartsAt?.toISOString()??null}))}/>}
     <TeamPanel eventId={event.id} owner={person('OWNER')} coOrganizers={person('CO_ORGANIZER')} invites={invites} canTeam={canTeam} selfProfileId={user.profile.id}/>
     <ArtistPanel eventId={event.id} artists={person('ARTIST')}/>
     <p className="field-note">{x('mediaOnPage')}</p>

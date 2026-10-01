@@ -10,7 +10,9 @@ Object.assign(globalThis, {React});
 import {renderToStaticMarkup} from 'react-dom/server';
 import Parser from 'rss-parser';
 import {ContentError, MAX_CONTENT_CHARS, parseContent, type PostMedia} from '../src/lib/blog/content';
-import {cleanContent, excerptOf, firstImage, isEmptyDoc, safeHref, withoutImages} from '../src/lib/blog/nodes';
+import {cleanContent, embedsOf, excerptOf, firstImage, isEmptyDoc, safeHref, withoutEmbeds, withoutImages} from '../src/lib/blog/nodes';
+import {contentHtml} from '../src/lib/blog/html';
+import {localizeUrl, renderNotification} from '../src/lib/notifications/render';
 import {renderContent, type ImageProps, type InstagramProps} from '../src/lib/blog/render';
 import {slugBase, uniqueSlug} from '../src/lib/blog/slug';
 import {canPost, postAbility} from '../src/lib/blog/permissions';
@@ -336,5 +338,258 @@ test('posts in the database: slugs, drafts, hidden content, sitemap and feed', a
   } finally {
     await db.user.deleteMany({where: {id: {in: [authorUser.id, readerUser.id, hiddenUser.id]}}});
     await db.profile.deleteMany({where: {id: {in: [author.id, reader.id, ghost.id]}}});
+  }
+});
+test('stored embeds win over the body; hidden embeds leave it; the HTML for feeds is escaped', () => {
+  const permalink = instagram.attrs.permalink, other = 'https://www.instagram.com/reel/AbCdE12345/';
+  const body = doc(p(text('<script>alert(1)</script> & "quotes"', [link('https://example.com/a?b=1&c="2"')])), instagram,
+    {type: 'instagram', attrs: {permalink: other}}, {type: 'instagram', attrs: {permalink}}, image({alt: 'A "quoted" <alt>'}),
+    {type: 'orderedList', attrs: {start: 3}, content: [{type: 'listItem', content: [p(text('three', [{type: 'bold'}]), {type: 'hardBreak'})]}]},
+    {type: 'script', content: [text('x')]}, p(text('bad', [link('javascript:alert(1)')])));
+  assert.deepEqual(embedsOf(body), [permalink, other], 'each permalink once, in order');
+  assert.deepEqual(embedsOf(withoutEmbeds(body, new Set([permalink]))), [other]);
+  assert.equal(withoutEmbeds(body, new Set()), body);
+  // The page shows what is stored with the post, not what the body claims.
+  const Instagram = ({permalink: url, meta}: InstagramProps) => createElement('a', {href: url, 'data-author': meta.author || 'none'}, meta.title || '');
+  const Image = ({storageKey, alt}: ImageProps) => createElement('img', {src: '/m/' + storageKey, alt});
+  const stored = new Map([[permalink, {author: 'real.author', title: 'Stored title'}], [other, {}]]);
+  const page = renderToStaticMarkup(createElement('div', null, renderContent(body, {Image, Instagram}, stored)));
+  assert.ok(page.includes('data-author="real.author"') && page.includes('Stored title') && !page.includes('swing.anna'));
+  assert.ok(page.includes('href="' + other + '" data-author="none"'), 'a row without data is a plain link card');
+  assert.ok(renderToStaticMarkup(createElement('div', null, renderContent(body, {Image, Instagram}))).includes('data-author="swing.anna"'), 'old posts fall back to the body');
+  // Feed HTML: escaped text and attributes, checked links with rel, absolute images, nothing unknown.
+  const html = contentHtml(body, {imageUrl: key => 'https://dance.example/api/media/file/' + key + '/800.webp', embeds: stored});
+  assert.ok(html.startsWith('<p><a href="https://example.com/a?b=1&amp;c=%222%22" rel="nofollow ugc">&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;quotes&quot;</a></p>'), html);
+  assert.ok(html.includes('<figure><img src="https://dance.example/api/media/file/' + KEY + '/800.webp" alt="A &quot;quoted&quot; &lt;alt&gt;"/></figure>'));
+  assert.ok(html.includes('<p><a href="' + permalink + '" rel="nofollow ugc">Instagram · real.author · Stored title</a></p>'));
+  assert.ok(html.includes('<ol start="3"><li><p><strong>three</strong><br/></p></li></ol>'));
+  assert.ok(html.endsWith('<p>bad</p>'), 'an unsafe link leaves its text only');
+  assert.equal(/<script|javascript:|onerror/i.test(html), false);
+  assert.equal(contentHtml(body, {imageUrl: () => null}).includes('<img'), false);
+  assert.equal(contentHtml({type: 'paragraph'}, {imageUrl: () => null}), '');
+});
+test('RSS carries the full body as content:encoded and stays well-formed', async () => {
+  const origin = 'https://dance.example';
+  const html = contentHtml(doc(p(text('Tom & Jerry ]]> <b>not bold</b> 💃', [link('https://example.com/?a=1&b=2')])), image()), {imageUrl: key => origin + '/m/' + key});
+  const xml = buildRss({title: 'Blog', link: origin + '/en/people/anna/posts', self: origin + '/api/feeds/rss/anna', description: 'Posts', items: [
+    {title: 'With body', link: origin + '/en/people/anna/posts/a', description: 'Summary only', content: html, publishedAt: new Date('2030-06-15T10:00:00Z')},
+    {title: 'Without body', link: origin + '/en/people/anna/posts/b', description: 'Summary', publishedAt: new Date('2030-06-14T10:00:00Z')}]});
+  assert.ok(xml.includes('xmlns:content="http://purl.org/rss/1.0/modules/content/"'));
+  assert.equal(xml.split('<content:encoded>').length, 2, 'only the item that has a body');
+  // No markup of the body is live XML: the element holds text.
+  assert.equal(/<p>|<a |<img|<b>/.test(xml), false);
+  const feed = await new Parser().parseString(xml);
+  const item = feed.items[0] as unknown as Record<string, string>;
+  assert.equal(item['content:encoded'], html, 'a reader gets back exactly the HTML that was built');
+  assert.equal(item.content, 'Summary only', 'the summary stays the description');
+  assert.ok(html.includes('rel="nofollow ugc"') && html.includes('&lt;b&gt;not bold&lt;/b&gt;') && html.includes('<img src="' + origin + '/m/' + KEY + '"'));
+  assert.equal((feed.items[1] as unknown as Record<string, string>)['content:encoded'], undefined);
+});
+test('a new post is announced in the reader language', () => {
+  const data = {postId: 'p1', slug: 'festival', handle: 'anna', name: 'Anna <b>', title: 'Herräng   2030'};
+  assert.deepEqual(renderNotification('en', 'NEW_POST', data), {title: 'New post by Anna <b>', body: 'Herräng 2030'});
+  assert.equal(renderNotification('es', 'NEW_POST', data).title, 'Nueva publicación de Anna <b>');
+  assert.equal(renderNotification('ru', 'NEW_POST', data).title, 'Новый пост: Anna <b>');
+  assert.equal(renderNotification('en', 'NEW_POST', {}).body, '');
+  assert.equal(localizeUrl('/people/anna/posts/festival', 'ru'), '/ru/people/anna/posts/festival');
+});
+test('school managers edit the posts of their schools and nobody else does', () => {
+  const manager = {role: 'USER', profile: {id: 'p1'}, schoolIds: ['s1']}, other = {role: 'USER', profile: {id: 'p2'}, schoolIds: ['s2']};
+  const draft = {profileId: 's1', publishedAt: null, hiddenAt: null}, live = {...draft, publishedAt: new Date()};
+  for (const action of ['read', 'update', 'publish', 'delete'] as const) {
+    assert.equal(canPost(manager, action, draft), true, action);
+    assert.equal(canPost(manager, action, live), true, action);
+    assert.equal(canPost(other, action, draft), false, action);
+    assert.equal(canPost({role: 'USER', profile: {id: 'p3'}, schoolIds: []}, action, draft), false, action);
+  }
+  assert.equal(canPost(other, 'read', live), true);
+  assert.equal(canPost(other, 'update', live), false);
+});
+test('posts in the database: autosave versions, school posts, embed rows, follower notifications, full RSS', async t => {
+  const {db} = await import('@dance/db');
+  try {await db.$queryRaw`SELECT 1`;} catch {t.skip('PostgreSQL is not available'); return;}
+  const {savePost, createDraft, publisherFor, postFor, publicPosts, ownPosts, patchInput} = await import('../src/lib/blog/posts');
+  const {readEmbeds, refreshEmbeds, MAX_POST_EMBEDS} = await import('../src/lib/blog/embeds');
+  const {notifyNewPost} = await import('../src/lib/blog/notify');
+  const {profileRss} = await import('../src/lib/blog/rss-feed');
+  const {dbEmbedStore} = await import('../src/lib/embeds/store');
+  const {closeRedis} = await import('../src/lib/redis');
+  const tag = randomUUID().slice(0, 8), origin = 'https://dance.example';
+  const names = ['author', 'manager', 'reader', 'blocked', 'blocker', 'banned', 'bare', 'stranger'] as const;
+  const users = Object.fromEntries(await Promise.all(names.map(async name => [name, await db.user.create({data: {id: 'blog2-' + name + '-' + tag, name,
+    email: 'blog2-' + name + '-' + tag + '@example.test', emailVerified: true, ...(name === 'banned' ? {bannedAt: new Date()} : {})}})] as const)));
+  // "bare" follows without having a profile of their own.
+  const profiles = Object.fromEntries(await Promise.all(names.filter(name => name !== 'bare').map(async name => [name, await db.profile.create({data: {
+    userId: users[name].id, type: 'DANCER', handle: 'b2' + name + '-' + tag, name: 'Blog2 ' + name}})] as const)));
+  const school = await db.profile.create({data: {type: 'SCHOOL', handle: 'b2school-' + tag, name: 'School ' + tag}});
+  const author = profiles.author;
+  const stored = (id: string) => db.post.findUniqueOrThrow({where: {id}});
+  const iso = (date: Date) => date.toISOString();
+  const body = (value: string, ...more: unknown[]) => doc(p(text(value)), ...more);
+  // Versions are timestamps with millisecond precision: consecutive saves of the test must not share one.
+  const tick = () => new Promise(resolve => setTimeout(resolve, 5));
+  try {
+    // --- Autosave and versions -------------------------------------------------------------------------------------
+    assert.equal(patchInput.safeParse({autosave: true, published: true}).success, false, 'an autosave never changes the published state');
+    assert.equal(patchInput.safeParse({updatedAt: 'yesterday'}).success, false);
+    const {id} = await createDraft(author.id, 'Versions ' + tag);
+    const opened = await stored(id);
+    await tick();
+    // Tab A autosaves; tab B still holds the version both started from.
+    const a = await savePost(opened, {content: body('from tab A'), updatedAt: iso(opened.updatedAt), autosave: true});
+    assert.equal(a.firstPublished, false);
+    assert.ok(a.updatedAt > opened.updatedAt);
+    await assert.rejects(savePost(opened, {content: body('from tab B'), updatedAt: iso(opened.updatedAt), autosave: true}), {code: 'STALE_POST', status: 409});
+    await assert.rejects(savePost(opened, {title: 'B', updatedAt: iso(opened.updatedAt)}), {code: 'STALE_POST'}, 'the Save button is refused as well');
+    assert.equal((await stored(id)).excerpt, 'from tab A', 'the stale write changed nothing');
+    assert.equal((await stored(id)).title, 'Versions ' + tag);
+    await tick();
+    // With the current version the next autosave goes through, and so does a deliberate overwrite without a version.
+    const next = await savePost(await stored(id), {content: body('second from A'), updatedAt: iso(a.updatedAt), autosave: true});
+    assert.equal((await stored(id)).excerpt, 'second from A');
+    await tick();
+    await savePost(await stored(id), {title: 'Forced ' + tag});
+    await assert.rejects(savePost(await stored(id), {title: 'late', updatedAt: iso(next.updatedAt), autosave: true}), {code: 'STALE_POST'});
+    // An autosave keeps a photo the body no longer shows (undo may bring it back); the Save button deletes it.
+    const [one, two] = await Promise.all(['a', 'b'].map((suffix, index) => db.mediaItem.create({data: {postId: id, kind: 'upload', uploaderProfileId: author.id,
+      storageKey: 'img/' + author.id + '/3f2b8c1e-7a4d-4e2b-9c1a-5d6e7f8a9b0' + suffix, position: index, alt: 'old ' + suffix}})));
+    const photo = (item: {id: string; storageKey: string | null}, alt: string) => image({mediaId: item.id, storageKey: item.storageKey, alt});
+    await savePost(await stored(id), {content: body('photos', photo(two, 'Second first'), photo(one, 'First second'))});
+    const ordered = await db.mediaItem.findMany({where: {postId: id, kind: 'upload'}, orderBy: {position: 'asc'}});
+    assert.deepEqual(ordered.map(item => [item.id, item.position, item.alt]), [[two.id, 0, 'Second first'], [one.id, 1, 'First second']],
+      'order and descriptions of the media items follow the body');
+    await savePost(await stored(id), {content: body('one photo', photo(two, 'Renamed')), autosave: true});
+    assert.equal(await db.mediaItem.count({where: {id: one.id}}), 1, 'autosave does not delete');
+    assert.equal((await db.mediaItem.findUniqueOrThrow({where: {id: two.id}})).alt, 'Renamed');
+    await savePost(await stored(id), {content: body('one photo', photo(two, 'Renamed'))});
+    assert.equal(await db.mediaItem.count({where: {id: one.id}}), 0, 'the explicit save does');
+    // A published post is never autosaved.
+    const published = await savePost(await stored(id), {published: true});
+    assert.equal(published.firstPublished, true);
+    await assert.rejects(savePost(await stored(id), {content: body('silent change'), autosave: true}), {code: 'AUTOSAVE_PUBLISHED', status: 409});
+    assert.equal((await stored(id)).excerpt, 'one photo');
+    // --- Followers hear about a post once ---------------------------------------------------------------------------
+    await db.follow.createMany({data: ['reader', 'blocked', 'blocker', 'banned', 'bare', 'author', 'manager'].map(name => ({userId: users[name].id, profileId: author.id}))});
+    await db.block.createMany({data: [{blockerProfileId: author.id, blockedProfileId: profiles.blocked.id}, {blockerProfileId: profiles.blocker.id, blockedProfileId: author.id}]});
+    const notes = () => db.notification.findMany({where: {type: 'NEW_POST', userId: {in: names.map(name => users[name].id)}}, orderBy: {userId: 'asc'}});
+    // Pages of one follower each: the batching must neither skip nor repeat anybody. The manager stands for "whoever pressed Publish".
+    assert.equal(await notifyNewPost(id, {batch: 1, excludeUserIds: [users.manager.id]}), 2);
+    const sent = await notes(), slug = (await stored(id)).slug;
+    assert.deepEqual(sent.map(note => note.userId).sort(), [users.bare.id, users.reader.id].sort(), 'not the author, the publisher, the banned or anyone blocked');
+    assert.deepEqual(sent[0].data, {postId: id, slug, handle: author.handle, name: author.name, title: 'Forced ' + tag});
+    assert.equal(sent[0].url, '/people/' + author.handle + '/posts/' + slug);
+    // Unpublishing and publishing again, or editing, is not a first publication.
+    assert.equal((await savePost(await stored(id), {published: false})).firstPublished, false);
+    assert.equal((await savePost(await stored(id), {published: true})).firstPublished, false);
+    assert.equal((await savePost(await stored(id), {title: 'Renamed ' + tag})).firstPublished, false);
+    // Two requests publishing the same draft at the same moment: exactly one of them announces it.
+    const raced = await createDraft(author.id, 'Race ' + tag);
+    await savePost(await stored(raced.id), {content: body('race')});
+    const same = await stored(raced.id);
+    const results = await Promise.all([savePost(same, {published: true}), savePost(same, {published: true})]);
+    assert.equal(results.filter(result => result.firstPublished).length, 1);
+    assert.ok((await stored(raced.id)).slug && (await stored(raced.id)).publishedAt);
+    // The cap bounds the fan-out; drafts and hidden posts announce nothing.
+    assert.equal(await notifyNewPost(raced.id, {cap: 1}), 1);
+    const quiet = await createDraft(author.id, 'Quiet ' + tag);
+    assert.equal(await notifyNewPost(quiet.id), 0);
+    await db.post.update({where: {id: raced.id}, data: {hiddenAt: new Date()}});
+    assert.equal(await notifyNewPost(raced.id), 0);
+    assert.equal((await notes()).length, 3);
+    // --- Posts in a school's name -----------------------------------------------------------------------------------
+    const manager = {role: 'USER', profile: {id: profiles.manager.id}, schoolIds: [school.id]};
+    const stranger = {role: 'USER', profile: {id: profiles.stranger.id}, schoolIds: []};
+    assert.deepEqual(await publisherFor(manager), {profileId: profiles.manager.id, schoolProfileId: null});
+    assert.deepEqual(await publisherFor(manager, profiles.manager.id), {profileId: profiles.manager.id, schoolProfileId: null});
+    assert.deepEqual(await publisherFor(manager, school.id), {profileId: school.id, schoolProfileId: school.id});
+    await assert.rejects(publisherFor(stranger, school.id), {code: 'FORBIDDEN'});
+    await assert.rejects(publisherFor(manager, author.id), {code: 'FORBIDDEN'}, 'not somebody else\'s profile');
+    await assert.rejects(publisherFor({...manager, schoolIds: [author.id]}, author.id), {code: 'FORBIDDEN'}, 'only a school can be published for');
+    await assert.rejects(publisherFor({role: 'USER', profile: null, schoolIds: [school.id]}, school.id), {code: 'PROFILE_REQUIRED'});
+    const as = await publisherFor(manager, school.id);
+    const schoolPost = await createDraft(as.profileId, 'School news ' + tag, as.schoolProfileId);
+    const row = await stored(schoolPost.id);
+    assert.deepEqual([row.profileId, row.schoolProfileId], [school.id, school.id]);
+    await assert.rejects(postFor(stranger, schoolPost.id, 'read'), {code: 'NOT_FOUND'});
+    assert.equal((await postFor(manager, schoolPost.id, 'update')).id, schoolPost.id);
+    const live = await savePost(await postFor(manager, schoolPost.id, 'publish'), {content: body('From the school'), published: true}, {actorProfileId: profiles.manager.id});
+    assert.equal(live.profile.handle, school.handle, 'the address is under the school');
+    await assert.rejects(postFor(stranger, schoolPost.id, 'update'), {code: 'FORBIDDEN'});
+    await assert.rejects(postFor({...manager, schoolIds: []}, schoolPost.id, 'delete'), {code: 'FORBIDDEN'}, 'a revoked manager loses the post');
+    assert.deepEqual((await publicPosts({profileId: school.id}, 10)).map(post => post.id), [schoolPost.id], 'listed on the school profile');
+    assert.equal((await publicPosts({profileId: profiles.manager.id}, 10)).length, 0);
+    const mine = await ownPosts([profiles.manager.id, school.id]);
+    assert.deepEqual(mine.map(post => [post.id, post.profile.handle]), [[schoolPost.id, school.handle]]);
+    // The school's followers are told; the manager who published is not, even when following the school.
+    await db.follow.createMany({data: [{userId: users.reader.id, profileId: school.id}, {userId: users.manager.id, profileId: school.id}]});
+    assert.equal(await notifyNewPost(schoolPost.id, {excludeUserIds: [users.manager.id]}), 1);
+    // --- Instagram blocks are mirrored as media rows ----------------------------------------------------------------
+    const permalink = 'https://www.instagram.com/p/T' + tag + 'ok/', down = 'https://www.instagram.com/reel/T' + tag + 'down/';
+    const block = (url: string, attrs: Record<string, unknown> = {}) => ({type: 'instagram', attrs: {permalink: url, ...attrs}});
+    const keep = photo(two, 'Renamed');
+    let calls = 0, outage = false;
+    const fetchStub = (async (input: URL | RequestInfo) => {
+      calls++;
+      if (outage || String(input).includes(encodeURIComponent(down))) throw new Error('Meta is down');
+      return Response.json({author_name: 'real.author', title: 'Real caption', thumbnail_url: 'https://scontent.cdninstagram.com/t.jpg', html: '<blockquote>x</blockquote>'});
+    }) as typeof fetch;
+    const embedDeps = {fetch: fetchStub};
+    const rows = () => db.mediaItem.findMany({where: {postId: id, kind: 'instagram'}, orderBy: {position: 'asc'}});
+    // The body lies about the author; the row is filled from the lookup, not from the request.
+    await savePost(await stored(id), {content: body('with embeds', keep, block(permalink, {author: 'fake.author', title: 'Fake'}), block(down), block(permalink))},
+      {actorProfileId: author.id, embedDeps});
+    let embedRows = await rows();
+    assert.deepEqual(embedRows.map(item => [item.sourceUrl, item.storageKey, item.postId, item.eventId, item.uploaderProfileId]),
+      [[permalink, null, id, null, author.id], [down, null, id, null, author.id]], 'one row per permalink, satisfying the CHECK constraints');
+    assert.deepEqual(embedRows[0].embedMeta, {author: 'real.author', title: 'Real caption', thumbnailUrl: 'https://scontent.cdninstagram.com/t.jpg'});
+    assert.ok(embedRows[0].embedFetched);
+    assert.equal(embedRows[1].embedFetched, null, 'no answer from Meta: the row exists and renders as a link');
+    // Saving again creates nothing new and asks nobody.
+    const before = calls;
+    await savePost(await stored(id), {content: body('with embeds', keep, block(permalink), block(down))}, {embedDeps});
+    assert.equal(calls, before);
+    assert.deepEqual((await rows()).map(item => item.id), embedRows.map(item => item.id));
+    // Meta goes down: the page still has its card from the rows, and the long-lived store answers for the permalink.
+    outage = true;
+    const state = readEmbeds(await rows());
+    assert.deepEqual(state.embeds.get(permalink), {author: 'real.author', title: 'Real caption', thumbnailUrl: 'https://scontent.cdninstagram.com/t.jpg'});
+    assert.equal(state.embeds.has(down), false);
+    assert.deepEqual(state.stale, [down]);
+    assert.equal((await dbEmbedStore.find(permalink))?.meta.author, 'real.author');
+    await refreshEmbeds([down], embedDeps);
+    assert.equal((await rows())[1].embedFetched, null, 'a failed refresh changes nothing');
+    const old = readEmbeds(await rows(), Date.now() + 2 * 86_400_000);
+    assert.deepEqual(old.stale.sort(), [down, permalink].sort(), 'a copy older than a day is due for a refresh but still shown');
+    assert.equal(old.embeds.get(permalink)?.author, 'real.author');
+    // Moderation hides an embed: it leaves the page data. Removing the block from the body removes its row.
+    await db.mediaItem.update({where: {id: embedRows[1].id}, data: {hiddenAt: new Date()}});
+    assert.deepEqual([...readEmbeds(await rows()).hidden], [down]);
+    await savePost(await stored(id), {content: body('one embed left', keep, block(permalink))}, {embedDeps});
+    embedRows = await rows();
+    assert.deepEqual(embedRows.map(item => item.sourceUrl), [permalink]);
+    await assert.rejects(savePost(await stored(id), {content: body('too many', ...Array.from({length: MAX_POST_EMBEDS + 1}, (_, index) =>
+      block('https://www.instagram.com/p/L' + tag + String(index).padStart(3, '0') + '/')))}, {embedDeps}), {code: 'EMBED_LIMIT'});
+    // --- RSS of the author: summary plus the whole body -------------------------------------------------------------
+    await savePost(await stored(id), {content: doc(p(text('Full <b>body</b> & more', [link('https://example.com/?a=1&b=2')])), block(permalink, {author: 'fake.author'}),
+      photo(two, 'Dancers "on" the floor'))}, {embedDeps});
+    const rss = await profileRss({id: author.id, handle: author.handle, name: author.name, bio: null}, 'es', origin);
+    const feed = await new Parser().parseString(rss.body);
+    assert.equal(feed.items.length, 1, 'the hidden post and the drafts are not in the feed');
+    const item = feed.items[0] as unknown as Record<string, string>;
+    assert.equal(item.link, origin + '/es/people/' + author.handle + '/posts/' + slug);
+    assert.equal(item.content, 'Full <b>body</b> & more', 'the summary stays the description');
+    const encoded = item['content:encoded'];
+    assert.ok(encoded.includes('<p><a href="https://example.com/?a=1&amp;b=2" rel="nofollow ugc">Full &lt;b&gt;body&lt;/b&gt; &amp; more</a></p>'), encoded);
+    assert.ok(encoded.includes('<a href="' + permalink + '" rel="nofollow ugc">Instagram · real.author · Real caption</a>'), 'the stored card data, not the body');
+    assert.ok(/<img src="https?:\/\/[^"]+" alt="Dancers &quot;on&quot; the floor"/.test(encoded), 'photo addresses are absolute');
+    assert.equal(rss.lastModified?.getTime(), (await stored(id)).publishedAt?.getTime());
+    // A photo hidden by moderation leaves the feed as it leaves the page.
+    await db.mediaItem.update({where: {id: two.id}, data: {hiddenAt: new Date()}});
+    const hiddenRss = await new Parser().parseString((await profileRss({id: author.id, handle: author.handle, name: author.name}, 'en', origin)).body);
+    assert.equal((hiddenRss.items[0] as unknown as Record<string, string>)['content:encoded'].includes('<img'), false);
+  } finally {
+    await db.user.deleteMany({where: {id: {in: names.map(name => users[name].id)}}});
+    await db.profile.deleteMany({where: {id: {in: [...Object.values(profiles).map(profile => profile.id), school.id]}}});
+    await closeRedis().catch(() => undefined);
   }
 });

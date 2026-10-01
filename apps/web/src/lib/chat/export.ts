@@ -8,7 +8,7 @@ export async function chatExport(userId: string) {
   if (!profile) return {messages: [], conversations: [], blocks: []};
   const [messages, conversations, blocks] = await Promise.all([
     db.message.findMany({where: {senderProfileId: profile.id}, orderBy: {createdAt: 'asc'},
-      select: {id: true, conversationId: true, body: true, hiddenAt: true, createdAt: true}}),
+      select: {id: true, conversationId: true, body: true, hiddenAt: true, editedAt: true, deletedAt: true, createdAt: true}}),
     db.conversationMember.findMany({where: {profileId: profile.id}, orderBy: {joinedAt: 'asc'}, select: {conversationId: true, admin: true, accepted: true,
       lastReadAt: true, joinedAt: true, conversation: {select: {kind: true, title: true, eventId: true, cityId: true}}}}),
     db.block.findMany({where: {blockerProfileId: profile.id}, orderBy: {createdAt: 'asc'}, select: {blockedProfileId: true, createdAt: true}})]);

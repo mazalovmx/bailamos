@@ -12,7 +12,10 @@ export const dbEmbedStore: EmbedStore = {
       orderBy: {embedFetched: 'desc'}, select: {embedHtml: true, embedMeta: true, embedFetched: true}
     });
     if (!row?.embedFetched) return null;
-    return {status: 'ok', meta: embedMeta(row.embedMeta), html: row.embedHtml || undefined, fetchedAt: row.embedFetched.getTime()};
+    const meta = embedMeta(row.embedMeta), html = row.embedHtml || undefined;
+    // A post that was already gone the first time we asked has no card to keep: it stays a plain link.
+    if (!html && !meta.author && !meta.title && !meta.thumbnailUrl) return {status: 'degraded', meta: {}, fetchedAt: row.embedFetched.getTime()};
+    return {status: 'ok', meta, html, fetchedAt: row.embedFetched.getTime()};
   },
   async save(permalink, entry) {
     await db.mediaItem.updateMany({where: {kind: 'instagram', sourceUrl: permalink}, data: {

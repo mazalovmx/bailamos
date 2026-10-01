@@ -3,6 +3,7 @@ import {usePathname, useRouter} from 'next/navigation';
 import {useTranslations, useLocale} from 'next-intl';
 import {useRef, useState} from 'react';
 import {UnreadBadge} from './chat/unread-badge';
+import {SearchBox} from './search/search-box';
 import {NotificationBell} from './notifications/bell';
 import {signOutCleanup} from './pwa/worker';
 export function Header({signedIn}:{signedIn:boolean}) {
@@ -29,6 +30,7 @@ export function Header({signedIn}:{signedIn:boolean}) {
 </>;
   return <header className="app-header" onKeyDown={e=>{if(e.key==='Escape'&&menu.current?.open){menu.current.open=false;menu.current.querySelector('summary')?.focus();}}}>
     <a className="brand" href={'/'+locale}>dance<span>community</span></a>
+    <SearchBox/>
     <nav className="main-nav desktop-nav" aria-label={t('navigation')}>{links}</nav>
     <details className="header-menu" ref={menu}>
       <summary className="menu-toggle">{t('openMenu')} <span aria-hidden="true">☰</span></summary>

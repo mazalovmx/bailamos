@@ -4,6 +4,8 @@ Audited on 2026-10-01 on `feature/requirements-completion`. This is the current 
 
 ## Verified baseline and current changes
 
+Follow-up integration acceptance: see [current delivery status](status.md). The latest run passed 209 tests, both builds, the HTTP workflow, owner/admin sign-in, native mobile navigation, city/style text search and browser draft autosave. Historical counts below refer to the earlier audit.
+
 The homepage has the supplied photographs, visible EN/ES/RU selection (English by default), mobile layouts, swing-focused class discovery and multi-select filters. The announcement studio exports PNG images for Instagram posts/stories and WhatsApp, with native file sharing where the browser supports it.
 
 The feature branch now contains implementations across all fourteen epics. The previous checklist was outdated: multiple skills, calendar export, recurrence exceptions, maps, media, moderation and other modules already exist. The table distinguishes implemented work from acceptance still required.
