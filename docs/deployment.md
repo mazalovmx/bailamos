@@ -31,6 +31,7 @@
 - `BETTER_AUTH_SECRET` — уникальный production-секрет не короче 32 символов.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` — рабочая почта для подтверждения регистрации и восстановления пароля. Локальный Mailpit для production не подходит.
 - `NEXT_TELEMETRY_DISABLED=1` — по желанию.
+- `RAILPACK_PRUNE_DEPS=false` — сохранить инструменты миграции/seed (`prisma`, `tsx`, `dotenv-cli`) для pre-deploy. Не включать удаление dev-зависимостей, пока эти инструменты используются в release-команде. [Настройки Node.js в Railpack](https://railpack.com/languages/node/).
 
 `PORT` задаёт Railway. `.env` остаётся локальным и не хранится в Git. Redis и S3 текущему web-сценарию не требуются. Админ-приложение не публикуется этой конфигурацией. До подключения БД, SMTP, домена и production-переменных публичный запуск не считается настроенным.
 
