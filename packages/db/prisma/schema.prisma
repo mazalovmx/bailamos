@@ -1,0 +1,319 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum ProfileType {
+  DANCER
+  ORGANIZER
+  SCHOOL
+  VENUE
+  ARTIST
+}
+enum DanceRole {
+  LEADER
+  FOLLOWER
+  BOTH
+}
+enum SkillLevel {
+  NEWCOMER
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  PRO
+}
+enum EventRole {
+  OWNER
+  CO_ORGANIZER
+  ARTIST
+  ATTENDEE
+}
+enum RsvpStatus {
+  GOING
+  INTERESTED
+  DECLINED
+}
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+}
+enum EventKind {
+  CLASS
+  WORKSHOP
+  MASTERCLASS
+  INTENSIVE
+  PRACTICE
+  SOCIAL
+  FESTIVAL
+  OTHER
+}
+enum DanceFormat {
+  SOLO
+  PARTNER
+  MIXED
+  UNSPECIFIED
+}
+enum EventLevel {
+  OPEN
+  NEWCOMER
+  BEGINNER
+  IMPROVER
+  INTERMEDIATE
+  ADVANCED
+  PRO
+  UNSPECIFIED
+}
+enum Intensity {
+  RELAXED
+  MODERATE
+  ENERGETIC
+  UNSPECIFIED
+}
+enum MusicTempo {
+  SLOW
+  MEDIUM
+  FAST
+  VARIED
+  UNSPECIFIED
+}
+model Profile {
+  id String @id @default(cuid())
+  userId String? @unique
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type ProfileType
+  handle String @unique
+  name String
+  bio String?
+  instagram String?
+  cityId String?
+  city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  skills DanceSkill[]
+  memberships EventMembership[]
+  rsvps Rsvp[]
+  posts Post[]
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  @@index([cityId, type])
+}
+model City {
+  id String @id @default(cuid())
+  slug String @unique
+  name String
+  countryCode String @db.Char(2)
+  timezone String
+  lat Float
+  lng Float
+  geo Unsupported("geography(Point,4326)")?
+  venues Venue[]
+  profiles Profile[]
+  events Event[]
+}
+model DanceStyle {
+  id String @id @default(cuid())
+  slug String @unique
+  name String
+  parentId String?
+  parent DanceStyle? @relation("StyleTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children DanceStyle[] @relation("StyleTree")
+  skills DanceSkill[]
+  events EventStyle[]
+  @@index([parentId])
+}
+model DanceSkill {
+  id String @id @default(cuid())
+  profileId String
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  styleId String
+  style DanceStyle @relation(fields: [styleId], references: [id], onDelete: Restrict)
+  role DanceRole
+  level SkillLevel
+  lookingFor Boolean @default(false)
+  @@unique([profileId, styleId, role])
+  @@index([styleId, level, lookingFor])
+}
+model Venue {
+  id String @id @default(cuid())
+  name String
+  address String
+  cityId String
+  city City @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  lat Float
+  lng Float
+  geo Unsupported("geography(Point,4326)")?
+  events Event[]
+  @@index([cityId])
+}
+model Event {
+  id String @id @default(cuid())
+  slug String @unique
+  title String
+  description String?
+  startsAt DateTime @db.Timestamptz(3)
+  endsAt DateTime? @db.Timestamptz(3)
+  timezone String
+  rrule String?
+  venueId String?
+  venue Venue? @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  cityId String
+  city City @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  lat Float?
+  lng Float?
+  geo Unsupported("geography(Point,4326)")?
+  status EventStatus @default(DRAFT)
+  kind EventKind @default(OTHER)
+  format DanceFormat @default(UNSPECIFIED)
+  level EventLevel @default(UNSPECIFIED)
+  intensity Intensity @default(UNSPECIFIED)
+  tempo MusicTempo @default(UNSPECIFIED)
+  prerequisites String?
+  partnerRequired Boolean?
+  tags EventTag[]
+  sourceUrl String?
+  styles EventStyle[]
+  members EventMembership[]
+  rsvps Rsvp[]
+  media MediaItem[]
+  occurrences EventOccurrence[]
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  @@index([cityId, startsAt])
+  @@index([status, startsAt])
+  @@index([kind, format, level])
+}
+model Tag {
+  id String @id
+  name String
+  events EventTag[]
+}
+model EventTag {
+  eventId String
+  tagId String
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Restrict)
+  @@id([eventId, tagId])
+  @@index([tagId])
+}
+model EventStyle {
+  eventId String
+  styleId String
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  style DanceStyle @relation(fields: [styleId], references: [id], onDelete: Restrict)
+  @@id([eventId, styleId])
+  @@index([styleId])
+}
+model EventOccurrence {
+  id String @id @default(cuid())
+  eventId String
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  startsAt DateTime @db.Timestamptz(3)
+  endsAt DateTime? @db.Timestamptz(3)
+  cancelled Boolean @default(false)
+  @@unique([eventId, startsAt])
+  @@index([startsAt])
+}
+model EventMembership {
+  eventId String
+  profileId String
+  role EventRole
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  @@id([eventId, profileId, role])
+  @@index([profileId])
+}
+model Rsvp {
+  eventId String
+  profileId String
+  status RsvpStatus
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  @@id([eventId, profileId])
+  @@index([profileId])
+}
+model Post {
+  id String @id @default(cuid())
+  profileId String
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title String
+  content Json
+  publishedAt DateTime? @db.Timestamptz(3)
+  media MediaItem[]
+  @@index([profileId, publishedAt])
+}
+model MediaItem {
+  id String @id @default(cuid())
+  postId String?
+  post Post? @relation(fields: [postId], references: [id], onDelete: Cascade)
+  eventId String?
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  kind String
+  storageKey String?
+  sourceUrl String?
+  embedHtml String?
+  embedFetched DateTime? @db.Timestamptz(3)
+  @@index([sourceUrl])
+  @@index([postId])
+  @@index([eventId])
+}
+
+model User {
+  id String @id
+  name String
+  email String @unique
+  emailVerified Boolean @default(false)
+  image String?
+  ageConfirmed Boolean @default(false)
+  locale String @default("en")
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  sessions Session[]
+  accounts Account[]
+  profile Profile?
+}
+model Session {
+  id String @id
+  token String @unique
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  ipAddress String?
+  userAgent String?
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+model Account {
+  id String @id
+  accountId String
+  providerId String
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken String?
+  refreshToken String?
+  idToken String?
+  accessTokenExpiresAt DateTime? @db.Timestamptz(3)
+  refreshTokenExpiresAt DateTime? @db.Timestamptz(3)
+  scope String?
+  password String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+model Verification {
+  id String @id
+  identifier String
+  value String
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  @@index([identifier])
+}
+model RateLimit {
+  id String @id @default(cuid())
+  key String @unique
+  count Int
+  lastRequest BigInt
+}

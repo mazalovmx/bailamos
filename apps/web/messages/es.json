@@ -1,0 +1,21 @@
+{
+  "Home": {
+    "title": "Dance Community — encuentra tu ritmo",
+    "description": "Un lugar para quienes viven el baile. Eventos, personas e historias de tu comunidad local.",
+    "language": "Idioma de la interfaz",
+    "eyebrow": "Más cerca. A través del baile.",
+    "headline": "Tu ciudad. Tu gente. Tu ritmo.",
+    "explore": "Explora la comunidad",
+    "discover": "Todo empieza con un baile",
+    "preview": "Próximamente",
+    "eventsTitle": "Encuentra tu próxima noche",
+    "eventsText": "Fiestas, festivales y prácticas en tu ciudad.",
+    "peopleTitle": "Conoce a tu gente",
+    "peopleText": "Bailarines, escuelas y artistas. Personas con quienes quieres bailar.",
+    "storiesTitle": "Comparte los momentos",
+    "storiesText": "Fotos, recuerdos e historias que quedan después de la música.",
+    "emptyTitle": "Estamos preparando la primera agenda",
+    "emptyText": "Aquí aparecerán eventos reales de la comunidad. Pronto abriremos.",
+    "footer": "Conectamos a personas que aman bailar."
+  }
+}

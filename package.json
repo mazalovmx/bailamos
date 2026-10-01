@@ -1,0 +1,30 @@
+{
+  "name": "dance-community",
+  "private": true,
+  "packageManager": "pnpm@10.15.1",
+  "engines": {
+    "node": ">=22.18.0 <25"
+  },
+  "scripts": {
+    "start": "node scripts/start-web.mjs",
+    "build:railway": "pnpm db:generate && pnpm --filter @dance/web build",
+    "release:railway": "pnpm db:migrate && pnpm db:seed",
+    "dev": "pnpm --parallel --filter './apps/*' dev",
+    "build": "pnpm db:generate && pnpm -r build",
+    "typecheck": "pnpm db:generate && pnpm -r typecheck",
+    "lint": "eslint .",
+    "test": "node --test tests/*.test.mjs && pnpm --filter @dance/web test",
+    "db:generate": "pnpm --filter @dance/db generate",
+    "db:migrate": "pnpm --filter @dance/db migrate",
+    "db:seed": "pnpm --filter @dance/db seed",
+    "infra:up": "docker compose up -d --wait",
+    "infra:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "eslint": "^9.39.0",
+    "typescript-eslint": "^8.46.0",
+    "typescript": "^5.9.3",
+    "@types/node": "^22.18.0"
+  }
+}

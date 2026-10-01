@@ -1,0 +1,21 @@
+{
+  "Home": {
+    "title": "Dance Community — find your rhythm",
+    "description": "A home for people who live to dance. Events, people and stories from your local dance community.",
+    "language": "Interface language",
+    "eyebrow": "Closer together. Through dance.",
+    "headline": "Your city. Your people. Your rhythm.",
+    "explore": "Explore the community",
+    "discover": "It starts with a dance",
+    "preview": "Opening soon",
+    "eventsTitle": "Find your next night",
+    "eventsText": "Parties, festivals and practice sessions in your city.",
+    "peopleTitle": "Meet your people",
+    "peopleText": "Dancers, schools and artists. People you want to dance with.",
+    "storiesTitle": "Share the moments",
+    "storiesText": "Photos, memories and stories that stay after the music ends.",
+    "emptyTitle": "Our first events are on their way",
+    "emptyText": "Real community events will appear here. Stay tuned for the opening.",
+    "footer": "Connecting people who love to dance."
+  }
+}
