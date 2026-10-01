@@ -1,31 +1,31 @@
-# Модель свингового сообщества
+# Swing community model
 
-Главная аудитория по уточнению владельца: свинг и линди-хоп. Это приоритет навигации и начального наполнения.
+Swing and Lindy Hop are the primary audience. This determines catalogue ordering, homepage content and examples.
 
-## На что опираемся
+## Design references
 
-- Herräng разделяет Lindy Hop, Solo Jazz, Balboa и уровни; отдельно предупреждает, что одинаковые названия уровней могут означать разную подготовку в разных школах. Поэтому кроме уровня у занятия есть описание конкретных требований. [Каталог Herräng](https://www.herrang.com/2026/courses).
-- Swing Patrol проводит еженедельные классы разных уровней; на парные занятия можно приходить без партнёра благодаря смене партнёров. Поэтому формат «парный» и требование «привести партнёра» — разные поля. [О классах Swing Patrol](https://www.swingpatrol.co.uk/about-classes/).
-- SwingStep отделяет основной курс от тематических занятий: свинг-ауты, сольная техника, музыкальность, телесная подготовка и рутины. Поэтому темы хранятся в тегах, а не создаются как отдельные стили. [Классы SwingStep](https://swingstep.com/classes/).
+- Herräng separates Lindy Hop, Solo Jazz, Balboa, levels and prerequisites. Since level labels can differ across schools, classes include explicit prerequisites. [Herräng courses](https://www.herrang.com/2026/courses).
+- Swing Patrol offers weekly classes where partnered dancing does not necessarily require bringing a partner. Dance format and partner requirements are separate fields. [Swing Patrol classes](https://www.swingpatrol.co.uk/about-classes/).
+- SwingStep distinguishes courses from topics such as swing-outs, solo technique, musicality, conditioning and routines. Topics belong in tags rather than new styles. [SwingStep classes](https://swingstep.com/classes/).
 
-## Принятые продуктовые решения
+## Product decisions
 
-1. **Направление / подстиль**: Swing → Lindy Hop, Solo Jazz, Balboa, Collegiate Shag, St. Louis Shag, Charleston, Boogie Woogie. Charleston → Solo Charleston / Partnered Charleston. Это рабочая навигация каталога, не утверждение о единственной исторической классификации.
-2. **Тип события**: класс, воркшоп, мастер-класс, интенсив, практика, вечеринка, фестиваль. Разница между воркшопом и мастер-классом задаётся организатором: общего стандарта здесь не предполагаем.
-3. **Формат**: соло, парный, смешанный. Для соло нельзя указать обязательного партнёра.
-4. **Уровень**: открытый, с нуля, начинающий, продолжающий, средний, продвинутый, профессиональный. Уровень не вычисляется по темпу.
-5. **Физическая нагрузка**: спокойная, умеренная, энергичная. Это описание организатора, не медицинская оценка.
-6. **Темп музыки**: медленный, средний, быстрый, разный. Общие BPM-пороги не навязываются: соответствие темпа и нагрузки зависит от танца и программы.
-7. **Теги**: музыкальность, импровизация, работа ног, взаимодействие в паре, техника, сольные рутины, свинг-ауты, живая музыка, смена ролей, для начинающих, пробное занятие.
-8. **Расписание**: одно событие или еженедельная серия 2–52 занятия. Календарные даты сохраняются в БД; часы остаются местными при DST.
-9. **Неизвестные значения**: старым событиям не приписываются уровни или нагрузка автоматически; миграция использует «не указано».
-10. **Запись**: сейчас RSVP на всю серию; интерфейс говорит об этом явно. Запись на отдельную дату, исключения, переносы, несколько преподавателей, лимит мест и лист ожидания — следующие расширения.
+1. **Style/substyle:** Swing includes Lindy Hop, Solo Jazz, Balboa, Shag, Charleston and Boogie Woogie, with additional branches in the catalogue. Charleston has solo/partnered variants; Balboa has Pure Balboa and Bal-Swing. This is navigation, not a definitive historical taxonomy.
+2. **Event type:** class, workshop, masterclass, intensive, practice, social or festival. The organizer chooses between workshop and masterclass; no universal distinction is imposed.
+3. **Format:** solo, partnered or mixed. Solo events cannot require a partner.
+4. **Level:** open, newcomer, beginner, improver, intermediate, advanced or professional. Level is not inferred from music tempo.
+5. **Physical intensity:** relaxed, moderate or energetic. An organizer's description, not a medical assessment.
+6. **Music tempo:** slow, medium, fast or varied. No universal BPM thresholds are imposed.
+7. **Tags:** musicality, improvisation, footwork, connection, technique, solo routines, swing-outs, live music, switch roles, beginner-friendly and taster classes.
+8. **Schedule:** occurrences are materialized as dates, preserving local wall-clock time across DST. The original weekly series supported 2–52 sessions; expanded recurrence/exception support is covered by the event tests.
+9. **Unknown values:** legacy events do not receive invented levels or intensity; unspecified remains explicit.
+10. **Attendance:** series RSVP and per-occurrence reservations are distinct. UI wording must match the endpoint. Per-date exceptions, capacity and waiting lists must not be implied without implementation.
 
-## Примеры поддерживаемого поиска
+## Discovery examples
 
-- Solo Jazz + соло + начинающий + спокойная нагрузка + медленная музыка + музыкальность.
-- Lindy Hop + парный + воркшоп + средний уровень + быстрый темп.
-- Swing + регулярные классы + можно без партнёра.
-- Charleston включает дочерние варианты при фильтрации по родительскому направлению.
+- Solo Jazz + solo + beginner + relaxed intensity + slow music + musicality.
+- Lindy Hop + partnered + workshop + intermediate + fast music.
+- Swing + regular classes + no partner required.
+- A parent style includes its descendants through the catalogue-aware search.
 
-Регистрация, профили и эти сценарии уже используют реальную БД. Демонстрационные события автоматически не публикуются.
+Multi-select filters use OR within a group and AND across groups. Event/profile forms keep singular fields where the domain value is singular, such as an event's city. Public examples are never automatically published by seeding.

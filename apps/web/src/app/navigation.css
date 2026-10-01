@@ -1,0 +1,17 @@
+.header-menu{display:none}
+.app-header .main-nav{flex-wrap:wrap}
+@media(max-width:1100px){
+  .app-header{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:14px 0}
+  .app-header .desktop-nav{display:none}
+  .header-menu{display:block;grid-column:1/-1;order:4}
+  .header-menu .menu-toggle{position:absolute;right:0;top:14px;list-style:none}
+  .header-menu .menu-toggle::-webkit-details-marker{display:none}
+  .app-header .brand{font-size:19px;min-width:0}
+  .menu-toggle{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 10px;border:1px solid #9fa897;border-radius:12px;background:#fffefa;color:inherit;font:inherit;font-size:14px;cursor:pointer}
+  .menu-toggle span{font-size:20px}
+  .app-header .language-nav{grid-column:1/-1;order:3;margin:0;justify-self:start}
+  .app-header .main-nav{grid-column:1/-1;order:4;display:none;margin:8px 0 0;width:100%;padding:12px 0 0;border-top:1px solid #d9ddd2;gap:4px}
+  .app-header .mobile-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .app-header .main-nav a,.app-header .main-nav button{min-width:0;min-height:44px;padding:10px;overflow-wrap:anywhere;text-align:left;justify-content:flex-start;border-radius:8px}
+  .app-header .main-nav a:hover{background:#e9edde}
+}

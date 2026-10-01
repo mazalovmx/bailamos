@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {config} from 'dotenv';
+import {db} from '@dance/db';
+import {createSchool,grantSchool,schoolList,schoolResources,createSchoolResource,changeSchoolResource} from '../src/lib/schools';
+import {setUserRole,banUser} from '../src/lib/moderation';
+import {allows} from '../src/lib/resources';
+config({path:'../../.env',quiet:true});
+test('owner hierarchy, school isolation, chat ownership and immediate revocation',{timeout:30000},async()=>{
+  const tag='rbac-'+randomUUID(),users=[tag+'owner',tag+'global',tag+'local',tag+'other'],schools:string[]=[];
+  try{
+    for(const [i,id]of users.entries())await db.user.create({data:{id,email:id+'@example.test',name:id,emailVerified:true,role:i===0?'OWNER':i===1?'ADMIN':'USER'}});
+    const [owner,global,local,other]=users;
+    const a=await createSchool(owner,{name:'School A',handle:'a-'+randomUUID().slice(0,8)}),b=await createSchool(global,{name:'School B',handle:'b-'+randomUUID().slice(0,8)});schools.push(a.id,b.id);
+    await grantSchool(global,a.id,{email:local+'@example.test'});await grantSchool(owner,b.id,{email:other+'@example.test'});
+    assert.deepEqual((await schoolList(local)).map(s=>s.id),[a.id]);
+    await assert.rejects(schoolResources(local,b.id),/FORBIDDEN/);
+    await assert.rejects(createSchoolResource(local,b.id,{kind:'post',title:'Attack',body:'No'}),/FORBIDDEN/);
+    await assert.rejects(grantSchool(local,b.id,{email:local+'@example.test'}),/FORBIDDEN/);
+    await assert.rejects(createSchool(local,{name:'Forbidden',handle:'forbidden-'+tag.slice(-6)}),/FORBIDDEN/);
+    const own=await createSchoolResource(local,a.id,{kind:'post',title:'My class',body:'Swing practice'}),foreign=await createSchoolResource(other,b.id,{kind:'post',title:'Other class',body:'Lindy Hop'});
+    await changeSchoolResource(local,a.id,{kind:'post',id:own.id,action:'publish'});
+    await assert.rejects(changeSchoolResource(local,a.id,{kind:'post',id:foreign.id,action:'hide'}),/NOT_FOUND/);
+    assert.equal((await db.post.findUniqueOrThrow({where:{id:foreign.id}})).hiddenAt,null);
+    const chat=await createSchoolResource(local,a.id,{kind:'conversation',title:'School A chat'}),otherChat=await createSchoolResource(other,b.id,{kind:'conversation',title:'School B chat'});
+    await changeSchoolResource(local,a.id,{kind:'conversation',id:chat.id,action:'rename',title:'Practice chat'});
+    await assert.rejects(changeSchoolResource(local,a.id,{kind:'conversation',id:otherChat.id,action:'rename',title:'Attack'}),/NOT_FOUND/);
+    const msg=await db.message.create({data:{conversationId:otherChat.id,senderProfileId:b.id,body:'Private to school B'}});
+    await assert.rejects(changeSchoolResource(local,a.id,{kind:'message',id:msg.id,action:'hide'}),/NOT_FOUND/);
+    assert.equal((await schoolResources(local,a.id)).messages.length,0);
+    await assert.rejects(setUserRole(local,'ADMIN',global),/FORBIDDEN/);
+    await assert.rejects(setUserRole(owner,'USER',global),/FORBIDDEN/);
+    await assert.rejects(setUserRole(other,'OWNER',owner),/FORBIDDEN/);
+    await assert.rejects(banUser(owner,'test',global),/FORBIDDEN/);
+    await assert.rejects(banUser(global,'test',local),/FORBIDDEN/);
+    assert.equal(allows('STAFF','SCHOOL_ADMIN'),false);assert.equal(allows('ADMIN','OWNER'),true);
+    await grantSchool(global,a.id,{email:local+'@example.test',revoke:true});
+    await assert.rejects(schoolResources(local,a.id),/FORBIDDEN/);
+    assert.equal((await schoolList(local)).length,0);
+    assert.ok(await db.auditLog.count({where:{actorUserId:{in:users},action:'SCHOOL_ADMIN_REVOKE'}}));
+  }finally{
+    await db.message.deleteMany({where:{conversation:{schoolProfileId:{in:schools}}}});
+    await db.conversation.deleteMany({where:{schoolProfileId:{in:schools}}});
+    await db.post.deleteMany({where:{schoolProfileId:{in:schools}}});
+    await db.profile.deleteMany({where:{id:{in:schools}}});
+    await db.auditLog.deleteMany({where:{actorUserId:{in:users}}});
+    await db.user.deleteMany({where:{id:{in:users}}});await db.$disconnect();
+  }
+});

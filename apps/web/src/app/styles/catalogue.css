@@ -1,0 +1,59 @@
+.combobox{display:flex;flex-direction:column;gap:8px;min-width:0;position:relative}
+.combobox>label{font-size:14px;font-weight:600}
+.combobox-control{position:relative}
+.combobox-control input{min-height:48px}
+.combobox-list{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 4px);margin:0;padding:6px;list-style:none;background:#fffefa;border:1px solid #718069;border-radius:12px;max-height:300px;overflow-y:auto;box-shadow:0 10px 24px #253b2f26}
+.combobox-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:15px;line-height:1.3;overflow-wrap:anywhere}
+.combobox-list li small{flex:0 0 auto;max-width:45%;text-align:right}
+.combobox-list li[aria-selected=true]{background:#253b2f;color:#fff}
+.combobox-list li[aria-selected=true] small{color:#e9edde}
+.combobox-empty{margin:0;font-size:13px;line-height:1.5;color:#516149}
+.combobox-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.combobox-chips button{background:#fffefa;border:1px solid #718069;border-radius:22px;padding:8px 14px;min-height:44px;font-size:13px;color:#202822;overflow-wrap:anywhere;max-width:100%}
+.combobox-chips button:hover{background:#dafa7c}
+.follow{display:inline-flex;flex-direction:column;gap:8px;align-items:flex-start}
+.follow .button{margin-top:0;min-height:48px;gap:10px}
+.follow .button[aria-pressed=true]{background:#253b2f;color:#fff}
+.follow .form-error{font-size:14px;padding:10px 12px}
+.city-switcher{display:flex;flex-direction:column;gap:12px;background:#e9edde;border-radius:16px;padding:20px;max-width:520px}
+.city-switcher p{margin:0;font-size:15px;line-height:1.5}
+.city-switcher-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.city-switcher-actions .button,.catalogue-actions .button{margin-top:0;min-height:48px;gap:10px}
+.link-button{background:none;border:0;padding:10px 4px;min-height:44px;text-decoration:underline;color:#253b2f;font-size:14px}
+.catalogue-page{padding-top:55px;padding-bottom:70px}
+.catalogue-page h1{font-size:clamp(38px,5vw,60px);letter-spacing:-2px;overflow-wrap:anywhere}
+.catalogue-page .intro{max-width:680px}
+.catalogue-search{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin:28px 0;max-width:620px}
+.catalogue-search label{flex:1 1 220px}
+.catalogue-search .button{margin-top:0;min-height:48px}
+.catalogue-search a{font-size:14px;padding:14px 4px}
+.breadcrumbs{flex-wrap:wrap;align-items:center;gap:4px;font-size:13px;margin-top:8px}
+.breadcrumbs ol{display:flex;flex-wrap:wrap;gap:4px;align-items:center;list-style:none;margin:0;padding:0}
+.breadcrumbs li{display:flex;align-items:center;gap:4px}
+.breadcrumbs li+li::before{content:"/";color:#718069}
+.breadcrumbs a{font-size:13px;font-weight:400;text-decoration:underline;padding:10px 6px;min-height:44px;display:inline-flex;align-items:center}
+.breadcrumbs [aria-current=page]{padding:10px 6px;font-weight:700}
+.catalogue-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;margin:24px 0}
+.catalogue-meta{font-size:14px;line-height:1.6;color:#516149;margin:0}
+.style-families{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin:30px 0}
+.style-family{background:#fffefa;border:1px solid #d5dbc9;border-radius:18px;padding:22px;min-width:0}
+.style-family h2{font-size:22px;letter-spacing:0;margin:0 0 4px;overflow-wrap:anywhere}
+.style-family h2 a{text-decoration:none}
+.style-family h2 a:hover{text-decoration:underline}
+.style-tree,.style-tree ul{list-style:none;margin:0;padding:0}
+.style-tree{margin-top:12px}
+.style-tree ul{padding-left:16px;border-left:1px solid #d5dbc9;margin-left:6px}
+.style-tree a{display:inline-flex;align-items:center;min-height:44px;padding:4px 6px;font-size:15px;line-height:1.3;text-decoration:none;overflow-wrap:anywhere}
+.style-tree a:hover{text-decoration:underline}
+.link-list{list-style:none;margin:20px 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 20px}
+.link-list a{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:44px;padding:6px 8px;border-radius:8px;text-decoration:none;font-size:15px;line-height:1.3;overflow-wrap:anywhere}
+.link-list a:hover{background:#e9edde}
+.link-list small{flex:0 0 auto}
+.country-group{border-top:1px solid #d5dbc9;padding:18px 0 6px}
+.country-group h2{font-size:20px;letter-spacing:0;margin:0}
+.agenda-day{border-top:1px solid #d5dbc9;padding-top:6px;margin-top:26px}
+.agenda-day h3{font-size:18px;margin:16px 0 0}
+.agenda-day .event-grid{margin:16px 0 0}
+.catalogue-page .tags a{min-height:44px;display:inline-flex;align-items:center}
+@media(max-width:900px){.style-families,.link-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.style-families,.link-list{grid-template-columns:1fr}.catalogue-page{padding-top:30px}.style-family{padding:18px}.city-switcher{padding:16px}.catalogue-actions .button,.catalogue-actions .follow,.follow .button{width:100%}.catalogue-search .button{flex:1}}

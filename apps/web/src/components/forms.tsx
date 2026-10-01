@@ -4,6 +4,8 @@ import {useRouter} from 'next/navigation';
 import {useState} from 'react';
 import Link from 'next/link';
 import {SwingFields} from './swing-fields';
+import {ScheduleFields} from './events/schedule-fields';
+import {VenuePicker} from './geo/venue-picker';
 type Options={id:string;name:string;timezone?:string}[];
 type Fields=Record<string,string>;
 async function submit(url:string,method:string,body:unknown) {
@@ -14,9 +16,10 @@ async function submit(url:string,method:string,body:unknown) {
 }
 function useFormStatus() {
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
-  const t=useTranslations('App');
+  const t=useTranslations('App'),x=useTranslations('EventsX');
+  // Error codes are looked up in App first, then in the events namespace.
   return {busy,setBusy,error,setError,
-    feedback:error?<p role="alert" className="form-error">{t.has('error_'+error)?t('error_'+error):t('error_GENERIC')}</p>:null};
+    feedback:error?<p role="alert" className="form-error">{t.has('error_'+error)?t('error_'+error):x.has('error_'+error)?x('error_'+error):t('error_GENERIC')}</p>:null};
 }
 function values(form:HTMLFormElement):Fields {return Object.fromEntries(new FormData(form)) as Fields;}
 export function AuthForm({mode,token}:{mode:'login'|'register'|'forgot'|'reset';token?:string}) {
@@ -31,7 +34,7 @@ export function AuthForm({mode,token}:{mode:'login'|'register'|'forgot'|'reset';
       try {
         const origin=window.location.origin;
         if(mode==='register') await submit('/api/auth/sign-up/email','POST',{...data,ageConfirmed:data.ageConfirmed==='on',locale,callbackURL:origin+'/'+locale+'/profile'});
-        if(mode==='login') {await submit('/api/auth/sign-in/email','POST',data);router.push('/'+locale+'/profile');router.refresh();return;}
+        if(mode==='login') {await submit('/api/auth/sign-in/email','POST',data);router.push('/'+locale+'/account');router.refresh();return;}
         if(mode==='forgot') await submit('/api/auth/request-password-reset','POST',{email:data.email,redirectTo:origin+'/'+locale+'/reset-password'});
         if(mode==='reset') await submit('/api/auth/reset-password','POST',{newPassword:data.password,token});
         setDone(true);
@@ -69,35 +72,42 @@ export function ProfileForm({cities,styles,initial}:{cities:Options;styles:Optio
     {s.feedback}<button className="button" disabled={s.busy}>{t(s.busy?'working':'saveProfile')}</button>
   </form>;
 }
-export function EventForm({cities,styles,initial,id,tags,selectedTags=[]}:{cities:Options;styles:Options;initial:Fields;id?:string;tags:Options;selectedTags?:string[]}) {
-  const t=useTranslations('App'),locale=useLocale(),router=useRouter(),s=useFormStatus();
+export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools=[]}:{cities:Options;styles:Options;initial:Fields;id?:string;tags:Options;selectedTags?:string[];schools?:Options}) {
+  const t=useTranslations('App'),x=useTranslations('EventsX'),locale=useLocale(),router=useRouter(),s=useFormStatus();
   const [cityId,setCityId]=useState(initial.cityId||'');
   return <form className="editor-form" onSubmit={async e=>{e.preventDefault();s.setBusy(true);s.setError('');
     try{
       const data=new FormData(e.currentTarget);
-      const body={...values(e.currentTarget),tagIds:data.getAll('tagIds'),partnerRequired:data.get('partnerRequired')==='on'};
-      const result=await submit('/api/events'+(id?'/'+id:''),id?'PATCH':'POST',body);router.push('/'+locale+'/events/'+result.slug);router.refresh();}
+      const body={...values(e.currentTarget),tagIds:data.getAll('tagIds'),recurrenceDays:data.getAll('recurrenceDays'),partnerRequired:data.get('partnerRequired')==='on'};
+      const result=await submit('/api/events'+(id?'/'+id:''),id?'PATCH':'POST',body);
+      // A new event continues in the editor, where the team, the artists and single dates are managed.
+      router.push('/'+locale+'/events/'+result.slug+(id?'':'/edit?created=1'));router.refresh();}
     catch(error){s.setError(error instanceof Error?error.message:'GENERIC');}finally{s.setBusy(false);}
   }}>
     <label>{t('title')}<input name="title" required minLength={3} maxLength={120} defaultValue={initial.title}/></label>
     <label>{t('description')}<textarea name="description" required minLength={10} maxLength={5000} rows={6} defaultValue={initial.description}/></label>
     <div className="form-grid"><label>{t('city')}<select name="cityId" required value={cityId} onChange={e=>setCityId(e.target.value)}><option value="">{t('choose')}</option>{cities.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
     <Select name="styleId" label={t('style')} options={styles} value={initial.styleId}/></div>
+    {/* The picker submits "venueId"; saving copies the venue's coordinates to the event, or the city's when there is none. */}
+    {!id&&schools.length>0&&<label>{x('onBehalfOf')}<select name="schoolProfileId" defaultValue=""><option value="">{x('onBehalfOfMe')}</option>{schools.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select><small>{x('onBehalfOfHint')}</small></label>}
+    <VenuePicker name="venueId" cityId={cityId} initialVenueId={initial.venueId}/>
+    <label>{x('price')}<input name="priceText" maxLength={120} defaultValue={initial.priceText} placeholder={x('pricePlaceholder')}/><small>{x('priceHint')}</small></label>
     <SwingFields initial={initial} tags={tags} selectedTags={selectedTags}/>
-    <p className="field-note">{t('timezoneNote')} <strong>{cities.find(c=>c.id===cityId)?.timezone}</strong></p>
-    <div className="form-grid"><label>{t('starts')}<input name="startsLocal" type="datetime-local" required defaultValue={initial.startsLocal}/></label>
-    <label>{t('ends')}<input name="endsLocal" type="datetime-local" required defaultValue={initial.endsLocal}/></label></div>
-    <Select name="status" label={t('status')} value={initial.status||'DRAFT'} options={(id?['DRAFT','PUBLISHED','CANCELLED']:['DRAFT','PUBLISHED']).map(id=>({id,name:t(id)}))}/>
+    <ScheduleFields initial={initial} zone={cities.find(c=>c.id===cityId)?.timezone}/>
+    <div className="form-grid"><label>{x('attendeeVisibility')}<select name="attendeeVisibility" defaultValue={initial.attendeeVisibility||'PUBLIC'}>{['PUBLIC','ATTENDEES','ORGANIZERS'].map(value=><option key={value} value={value}>{x('visibility_'+value)}</option>)}</select><small>{x('attendeeVisibilityHint')}</small></label>
+    <Select name="status" label={t('status')} value={initial.status||'DRAFT'} options={(id?['DRAFT','PUBLISHED','CANCELLED']:['DRAFT','PUBLISHED']).map(id=>({id,name:t(id)}))}/></div>
     {s.feedback}<button className="button" disabled={s.busy}>{t(s.busy?'working':'saveEvent')}</button>
   </form>;
 }
 export function RsvpButtons({eventId,initial}:{eventId:string;initial:string}) {
   const t=useTranslations('App'),router=useRouter(),s=useFormStatus();
-  const [status,setStatus]=useState(initial);
-  return <div><div className="rsvp-buttons">{[['GOING','going'],['INTERESTED','interested'],['DECLINED','declined']].map(([value,label])=>
-    <button key={value} className={status===value?'button':'button secondary'} aria-pressed={status===value} disabled={s.busy} onClick={async()=>{
+  const [status,setStatus]=useState(initial==='DECLINED'?'':initial);
+  // "Remove RSVP" is only offered once there is an answer to remove.
+  const choices=[['GOING','going'],['INTERESTED','interested'],...(status?[['DECLINED','declined']]:[])];
+  return <div><div className="rsvp-buttons">{choices.map(([value,label])=>
+    <button key={value} type="button" className={status===value?'button':'button secondary'} aria-pressed={value==='DECLINED'?undefined:status===value} disabled={s.busy} onClick={async()=>{
       s.setBusy(true);s.setError('');
-      try{await submit('/api/events/'+eventId+'/rsvp','PUT',{status:value});setStatus(value);router.refresh();}
+      try{await submit('/api/events/'+eventId+'/rsvp','PUT',{status:value});setStatus(value==='DECLINED'?'':value);router.refresh();}
       catch(error){s.setError(error instanceof Error?error.message:'GENERIC');}finally{s.setBusy(false);}
     }}>{t(label)}</button>)}</div>{s.feedback}</div>;
 }

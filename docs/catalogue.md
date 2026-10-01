@@ -1,11 +1,42 @@
-# Города и направления
+# Cities and dance styles
 
-Каталог расширен с 3 до 18 городов и с 16 до 23 направлений. Данные добавляются идемпотентным `pnpm db:seed`: существующие записи пользователя не перезаписываются. Это доступные места для публикации, а не обещание наличия событий в каждом городе.
+The expanded dataset defines 97 cities and 291 styles in a parentId tree. pnpm db:seed matches by slug without overwriting existing records, preserving administrative edits. Available cities are not a promise of events in each location.
 
-Добавлены Barcelona, Valencia, Sevilla, Guadalajara, Monterrey, Санкт-Петербург, Казань, Berlin, Paris, London, Lisboa, Stockholm, New York, Buenos Aires, Bogotá. Координаты обозначают приблизительные центры городов, не площадки событий. Для каждого города задан идентификатор часового пояса IANA; его поддержка проверяется тестом и перед загрузкой записи. [О базе часовых поясов IANA](https://www.iana.org/time-zones).
+## Data sources
 
-Новые направления: Pure Balboa и Bal-Swing (внутри Balboa), Carolina Shag, West Coast Swing, East Coast Swing, Blues, Tap. Blues и Tap — самостоятельные соседние направления, не подстили Lindy Hop. Выбор Balboa в поиске включает оба новых подстиля; выбор Swing включает все его дочерние направления.
+- packages/db/prisma/data/styles.ts: styleTree; parents precede children. Unknown parents/cycles are rejected.
+- packages/db/prisma/data/cities.ts: slug, local name, ISO country code, IANA zone and centre coordinates.
+- packages/db/prisma/catalogue-additions.ts: earlier entries retained for compatibility with existing tests and included in the larger lists.
 
-Ориентиры для названий: [Herräng — программы Balboa, Solo Jazz и Tap](https://www.herrang.com/2026/courses), [Brisbane Balboa Swing — Pure Balboa и Bal-Swing](https://brisbanebalboaswing.dance/), [World Swing Dance Council — West Coast Swing](https://worldsdc.com/about/), [Association of Carolina Shag Clubs](https://shagdance.com/acscpage.htm). Группировка в каталоге — продуктовая навигация, не исчерпывающая историческая классификация.
+Slugs are permanent identifiers, matching seeded IDs. URLs, filters and city cookies depend on them. Existing slugs, including mexico-city, madrid, moscow and the Swing family, are preserved.
 
-В фильтрах с более чем 10 вариантами доступен поиск внутри списка. Он не очищает выбранные значения и не отправляется как глобальный поиск событий. «Выбрать найденные» добавляет совпавшие варианты к текущему выбору. Скрытые поиском выбранные чекбоксы остаются частью запроса. Символы с диакритикой, например Bogotá, можно искать без неё: Bogota.
+## Cities and styles
+
+Cities cover Europe, the Americas, CIS and selected locations elsewhere. Coordinates are approximate centres, not venues. IANA zones are validated during seeding and tests. [IANA database](https://www.iana.org/time-zones). Names use local spellings; autocomplete also searches slugs, so moscow, lisbon, cologne and bogota work.
+
+Root style families include Salsa, Bachata, Tango, Kizomba, Swing, Zouk, Forró, Brazilian, Afro-Cuban, Merengue, Cumbia, Latin urban, Konpa, Ballroom (Standard/Latin/American Smooth/American Rhythm), Hustle, Discofox, Blues, Tap, Fusion, Country & Western, Folk & traditional, Flamenco, Hip-hop & street dance, Afro dance, Contemporary, Jazz dance, Ballet, Oriental, Indian, Polynesian and Historical. Canonical proper names are not translated.
+
+Blues and Tap are independent neighbours, not Lindy Hop substyles. West Coast Swing remains under Swing to preserve its existing identity. The grouping is navigation, not an exhaustive historical classification.
+
+References: [Herräng](https://www.herrang.com/2026/courses), [Brisbane Balboa Swing](https://brisbanebalboaswing.dance/), [World Swing Dance Council](https://worldsdc.com/about/), [Carolina Shag clubs](https://shagdance.com/acscpage.htm).
+
+## Navigation
+
+- /[locale]/styles: searchable tree. /[locale]/styles/[slug]: descendants, upcoming published events and following. A chosen home city narrows events unless ?everywhere=1 is used.
+- /[locale]/cities: country-grouped directory, active event counts and home-city selection. /[locale]/cities/[slug]: daily programme in the city's time zone, calendar/map/iCal links and following.
+- The city cookie stores a slug for one year with SameSite=Lax. Server helpers: currentCitySlug()/currentCity() in lib/catalogue/current-city.ts.
+- upcomingOccurrences() in lib/catalogue/data.ts returns published, non-hidden, non-cancelled future occurrences.
+
+## Autocomplete and following
+
+GET /api/catalogue/styles?q= and /api/catalogue/cities?q= return at most ten matches, ranked by exact match, name/slug prefix, word prefix and substring. Matching ignores case/diacritics; responses use public, max-age=300.
+
+StyleAutocomplete and CityAutocomplete expose ARIA comboboxes and submit IDs through hidden inputs. Multiple style selection submits one input per style.
+
+PUT/DELETE /api/follows accept exactly one target: cityId, styleId or profileId. GET returns the caller's subscriptions. Duplicate follows are idempotent. A new profile follow sends one NEW_FOLLOWER notification; self-following and following hidden profiles are forbidden.
+
+## Discovery filters
+
+Long option lists support internal search without clearing selections or changing the global event query. Select matching options adds to existing selections. Hidden checked options still submit. Diacritics are optional.
+
+The synchronous eventSearch() retains static Swing-family expansion for isolated callers/tests. Public pages should use eventSearchAll(), which expands each selected style through the full database tree and combines the results without duplicates. Integration status is tracked in the epic audit.

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Swing News</title>
+    <link>https://news.example.org/</link>
+    <description>News of the swing scene</description>
+    <item>
+      <title>Herrang announces &lt;b&gt;2027&lt;/b&gt; dates</title>
+      <link>https://news.example.org/herrang-2027</link>
+      <guid isPermaLink="false">news-1</guid>
+      <pubDate>Mon, 14 Sep 2026 09:30:00 GMT</pubDate>
+      <description><![CDATA[<p>The camp returns <a href="javascript:alert(1)" onclick="steal()">next summer</a>.</p><script>alert('x')</script><img src=x onerror=alert(1)>]]></description>
+    </item>
+    <item>
+      <title>Relative link story</title>
+      <link>/stories/relative</link>
+      <pubDate>Tue, 15 Sep 2026 10:00:00 +0200</pubDate>
+      <description>&lt;script&gt;alert(2)&lt;/script&gt;Plain &amp;amp; simple</description>
+    </item>
+    <item>
+      <title>From the future</title>
+      <link>https://news.example.org/future</link>
+      <pubDate>Fri, 01 Jan 2100 00:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Bad scheme is dropped</title>
+      <link>javascript:alert(3)</link>
+    </item>
+    <item>
+      <title>Long one</title>
+      <link>https://news.example.org/long</link>
+      <description>word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word</description>
+    </item>
+  </channel>
+</rss>
