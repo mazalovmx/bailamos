@@ -111,7 +111,7 @@ export default async function EventPage({params,searchParams}:Props) {
         {isSeries&&<><h3>{x('rsvpSeries')}</h3><p className="field-note">{x('rsvpSeriesHint')}</p></>}
         <RsvpButtons eventId={event.id} initial={series||''}/>
         {isSeries&&selected&&!selected.cancelled&&selected.startsAt>=now&&<DateRsvp key={selected.id} eventId={event.id} occurrenceId={selected.id} date={date(startsAt)} series={series||''} override={override||''}/>}
-      </>:<Link className="button" href={'/'+locale+(user?'/profile':'/login')}>{t(user?'profileRequired':'signInRsvp')}</Link>)}
+      </>:<Link className="button" href={'/'+locale+(user?'/onboarding':'/login')+'?next='+encodeURIComponent('/'+locale+'/events/'+slug)}>{t(user?'profileRequired':'signInRsvp')}</Link>)}
       <h3>{isSeries?x('attendeesOnDate',{date:date(startsAt)}):x('attendees')}</h3>
       {!visible?<p className="field-note">{x('attendeesHidden_'+event.attendeeVisibility)}</p>:attendees.length===0?<p className="field-note">{x('noAttendees')}</p>:
         <ul className="attendee-list">{attendees.map(a=><li key={a.handle}><Link href={'/'+locale+'/@'+a.handle}>{a.name}</Link><span className="badge">{t(a.status==='GOING'?'going':'interested')}</span></li>)}</ul>}

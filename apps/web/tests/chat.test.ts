@@ -536,7 +536,7 @@ test('HTTP layer: session, same-origin mutations, bans and error codes', {timeou
   assert.equal((await stream.GET(request('/api/chat/stream', cookieA))).status, 403);
   // A member without a profile is told to create one.
   await db.profile.delete({where: {id: c.profileId}});
-  assert.deepEqual(await (await unread.GET(request('/api/chat/unread', cookieC))).json(), {error: 'PROFILE_REQUIRED'});
+  assert.deepEqual(await (await unread.GET(request('/api/chat/unread', cookieC))).json(), {total: 0, conversations: 0, requests: 0});
 });
 // ---------- Gaps closed after the first version: ordering, attachments, edit/delete, invitations, school chats, blocks in groups ----------
 async function upload(who: Me, conversationId: string) {

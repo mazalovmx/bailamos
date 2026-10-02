@@ -179,5 +179,11 @@
   "error_SESSION_NOT_FRESH": "В целях безопасности выйдите, войдите снова и повторите действие.",
   "error_SOCIAL_ACCOUNT_ALREADY_LINKED": "Этот аккаунт Google уже подключён.",
   "error_PROVIDER_NOT_FOUND": "Вход через Google сейчас недоступен.",
-  "error_CREDENTIAL_ACCOUNT_NOT_FOUND": "У этого аккаунта ещё нет пароля. Сначала задайте его по почте."
+  "error_CREDENTIAL_ACCOUNT_NOT_FOUND": "У этого аккаунта ещё нет пароля. Сначала задайте его по почте.",
+  "onboardingWho": "Для кого этот аккаунт?",
+  "onboardingKind_DANCER": "Для танцора",
+  "onboardingKind_SCHOOL": "Для школы или студии",
+  "onboardingKind_ORGANIZER": "Для организатора событий",
+  "onboardingAllStyles": "Все остальные стили ({count})",
+  "onboardingSchoolNote": "Дальше вы попадёте на свою публичную страницу, где можно добавить занятия, воркшопы и события."
 }

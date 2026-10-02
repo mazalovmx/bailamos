@@ -11,7 +11,7 @@ import {pendingInvites} from '../../../../../lib/events/invites';
 import {EventForm} from '../../../../../components/forms';
 import {EventActions,TeamPanel,ArtistPanel,OccurrencePanel} from '../../../../../components/events/manage';
 import '../../../../styles/events.css';
-export const metadata={robots:{index:false,follow:false}};
+export async function generateMetadata(){const t=await getTranslations('App');return {title:t('editEvent'),robots:{index:false,follow:false}};}
 export default async function Edit({params,searchParams}:{params:Promise<{locale:string;slug:string}>;searchParams:Promise<{created?:string}>}) {
   const {locale,slug}=await params,user=await currentUser();
   if(!user) redirect('/'+locale+'/login');

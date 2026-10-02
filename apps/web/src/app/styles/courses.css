@@ -52,7 +52,7 @@
 .school-card-text>span{color:#516149}
 .school-badge{display:inline-block;align-self:flex-start;margin:6px 0 0;padding:4px 10px;border:1px solid #8a6d1f;border-radius:20px;background:#fdf3d3;color:#5c4708;font-size:12px;font-weight:700;line-height:1.4}
 .school-card-text>.school-badge{color:#5c4708}
-.school-header{display:flex;gap:22px;align-items:center;margin:6px 0 20px}
+.school-header{display:flex;justify-content:flex-start;gap:22px;align-items:center;margin:6px 0 20px}
 .school-header>div{min-width:0}
 .school-header h1{margin:4px 0}
 .school-header .intro{margin:0}

@@ -306,5 +306,7 @@
   "homeShareText": "Cada evento trae una imagen lista. Pulsa Compartir y elige Instagram o WhatsApp en tu teléfono, o guarda la imagen y copia el texto.",
   "homeShareCta": "Crear un anuncio",
   "navMore": "Más",
-  "adminPanel": "Panel de administración"
+  "adminPanel": "Panel de administración",
+  "accountSchoolPage": "Tu página pública y horario",
+  "accountAddClass": "Añadir una clase, taller o evento"
 }

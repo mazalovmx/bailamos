@@ -8,10 +8,10 @@ import {EventComposer} from '../../../../components/events/event-composer';
 import {SectionGuide} from '../../../../components/guide/section-guide';
 import {parserEnabled} from '../../../../lib/events/parse/llm';
 import '../../../styles/events.css';
-export const metadata={robots:{index:false,follow:false}};
+export async function generateMetadata(){const t=await getTranslations('App');return {title:t('newEvent'),robots:{index:false,follow:false}};}
 export default async function NewEvent({params}:{params:Promise<{locale:string}>}) {
   const {locale}=await params,user=await currentUser();
-  if(!user) redirect('/'+locale+'/login');
+  if(!user) redirect('/'+locale+'/login?next='+encodeURIComponent('/'+locale+'/events/new'));
   const t=await getTranslations('App'),x=await getTranslations('EventsX');
   if(!user.profile) return <main className="form-page"><h1>{t('newEvent')}</h1><p>{t('profileRequired')}</p><Link className="button" href={'/'+locale+'/profile'}>{t('editProfile')}</Link></main>;
   const [{cities,styles,tags},schools]=await Promise.all([catalogue(),managedSchools(user.schoolIds)]);

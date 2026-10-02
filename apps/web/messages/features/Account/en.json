@@ -179,5 +179,11 @@
   "error_SESSION_NOT_FRESH": "For your safety, sign out, sign in again and repeat this.",
   "error_SOCIAL_ACCOUNT_ALREADY_LINKED": "This Google account is already connected.",
   "error_PROVIDER_NOT_FOUND": "Google sign-in is not available right now.",
-  "error_CREDENTIAL_ACCOUNT_NOT_FOUND": "This account has no password yet. Set one by email first."
+  "error_CREDENTIAL_ACCOUNT_NOT_FOUND": "This account has no password yet. Set one by email first.",
+  "onboardingWho": "Who is this account for?",
+  "onboardingKind_DANCER": "A dancer",
+  "onboardingKind_SCHOOL": "A school or studio",
+  "onboardingKind_ORGANIZER": "An organizer of events",
+  "onboardingAllStyles": "All other styles ({count})",
+  "onboardingSchoolNote": "Next you will land on your public page, where you can add classes, workshops and events."
 }

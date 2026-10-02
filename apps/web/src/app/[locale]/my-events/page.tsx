@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {currentUser} from '../../../lib/session';
 import {EventCard} from '../../../components/event-card';
 import '../../styles/events.css';
-export const metadata={robots:{index:false,follow:false}};
+export async function generateMetadata(){const t=await getTranslations('App');return {title:t('myEvents'),robots:{index:false,follow:false}};}
 export default async function MyEvents({params}:{params:Promise<{locale:string}>}) {
   const {locale}=await params,user=await currentUser();
   if(!user) redirect('/'+locale+'/login');

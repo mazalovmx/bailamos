@@ -179,5 +179,11 @@
   "error_SESSION_NOT_FRESH": "Por seguridad, cierra la sesión, vuelve a iniciarla y repite la acción.",
   "error_SOCIAL_ACCOUNT_ALREADY_LINKED": "Esta cuenta de Google ya está conectada.",
   "error_PROVIDER_NOT_FOUND": "El acceso con Google no está disponible ahora.",
-  "error_CREDENTIAL_ACCOUNT_NOT_FOUND": "Esta cuenta aún no tiene contraseña. Crea una por correo primero."
+  "error_CREDENTIAL_ACCOUNT_NOT_FOUND": "Esta cuenta aún no tiene contraseña. Crea una por correo primero.",
+  "onboardingWho": "¿Para quién es esta cuenta?",
+  "onboardingKind_DANCER": "Una persona que baila",
+  "onboardingKind_SCHOOL": "Una escuela o estudio",
+  "onboardingKind_ORGANIZER": "Una organización de eventos",
+  "onboardingAllStyles": "Todos los demás estilos ({count})",
+  "onboardingSchoolNote": "A continuación llegarás a tu página pública, donde podrás añadir clases, talleres y eventos."
 }
