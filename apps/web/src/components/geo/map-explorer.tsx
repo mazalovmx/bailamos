@@ -49,6 +49,12 @@ export function MapExplorer({locale, cities, styles, initial, defaults, centre}:
       item.append(link, meta); list.append(item);
     }
     node.append(list);
+    // One event: its photo and note are fetched on demand and added as plain elements, never as markup.
+    if (items.length === 1) fetch('/api/events/' + encodeURIComponent(items[0].id) + '/place').then(response => response.ok ? response.json() : null).then((place: {note: string | null; image: string | null} | null) => {
+      if (!place || !node.isConnected) return;
+      if (place.image) { const image = document.createElement('img'); image.src = place.image; image.alt = t('popupPhotoAlt'); image.loading = 'lazy'; image.className = 'geo-popup-photo'; node.append(image); }
+      if (place.note) { const note = document.createElement('p'); note.className = 'geo-popup-note'; note.textContent = place.note; node.append(note); }
+    }).catch(() => undefined);
     popup.current?.remove();
     popup.current = new lib.current.Popup({maxWidth: 'min(320px, 80vw)', offset: 12}).setLngLat(at).setDOMContent(node).addTo(map.current);
     if (focus) node.querySelector('a')?.focus({preventScroll: true});

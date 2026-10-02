@@ -36,7 +36,10 @@ export async function PATCH(request: Request, {params}: Context) {
       status=quick.status;
       await db.event.update({where:{id},data:quick});
     } else {
-      const {fields,occurrences,styleId,tagIds}=await prepareEvent(body);
+      const {fields,occurrences,styleId,tagIds,exactPlace}=await prepareEvent(body);
+      if (!exactPlace) throw new ApiError('PLACE_REQUIRED',400);
+      // A new map photo must be the editor's own upload; the one already on the event may stay.
+      if (fields.mapImageKey && fields.mapImageKey!==event.mapImageKey && !fields.mapImageKey.startsWith('img/'+(user.profile?.id||'')+'/')) throw new ApiError('INVALID_MAP_IMAGE',400);
       status=fields.status;
       await db.$transaction(async tx=>{
         await tx.event.update({where:{id},data:{...fields,

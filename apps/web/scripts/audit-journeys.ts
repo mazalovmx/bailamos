@@ -64,6 +64,11 @@ async function createEvent(page: Page, input: {title: string; kind: string; week
     console.log('  weekly controls: ' + JSON.stringify(controls));
     await page.fill('input[name=recurrenceWeeks]', '6').catch(() => note('weekly: no "number of dates" input after choosing weekly'));
   }
+  // The exact marker is required: click the map of the place block and wait for the city lookup.
+  await page.click('.driver-popover-close-btn').catch(() => undefined);
+      await page.clickAt('.event-place .geo-map');
+  await sleep(3000);
+  if (!await page.inputValue('input[name=pin]')) note(input.label + ': clicking the map did not set the marker');
   await page.fill('select[name=status]', 'PUBLISHED');
   await look(page, input.label + '-form', true);
   await page.click('form.editor-form button.button', 'Save');

@@ -1,6 +1,8 @@
 import {z} from 'zod';
 import {eventKinds,danceFormats,classLevels,intensities,tempos} from '../swing';
 import {weekdays,MAX_DATES,MAX_INTERVAL} from '../schedule';
+import {isBaseKey} from '../media/keys';
+import {mapNoteProblem} from './map-note';
 export const attendeeVisibilities=['PUBLIC','ATTENDEES','ORGANIZERS'] as const;
 export const eventStatuses=['DRAFT','PUBLISHED','CANCELLED'] as const;
 const local=z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
@@ -13,6 +15,10 @@ export const eventInput=z.object({
   // Set only on creation, and only for a school the author manages; checked in the route.
   schoolProfileId:z.string().max(64).nullish().transform(value=>value||null),
   priceText:z.string().trim().max(120).nullish().transform(value=>value||null),
+  address:z.string().trim().max(200).nullish().transform(value=>value||null),
+  // The photo and the two-sentence note shown when the event is opened on the map.
+  mapImageKey:z.string().max(200).nullish().transform(value=>value||null).refine(value=>!value||isBaseKey(value),{message:'INVALID_MAP_IMAGE'}),
+  mapNote:z.string().trim().max(300).nullish().transform(value=>value||null).refine(value=>!value||!mapNoteProblem(value),{message:'MAP_NOTE_TOO_LONG'}),
   attendeeVisibility:z.enum(attendeeVisibilities).default('PUBLIC'),
   startsLocal:local,endsLocal:local,
   status:z.enum(eventStatuses),

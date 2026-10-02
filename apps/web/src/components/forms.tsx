@@ -5,8 +5,9 @@ import {useState} from 'react';
 import Link from 'next/link';
 import {SwingFields} from './swing-fields';
 import {ScheduleFields} from './events/schedule-fields';
-import {EventLocation} from './geo/event-location';
-type Options={id:string;name:string;timezone?:string;lat?:number;lng?:number}[];
+import {EventPlace} from './events/event-place';
+import {MapCardFields} from './events/map-card-fields';
+type Options={id:string;name:string;timezone?:string;lat?:number;lng?:number;countryCode?:string}[];
 type Fields=Record<string,string>;
 async function submit(url:string,method:string,body:unknown) {
   const response=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -72,13 +73,15 @@ export function ProfileForm({cities,styles,initial}:{cities:Options;styles:Optio
     {s.feedback}<button className="button" disabled={s.busy}>{t(s.busy?'working':'saveProfile')}</button>
   </form>;
 }
-export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools=[],parseId}:{cities:Options;styles:Options;initial:Fields;id?:string;tags:Options;selectedTags?:string[];schools?:Options;parseId?:string}) {
+export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools=[]}:{cities:Options;styles:Options;initial:Fields;id?:string;tags:Options;selectedTags?:string[];schools?:Options}) {
   const t=useTranslations('App'),x=useTranslations('EventsX'),locale=useLocale(),router=useRouter(),s=useFormStatus();
   const [cityId,setCityId]=useState(initial.cityId||'');
   return <form className="editor-form" onSubmit={async e=>{e.preventDefault();s.setBusy(true);s.setError('');
     try{
       const data=new FormData(e.currentTarget);
-      const body={...values(e.currentTarget),pin:data.get('pin')?JSON.parse(String(data.get('pin'))):null,tagIds:data.getAll('tagIds'),recurrenceDays:data.getAll('recurrenceDays'),partnerRequired:data.get('partnerRequired')==='on',parsedConfirmed:data.get('parsedConfirmed')==='on'};
+      // The exact marker is not optional: without a venue the organizer must have placed one on the map.
+      if(!data.get('pin')&&!data.get('venueId')){s.setBusy(false);s.setError('PLACE_REQUIRED');e.currentTarget.querySelector('.event-place')?.scrollIntoView({block:'center'});return;}
+      const body={...values(e.currentTarget),pin:data.get('pin')?JSON.parse(String(data.get('pin'))):null,tagIds:data.getAll('tagIds'),recurrenceDays:data.getAll('recurrenceDays'),partnerRequired:data.get('partnerRequired')==='on'};
       const result=await submit('/api/events'+(id?'/'+id:''),id?'PATCH':'POST',body);
       // A new event continues in the editor, where the team, the artists and single dates are managed.
       router.push('/'+locale+'/events/'+result.slug+(id?'':'/edit?created=1'));router.refresh();}
@@ -86,18 +89,15 @@ export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools
   }}>
     <label>{t('title')}<input name="title" required minLength={3} maxLength={120} defaultValue={initial.title}/></label>
     <label>{t('description')}<textarea name="description" required minLength={10} maxLength={5000} rows={6} defaultValue={initial.description}/></label>
-    <div className="form-grid" data-guide="event-details"><label>{t('city')}<select name="cityId" required value={cityId} onChange={e=>setCityId(e.target.value)}><option value="">{t('choose')}</option>{cities.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-    <Select name="styleId" label={t('style')} options={styles} value={initial.styleId}/></div>
-    {/* The picker submits "venueId"; saving copies the venue's coordinates to the event, or the city's when there is none. */}
+    <div data-guide="event-details"><Select name="styleId" label={t('style')} options={styles} value={initial.styleId}/></div>
     {!id&&schools.length>0&&<label>{x('onBehalfOf')}<select name="schoolProfileId" defaultValue=""><option value="">{x('onBehalfOfMe')}</option>{schools.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select><small>{x('onBehalfOfHint')}</small></label>}
-    <div data-guide="event-place"><EventLocation key={cityId} city={cities.find(c=>c.id===cityId)} initial={cityId===initial.cityId?initial:{}}/></div>
+    <div data-guide="event-place"><EventPlace cities={cities} cityId={cityId} onCity={setCityId} initial={initial}/></div>
+    <MapCardFields initialKey={initial.mapImageKey} initialNote={initial.mapNote}/>
     <label>{x('price')}<input name="priceText" maxLength={120} defaultValue={initial.priceText} placeholder={x('pricePlaceholder')}/><small>{x('priceHint')}</small></label>
     <SwingFields initial={initial} tags={tags} selectedTags={selectedTags}/>
     <div data-guide="event-schedule"><ScheduleFields initial={initial} zone={cities.find(c=>c.id===cityId)?.timezone}/></div>
     <div className="form-grid"><label>{x('attendeeVisibility')}<select name="attendeeVisibility" defaultValue={initial.attendeeVisibility||'PUBLIC'}>{['PUBLIC','ATTENDEES','ORGANIZERS'].map(value=><option key={value} value={value}>{x('visibility_'+value)}</option>)}</select><small>{x('attendeeVisibilityHint')}</small></label>
     <Select name="status" label={t('status')} value={initial.status||'DRAFT'} options={(id?['DRAFT','PUBLISHED','CANCELLED']:['DRAFT','PUBLISHED']).map(id=>({id,name:t(id)}))}/></div>
-    {/* Values suggested by the announcement parser are never saved without the organizer saying they were checked. */}
-    {parseId&&<><input type="hidden" name="parseId" value={parseId}/><label className="checkbox"><input type="checkbox" name="parsedConfirmed" required/>{x('parseConfirm')}</label></>}
     {s.feedback}<button data-guide="event-publish" className="button" disabled={s.busy}>{t(s.busy?'working':'saveEvent')}</button>
   </form>;
 }

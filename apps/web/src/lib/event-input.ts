@@ -29,12 +29,13 @@ export async function prepareEvent(body:unknown) {
   const {occurrences,...when}=times;
   const fields={title:input.title,description:input.description,cityId:city.id,timezone:city.timezone,...when,
     venueId:venue?.id??null,lat:position.lat,lng:position.lng,
-    priceText:input.priceText,attendeeVisibility:input.attendeeVisibility,
+    priceText:input.priceText,address:input.address,mapImageKey:input.mapImageKey,mapNote:input.mapNote,attendeeVisibility:input.attendeeVisibility,
     status:input.status,kind:input.kind,format:input.format,level:input.level,intensity:input.intensity,
     tempo:input.tempo,prerequisites:input.prerequisites,partnerRequired:input.partnerRequired,
     // The same key the importer computes, so an imported copy of this event is recognised as a duplicate.
     dedupeKey:eventDedupeKey({title:input.title,startsAt:when.startsAt,timezone:city.timezone,cityId:city.id,lat:position.lat,lng:position.lng,precise:!!venue||!!input.pin})};
-  return {fields,occurrences,styleId:style.id,tagIds:tags.map(t=>t.id),schoolProfileId:input.schoolProfileId};
+  // Whether the organizer gave an exact place: a venue of the directory or a marker on the map.
+  return {fields,occurrences,styleId:style.id,tagIds:tags.map(t=>t.id),schoolProfileId:input.schoolProfileId,exactPlace:!!venue||!!input.pin};
 }
 // Replaces the dates of a series while keeping rows whose start did not move: a cancelled date stays cancelled
 // and a reminder that was already sent is not sent again.

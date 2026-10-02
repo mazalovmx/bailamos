@@ -27,7 +27,7 @@ export async function startUpload(user: MediaUser, input: unknown) {
   if (!allowedMimes().includes(mime.toLowerCase())) throw new MediaError('MEDIA_TYPE', 415);
   if (size > maxBytes()) throw new MediaError('MEDIA_TOO_LARGE', 413);
   await assertRoom(await authorizeTarget(user, target, targetId));
-  const key = rawKey(profileId, target, target === 'avatar' || target === 'cover' ? undefined : targetId, randomUUID());
+  const key = rawKey(profileId, target, target === 'avatar' || target === 'cover' || target === 'eventmap' ? undefined : targetId, randomUUID());
   const presigned = await storage().presignUpload(key, {mime: mime.toLowerCase(), size});
   return {key, uploadUrl: presigned.url, method: presigned.method, headers: presigned.headers, expiresAt: presigned.expiresAt};
 }
@@ -57,6 +57,8 @@ export async function completeUpload(user: MediaUser, input: unknown): Promise<U
     for (const file of processed.files) await store.putObject(variantKey(base, file.width, file.format), file.body, file.contentType);
     // A chat attachment has no MediaItem and no public URL: the key is handed to the message that is sent next.
     if (raw.target === 'chat') return {key: base, url: ''};
+    // The map photo has no MediaItem either: Event.mapImageKey points at it once the event is saved.
+    if (raw.target === 'eventmap') return {key: base, url: mediaUrl(base)};
     if (raw.target === 'avatar' || raw.target === 'cover') {
       const field = raw.target === 'avatar' ? 'avatarKey' : 'coverKey';
       const previous = (await db.profile.findUnique({where: {id: profileId}, select: {avatarKey: true, coverKey: true}}))?.[field];

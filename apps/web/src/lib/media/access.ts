@@ -23,7 +23,8 @@ export async function ownsPost(profileId: string | undefined, postId: string, sc
 /** Checks that the user may attach media to the target and returns the parent the MediaItem will belong to. */
 export async function authorizeTarget(user: MediaUser, target: UploadTarget, targetId?: string): Promise<Parent> {
   const profileId = profileOf(user);
-  if (target === 'avatar' || target === 'cover') return {};
+  // The map photo of an event is uploaded while the event is being written; the form then hands its key to the event.
+  if (target === 'avatar' || target === 'cover' || target === 'eventmap') return {};
   if (!targetId) throw new MediaError('INVALID_INPUT', 400);
   if (target === 'chat') {
     // The chat's own gate decides: an accepted member who may write, and never inside a request that is still pending.

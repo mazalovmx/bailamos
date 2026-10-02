@@ -52,7 +52,8 @@ async function apiEvent(cookie: string, input: {title: string; kind: string; wee
   const city = await db.city.findFirstOrThrow({where: {slug: 'madrid'}});
   const response = await call(web, '/api/events', 'POST', {title: input.title, description: input.title + '. Friendly group, bring comfortable shoes.', cityId: city.id, styleId: 'lindy-hop',
     kind: input.kind, startsLocal: local(input.days, 19), endsLocal: local(input.days, 20), status: 'PUBLISHED', tagIds: [], recurrenceDays: [],
-    recurrenceWeeks: input.weekly ? 4 : 1, schoolProfileId: input.schoolProfileId}, cookie);
+    recurrenceWeeks: input.weekly ? 4 : 1, schoolProfileId: input.schoolProfileId, pin: {lat: 40.4153, lng: -3.7074}, address: 'Plaza Mayor',
+    mapNote: 'Meet at the statue. We dance on the east side.'}, cookie);
   if (!response.ok) throw new Error('event not created: ' + response.status + ' ' + (await response.text()).slice(0, 150));
   return await response.json() as {id: string; slug: string};
 }
@@ -293,20 +294,45 @@ async function main() {
       await page.goto('/en/my-events');
       await look(page, 's8-my-events');
     }, page);
-    await scenario('S9 announcement parser', async () => {
+    await scenario('S9 event place and map card', async () => {
       await page.setCookies(leo.cookie);
       await page.goto('/en/events/new');
       const form = await look(page, 's9-new-event');
-      if (!(await page.exists('.parse-panel'))) {console.log('  parser panel is not shown (no model key in this build)'); return;}
-      await page.fill('.parse-panel textarea', 'SWING NIGHT 🎷 Saturday 21:00 at Café Central, Plaza del Ángel 10, Madrid. Lindy hop social with DJ Marta, all levels welcome. Entry 8 €. Every week!');
-      await page.click('.parse-panel button', 'Fill in the form');
-      await sleep(9000);
-      const parsed = await look(page, 's9-parsed');
-      const title = (parsed.fields.find(f => f.startsWith('title')) || ''), starts = parsed.fields.find(f => f.startsWith('startsLocal')) || '';
-      console.log('  parsed: ' + title + ' | ' + starts + ' | notices: ' + parsed.notices.join(' | ').slice(0, 400));
-      if (!/title\*=.+/.test(title)) note('S9: the parser did not fill in the title (notices: ' + parsed.notices.join(' | ').slice(0, 200) + ')');
-      if (!/startsLocal\*=\d{4}/.test(starts)) note('S9: the parser did not fill in the start time');
-      void form;
+      if (await page.exists('.parse-panel')) note('S9: the announcement parser panel is still shown');
+      await page.fill('input[name=title]', 'Street swing ' + tag);
+      await page.fill('textarea[name=description]', 'Open-air social dancing on the square. No partner needed.');
+      await page.fill('input[name=startsLocal]', local(8, 18)); await page.fill('input[name=endsLocal]', local(8, 21));
+      // Saving without a marker must be refused with a clear message.
+      await page.fill('select[name=cityId]', '');
+      await page.click('form.editor-form button.button', 'Save');
+      await sleep(500);
+      // Clicking the map chooses the city and the country and sets the marker.
+      await page.click('.driver-popover-close-btn').catch(() => undefined);
+      await page.clickAt('.event-place .geo-map');
+      await sleep(3500);
+      const placed = await look(page, 's9-marker-placed');
+      const pin = await page.inputValue('input[name=pin]'), city = await page.inputValue('select[name=cityId]');
+      console.log('  after a click on the map: city=' + city + ' pin=' + pin + ' fields=' + form.fields.filter(f => /cityId|address/.test(f)).join(','));
+      if (!pin) note('S9: a click on the map did not set the marker (status: ' + placed.notices.join(' | ').slice(0, 200) + ')');
+      if (!city) note('S9: a click on the map did not choose the city');
+      await page.fill('input[name=address]', 'Plaza Mayor, by the statue');
+      await page.fill('textarea[name=mapNote]', 'Meet at the statue. We dance on the east side.');
+      await page.click('form.editor-form button.button', 'Save');
+      await sleep(1500);
+      const saved = await look(page, 's9-saved');
+      if (!saved.url.includes('/edit')) {note('S9: an event with a marker was not saved (' + saved.notices.join(' | ').slice(0, 200) + ')'); return;}
+      const event = await db.event.findFirst({where: {title: 'Street swing ' + tag}, select: {id: true, slug: true, lat: true, lng: true, address: true, mapNote: true, venueId: true}});
+      console.log('  saved: ' + JSON.stringify(event));
+      if (!event?.lat || !event.mapNote || event.address !== 'Plaza Mayor, by the statue') note('S9: marker, address or map note were not stored');
+      else ok('event saved with its own marker, address and map note');
+      if (event) {
+        await db.event.update({where: {id: event.id}, data: {status: 'PUBLISHED'}});
+        const place = await call(web, '/api/events/' + event.id + '/place', 'GET');
+        if (!place.ok || !(await place.text()).includes('Meet at the statue')) note('S9: the map card endpoint does not return the note');
+        await page.goto('/en/events/' + event.slug);
+        await look(page, 's9-event-page');
+        if (!(await page.text('main')).includes('Meet at the statue')) note('S9: the event page does not show the map note');
+      }
     }, page);
     await scenario('S10 sharing, calendar files, short link, mobile', async () => {
       await page.setCookies('');

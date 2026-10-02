@@ -78,11 +78,13 @@ export default async function EventPage({params,searchParams}:Props) {
         location={[venue?.name,venue?.address,cityLabel].filter(Boolean).join(', ')} details={(event.description||'').slice(0,500)} url={links.canonical}/>}
     </div>
     <div><h2>{t('location')}</h2>
-      {venue?<><p><strong>{venue.name}</strong></p><p>{venue.address}</p><p>{cityLabel}</p></>:<p>{cityLabel}</p>}
+      {venue?<><p><strong>{venue.name}</strong></p><p>{venue.address}</p><p>{cityLabel}</p></>:<>{event.address&&<p>{event.address}</p>}<p>{cityLabel}</p></>}
       {event.priceText&&<><h2>{x('price')}</h2><p>{event.priceText}</p></>}
     </div></div>
     {/* A venue is shown exactly; an event without one sits at the city's coordinates. */}
-    {event.lat!==null&&event.lng!==null&&<LocationMap lat={event.lat} lng={event.lng} label={venue?venue.name+', '+venue.address:cityLabel}/>}
+    {event.lat!==null&&event.lng!==null&&<LocationMap lat={event.lat} lng={event.lng} label={venue?venue.name+', '+venue.address:[event.address,cityLabel].filter(Boolean).join(', ')}/>}
+    {/* What the organizer wants people to see on arrival: the entrance, the sign, the corner of the square. */}
+    {(event.mapImageKey||event.mapNote)&&<figure className="event-map-card">{event.mapImageKey&&<img src={'/api/media/file/'+event.mapImageKey} alt={x('mapImageAlt')} loading="lazy" width={640} height={400}/>}{event.mapNote&&<figcaption>{event.mapNote}</figcaption>}</figure>}
     <h2>{t('classification')}</h2><dl className="class-facts">
       <div><dt>{t('kind')}</dt><dd>{t('kind_'+event.kind)}</dd></div>
       <div><dt>{t('format')}</dt><dd>{t('format_'+event.format)}</dd></div>

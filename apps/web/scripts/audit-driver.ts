@@ -46,6 +46,7 @@ export async function openBrowser(origin: string, outDir: string, port = 9444, w
   let step = 0;
   const page = {
     errors, failed,
+    evaluate,
     async goto(path: string) {await send('Page.navigate', {url: origin + path}); await settle();},
     url: () => evaluate<string>('location.pathname + location.search'),
     settle,
@@ -68,6 +69,14 @@ export async function openBrowser(origin: string, outDir: string, port = 9444, w
       if (!ok) throw new Error('click: not found ' + selector + (text ? ' "' + text + '"' : ''));
       await settle();
     },
+    async clickAt(selector: string) {
+      const box = await evaluate<{x: number; y: number} | null>(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)return null;e.scrollIntoView({block:'center',behavior:'instant'});const r=e.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}})()`);
+      if (!box) throw new Error('clickAt: not found ' + selector);
+      await sleep(300);
+      for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', {type, x: box.x, y: box.y, button: 'left', clickCount: 1});
+      await sleep(400);
+    },
+    inputValue: (selector: string) => evaluate<string>(`(document.querySelector(${JSON.stringify(selector)})?.value||'')`),
     exists: (selector: string) => evaluate<boolean>(`!!document.querySelector(${JSON.stringify(selector)})`),
     text: (selector: string) => evaluate<string>(`(document.querySelector(${JSON.stringify(selector)})?.innerText||'').trim()`),
     // A compact description of what the user sees: heading, notices, form controls, actions.

@@ -33,7 +33,7 @@ export default async function Edit({params,searchParams}:{params:Promise<{locale
     <section aria-labelledby="details-title"><h2 id="details-title">{x('details')}</h2>
     {event.rrule&&<p className="notice">{t('editSeries')}</p>}
     <EventForm id={event.id} cities={cities} styles={styles} tags={tags} selectedTags={event.tags.map(t=>t.tagId)}
-      initial={{lat:event.lat===null?'':String(event.lat),lng:event.lng===null?'':String(event.lng),title:event.title,description:event.description||'',cityId:event.cityId,venueId:event.venueId||'',priceText:event.priceText||'',attendeeVisibility:event.attendeeVisibility,
+      initial={{lat:event.lat===null?'':String(event.lat),lng:event.lng===null?'':String(event.lng),address:event.address||'',mapImageKey:event.mapImageKey||'',mapNote:event.mapNote||'',title:event.title,description:event.description||'',cityId:event.cityId,venueId:event.venueId||'',priceText:event.priceText||'',attendeeVisibility:event.attendeeVisibility,
       styleId:event.styles[0]?.styleId||'',status:event.status,startsLocal:local(event.startsAt),endsLocal:event.endsAt?local(event.endsAt):'',
       kind:event.kind,format:event.format,level:event.level,intensity:event.intensity,tempo:event.tempo,prerequisites:event.prerequisites||'',partnerRequired:String(event.partnerRequired),
       recurrenceWeeks:String(recurrence.until?1:recurrence.count),recurrenceInterval:String(recurrence.interval),recurrenceDays:recurrence.byDay.join(','),recurrenceUntil:recurrence.until||''}}/></section>

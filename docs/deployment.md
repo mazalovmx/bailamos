@@ -37,7 +37,6 @@ The root railway.json defines build/start settings but does not connect GitHub o
 | SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD, SMTP_FROM | Real verification, recovery and notification email delivery. Mailpit is development-only. |
 | RAILPACK_PRUNE_DEPS=false | Retain prisma, tsx and dotenv-cli for release commands. |
 | NEXT_TELEMETRY_DISABLED=1 | Optional telemetry setting. |
-| DEEPSEEK_API_KEY | Optional. Enables event parsing from pasted announcements; leave unset to keep manual event creation. The default model is `deepseek-chat`; optionally set `DEEPSEEK_MODEL` or `DEEPSEEK_API_URL`. |
 
 Railway supplies PORT. .env is local and ignored. The root config deploys web only, not admin or the background worker. Create a separate worker service with railway.worker.json following the [worker runbook](worker.md). Expanded modules require Redis, worker scheduling, persistent media storage and integration-specific configuration. Do not assume they are operational until exercised in the target environment.
 

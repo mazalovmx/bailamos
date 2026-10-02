@@ -57,4 +57,8 @@ Fixed in this pass:
 
 Not a defect, by design: no notification about a chat reply while the recipient was in the conversation less than a minute ago.
 
-Still open, in addition to the list above: the first-visit guide overlay covers the parser result on the new-event page; the parser leaves the required end time empty; the admin panel was crawled and its queue opened, but no moderation decision was applied.
+Still open, in addition to the list above: the admin panel was crawled and its queue opened, but no moderation decision was applied.
+
+## Event place — 2 October 2026
+
+The announcement parser was removed at the product owner's request, so the parser findings above no longer apply. The new-event form now has one place block: country → city → address or venue, or a click on the map that fills in city and country. An exact marker is required. Scenario S9 of `audit-full.ts` covers it: a map click sets the marker and the city, the event is saved with coordinates, address and map note, and the public page and the map card endpoint show the note. Both audit scripts pass with no findings.

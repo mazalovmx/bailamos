@@ -277,6 +277,11 @@ model Event {
   prerequisites String?
   partnerRequired Boolean?
   priceText String?
+  // What a visitor sees when they open the event on the map: a photo (for example of the entrance) and a short note.
+  mapImageKey String?
+  // Free-text address for places that are not a venue of the directory.
+  address String?
+  mapNote String?
   attendeeVisibility AttendeeVisibility @default(PUBLIC)
   hiddenAt DateTime? @db.Timestamptz(3)
   tags EventTag[]
