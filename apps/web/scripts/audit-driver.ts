@@ -23,10 +23,12 @@ export async function openBrowser(origin: string, outDir: string, port = 9444, w
   await new Promise((resolve, reject) => {socket.onopen = resolve; socket.onerror = reject;});
   let next = 0;
   const waiting = new Map<number, (value: never) => void>(), errors: string[] = [], failed: string[] = [];
+  let lastUrl = '';
   socket.onmessage = event => {
     const message = JSON.parse(String(event.data));
     if (message.id) {waiting.get(message.id)?.((message.result ?? {error: message.error}) as never); waiting.delete(message.id); return;}
-    if (message.method === 'Runtime.exceptionThrown') errors.push('exception: ' + (message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text).slice(0, 300));
+    if (message.method === 'Page.frameNavigated' && !message.params.frame.parentId) lastUrl = String(message.params.frame.url).replace(origin, '');
+    if (message.method === 'Runtime.exceptionThrown') errors.push('exception on ' + lastUrl + ': ' + (message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text).slice(0, 300));
     if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') errors.push('console: ' + String(message.params.entry.text).slice(0, 300) + ' ' + (message.params.entry.url || ''));
     if (message.method === 'Network.responseReceived' && message.params.response.status >= 400) failed.push(message.params.response.status + ' ' + message.params.response.url.replace(origin, ''));
   };

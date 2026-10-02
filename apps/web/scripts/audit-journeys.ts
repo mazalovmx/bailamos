@@ -104,12 +104,20 @@ async function journeyB(page: Page) {
   if (classSlug) {await page.goto('/en/events/' + classSlug + '/edit'); await look(page, 'b-class-editor', true);}
   await page.goto('/en/schools/' + profile.handle);
   const school = await look(page, 'b-school-filled', true), schoolText = await page.text('main');
-  if (!schoolText.includes('Lindy Hop Beginners')) note('weekly class does not show on the school page');
+  // A class that starts next week is reached through the link the empty week offers.
+  if (!schoolText.includes('Lindy Hop Beginners')) {
+    await page.click('main a', 'First classes').catch(() => note('school page: the week is empty and nothing points to the first week with classes'));
+    await look(page, 'b-school-first-week', true);
+    if (!(await page.text('main')).includes('Lindy Hop Beginners')) note('weekly class does not show on the school page, even in its first week');
+    await page.goto('/en/schools/' + profile.handle);
+  }
   if (!schoolText.includes('Charleston Workshop')) note('workshop does not show on the school page');
   void school;
-  await page.goto('/en/classes?city=madrid');
+  // The city timetable is checked in the week of the first class.
+  const firstDate = classEvent?.occurrences.map(o => o.startsAt).sort((x, y) => x.getTime() - y.getTime())[0];
+  await page.goto('/en/classes?city=madrid' + (firstDate ? '&week=' + firstDate.toISOString().slice(0, 10) : ''));
   await look(page, 'b-classes-madrid', true);
-  if (!(await page.text('main')).includes('Lindy Hop Beginners')) note('weekly class does not show in /classes?city=madrid');
+  if (!(await page.text('main')).includes('Lindy Hop Beginners')) note('weekly class does not show in the city timetable for its own week');
   await page.goto('/en/my-events');
   await look(page, 'b-my-events', true);
   if (classSlug) {await page.goto('/en/events/' + classSlug); await look(page, 'b-class-public', true);}

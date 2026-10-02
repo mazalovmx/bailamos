@@ -217,7 +217,10 @@ async function main() {
       await page.setCookies(ana.cookie);
       await page.goto('/en/notifications');
       await look(page, 's5-ana-notifications');
-      if (!/Leo Audit/.test(await page.text('main'))) note('S5: no notification about the reply (may be suppressed while the stream is open)');
+      // A notification is deliberately not created while the recipient was in the conversation a moment ago;
+      // what must always work is the unread counter.
+      const unread = await (await call(web, '/api/chat/unread', 'GET', undefined, ana.cookie)).json() as {total: number};
+      if (!(unread.total >= 1)) note('S5: the reply does not count as unread for the recipient'); else ok('reply counted as unread (' + unread.total + ')');
     }, page);
     await scenario('S6 partner search', async () => {
       for (const who of [ana, leo]) {
