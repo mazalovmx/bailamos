@@ -2,17 +2,26 @@
 
 ## Installed photographs
 
-The homepage uses user-supplied images from images/. Originals are unchanged. Public copies live in apps/web/public/images/community/, with the section mapping in apps/web/src/components/community-photo.tsx. Next Image serves responsive versions: the hero is prioritized, other images load lazily, and containers preserve source proportions on desktop and mobile.
+The homepage uses user-supplied images from images/. Originals are unchanged. Public copies live in apps/web/public/images/community/, with the section mapping in apps/web/src/components/community-photo.tsx. Static WebP variants at 640 and 1280 pixels are served through srcset without the runtime image optimizer. The hero is prioritized, other images load lazily, and containers preserve source proportions on desktop and mobile. The current variants are approximately 43–163 KB each.
+
+Regenerate variants after changing the PNG sources: `node apps/web/scripts/prepare-community-images.mjs`. Commit the generated WebP assets with the component changes so branch promotions retain the photographs.
 
 | Section | Original file in images/ | Public copy |
 | --- | --- | --- |
 | Hero | 1950s Swing Dance Hall Jubilee.png | hero.png |
 | Regular classes | Midcentury Swing Dance Hall.png | classes.png |
-| Solo jazz and workshops | Vintage Swing Dance Lesson.png | lesson.png |
+| Solo jazz | 5356bd50-2311-4eb5-af38-c1502e585443.png | solo-jazz.png |
+| Workshops | Vintage Swing Dance Lesson.png | lesson.png |
 | Lindy Hop | Swing Dance in the Park.png | lindy-hop.png |
 | Socials | Swing Night at the Jazz Club.png | social.png |
 
-The lesson image appears twice because it demonstrates a solo step to a group. The duplicate Vintage Swing Dance Lesson (1).png and other alternatives remain in the source folder. Screen-reader descriptions are available in all three languages. To replace an image, update its public file and component proportions/description, then rebuild.
+Every section has its own image. The duplicate Vintage Swing Dance Lesson (1).png and the two street scenes remain unused in the source folder. Frames have fixed proportions set in home-actions.css and the images are cropped to fill them, so a tall source cannot stretch the page. Screen-reader descriptions are available in all three languages. To replace an image, update its public file and component proportions/description, then rebuild.
+
+## Homepage Instagram strip and school screenshots
+
+The homepage shows up to five Instagram posts through Instagram's own embed pages in frames (`apps/web/src/lib/home/instagram.ts`). Set `HOME_INSTAGRAM_URLS` to a comma- or space-separated list of post or reel links to replace the built-in list; profile links are ignored. The content security policy allows frames from www.instagram.com only.
+
+The two "run a school" pictures in `apps/web/public/images/guide/` are real screenshots of the profile editor and the new-event form. Regenerate them against a local build with `pnpm exec tsx scripts/guide-screenshots.ts` (see the header of that script); it creates and deletes a throwaway account in the local database.
 
 ## Prompts for future alternatives
 

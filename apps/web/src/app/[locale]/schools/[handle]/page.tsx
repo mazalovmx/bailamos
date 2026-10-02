@@ -3,6 +3,8 @@ import Link from 'next/link';
 import type {Metadata} from 'next';
 import {notFound} from 'next/navigation';
 import {getTranslations} from 'next-intl/server';
+import {cityLabeler} from '../../../../lib/catalogue/data';
+
 import {currentUser} from '../../../../lib/session';
 import {siteUrl} from '../../../../lib/mail';
 import {mediaUrl} from '../../../../lib/account/media';
@@ -32,7 +34,7 @@ export default async function SchoolPage({params, searchParams}: Props) {
   const [t, app, user, timetable, specials, venues] = await Promise.all([getTranslations('Courses'), getTranslations('App'), currentUser(),
     weekTimetable(week, {profileId: profile.id}), upcomingSpecials(profile.id), schoolVenues(profile.id)]);
   const own = !!user && profile.userId === user.id, following = own ? false : await isFollowing(user?.id, {profileId: profile.id});
-  const origin = siteUrl(), path = '/' + locale + '/schools/' + profile.handle, place = [profile.city?.name, profile.district].filter(Boolean).join(' · ');
+  const origin = siteUrl(), path = '/' + locale + '/schools/' + profile.handle, label = await cityLabeler(locale), place = [label(profile.city?.name), profile.district].filter(Boolean).join(' · ');
   const zones = new Set(timetable.days.flatMap(day => day.entries.map(entry => entry.timezone)));
   return <main className="courses-page">
     {/* JSON-LD is a data block, not executable script, so it is CSP-safe; "<" is escaped so user text cannot close the element. */}
@@ -62,12 +64,12 @@ export default async function SchoolPage({params, searchParams}: Props) {
       {specials.length ? <ul className="school-events">{specials.map(event => <li key={event.id}><Link href={'/' + locale + '/events/' + event.slug + '?date=' + encodeURIComponent(event.startsAt.toISOString())}>
         <strong>{event.title}</strong>
         <time dateTime={event.startsAt.toISOString()}>{new Intl.DateTimeFormat(locale, {dateStyle: 'full', timeStyle: 'short', timeZone: event.timezone}).format(event.startsAt)}</time>
-        <span>{[app('kind_' + event.kind), event.level !== 'UNSPECIFIED' ? app('level_' + event.level) : '', event.venue || event.city.name, event.priceText].filter(Boolean).join(' · ')}</span>
+        <span>{[app('kind_' + event.kind), event.level !== 'UNSPECIFIED' ? app('level_' + event.level) : '', event.venue || label(event.city.name), event.priceText].filter(Boolean).join(' · ')}</span>
       </Link></li>)}</ul> : <p className="courses-meta">{t('noSpecials')}</p>}
     </section>
     <section aria-labelledby="school-venues"><h2 id="school-venues">{t('venues')}</h2>
       {venues.length ? <ul className="school-venues">{venues.map(venue => <li key={venue.id}><Link href={'/' + locale + '/venues/' + venue.id}><strong>{venue.name}</strong>
-        <span>{venue.address}, {venue.city.name}</span></Link></li>)}</ul> : <p className="courses-meta">{t('noVenues')}</p>}
+        <span>{venue.address}, {label(venue.city.name)}</span></Link></li>)}</ul> : <p className="courses-meta">{t('noVenues')}</p>}
     </section>
   </main>;
 }

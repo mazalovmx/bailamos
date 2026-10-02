@@ -92,14 +92,26 @@ export function isEmptyDoc(doc: unknown) {
   walk(doc, node => {if (node.type === 'image' || node.type === 'instagram') media = true;});
   return !media && !plainText(doc, 10);
 }
-/** A copy of the body without the image nodes whose MediaItem is listed (hidden by moderation, for instance). */
-export function withoutImages<T>(doc: T, mediaIds: ReadonlySet<string>): T {
-  if (!mediaIds.size) return doc;
+function without<T>(doc: T, drop: (node: Record<string, unknown>) => boolean): T {
   const strip = (node: unknown, depth: number): unknown => {
     if (!isObject(node) || !Array.isArray(node.content) || depth > 20) return node;
-    return {...node, content: node.content
-      .filter(child => !(isObject(child) && child.type === 'image' && isObject(child.attrs) && mediaIds.has(String(child.attrs.mediaId))))
-      .map(child => strip(child, depth + 1))};
+    return {...node, content: node.content.filter(child => !(isObject(child) && drop(child))).map(child => strip(child, depth + 1))};
   };
   return strip(doc, 0) as T;
+}
+/** A copy of the body without the image nodes whose MediaItem is listed (hidden by moderation, for instance). */
+export function withoutImages<T>(doc: T, mediaIds: ReadonlySet<string>): T {
+  return mediaIds.size ? without(doc, node => node.type === 'image' && isObject(node.attrs) && mediaIds.has(String(node.attrs.mediaId))) : doc;
+}
+/** A copy of the body without the Instagram blocks of the listed permalinks. */
+export function withoutEmbeds<T>(doc: T, permalinks: ReadonlySet<string>): T {
+  return permalinks.size ? without(doc, node => node.type === 'instagram' && isObject(node.attrs) && permalinks.has(String(node.attrs.permalink))) : doc;
+}
+/** Canonical permalinks of the Instagram blocks of a body, in document order, each once. */
+export function embedsOf(doc: unknown): string[] {
+  const found = new Set<string>();
+  walk(doc, node => {
+    if (node.type === 'instagram' && isObject(node.attrs) && typeof node.attrs.permalink === 'string' && INSTAGRAM_PERMALINK.test(node.attrs.permalink)) found.add(node.attrs.permalink);
+  });
+  return [...found];
 }

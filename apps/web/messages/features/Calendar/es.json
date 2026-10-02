@@ -11,6 +11,7 @@
   "retry": "Reintentar",
   "truncated": "Hay demasiados eventos en este periodo. Ajusta los filtros para verlos todos.",
   "cancelled": "Cancelado",
+  "rescheduled": "Reprogramada",
   "addToCalendar": "Añadir al calendario",
   "downloadIcs": "Descargar .ics",
   "addGoogle": "Añadir a Google Calendar",

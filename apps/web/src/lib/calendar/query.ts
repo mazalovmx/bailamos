@@ -46,18 +46,18 @@ export function overlap(from: Date, to: Date): Prisma.EventOccurrenceWhereInput 
 export async function findOccurrences(range: {from: Date; to: Date}, filters: CalendarFilters) {
   const rows = await db.eventOccurrence.findMany({where: {...overlap(range.from, range.to), event: eventWhere(filters, await styleIds(filters.style))},
     orderBy: [{startsAt: 'asc'}, {id: 'asc'}], take: MAX_OCCURRENCES + 1,
-    select: {id: true, startsAt: true, endsAt: true, cancelled: true, event: {select: {id: true, slug: true, title: true, timezone: true, kind: true, level: true,
+    select: {id: true, startsAt: true, endsAt: true, cancelled: true, originalStartsAt: true, event: {select: {id: true, slug: true, title: true, timezone: true, kind: true, level: true,
       city: {select: {slug: true, name: true}}, venue: {select: {name: true, hiddenAt: true}}, styles: {select: {style: {select: {slug: true, name: true}}}}}}}});
   return {truncated: rows.length > MAX_OCCURRENCES, occurrences: rows.slice(0, MAX_OCCURRENCES).map(({event, ...o}) => ({
     id: o.id, eventId: event.id, slug: event.slug, title: event.title, startsAt: o.startsAt.toISOString(), endsAt: o.endsAt?.toISOString() ?? null,
     timezone: event.timezone, localStart: wallClock(o.startsAt, event.timezone), localEnd: o.endsAt ? wallClock(o.endsAt, event.timezone) : null,
-    cancelled: o.cancelled, kind: event.kind, level: event.level, city: event.city,
+    cancelled: o.cancelled, moved: !!o.originalStartsAt, kind: event.kind, level: event.level, city: event.city,
     venue: event.venue && !event.venue.hiddenAt ? event.venue.name : null, styles: event.styles.map(s => s.style)}))};
 }
 export type CalendarOccurrence = Awaited<ReturnType<typeof findOccurrences>>['occurrences'][number];
 const icsSelect = {id: true, slug: true, title: true, description: true, timezone: true, status: true, updatedAt: true, startsAt: true, endsAt: true,
   city: {select: {name: true}}, venue: {select: {name: true, address: true, hiddenAt: true}}} satisfies Prisma.EventSelect;
-const occurrenceSelect = {id: true, startsAt: true, endsAt: true, cancelled: true} satisfies Prisma.EventOccurrenceSelect;
+const occurrenceSelect = {id: true, startsAt: true, endsAt: true, cancelled: true, originalStartsAt: true} satisfies Prisma.EventOccurrenceSelect;
 // One event by id or slug for the .ics download, with every materialized date. Drafts and hidden events do not exist here.
 export function findIcsEvent(idOrSlug: string) {
   return db.event.findFirst({where: {OR: [{id: idOrSlug}, {slug: idOrSlug}], status: {in: ['PUBLISHED', 'CANCELLED']}, hiddenAt: null},

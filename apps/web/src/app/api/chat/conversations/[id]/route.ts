@@ -1,9 +1,10 @@
 import {z} from 'zod';
 import {apiError, jsonBody} from '../../../../../lib/api';
 import {chatActor, chatViewer, noStore} from '../../../../../lib/chat/http';
-import {acceptConversation, conversationDetail, leaveConversation, markRead} from '../../../../../lib/chat/service';
+import {acceptConversation, conversationDetail, leaveConversation, markRead, renameConversation, setMuted} from '../../../../../lib/chat/service';
 type Context = {params: Promise<{id: string}>};
-const actionInput = z.object({action: z.enum(['accept', 'read'])});
+// {action: 'rename', title} renames a group; only its admins (the school, in a school's conversation) may.
+const actionInput = z.object({action: z.enum(['accept', 'read', 'rename', 'mute', 'unmute']), title: z.string().max(400).optional()});
 export async function GET(request: Request, {params}: Context) {
   try {
     const me = await chatViewer(request);
@@ -13,8 +14,11 @@ export async function GET(request: Request, {params}: Context) {
 export async function PATCH(request: Request, {params}: Context) {
   try {
     const me = await chatActor(request), {id} = await params;
-    const {action} = actionInput.parse(await jsonBody(request));
-    if (action === 'accept') await acceptConversation(me, id); else await markRead(me, id);
+    const {action, title} = actionInput.parse(await jsonBody(request));
+    if (action === 'accept') await acceptConversation(me, id);
+    else if (action === 'rename') await renameConversation(me, id, {title});
+    else if (action === 'mute' || action === 'unmute') await setMuted(me, id, action === 'mute');
+    else await markRead(me, id);
     return Response.json({ok: true});
   } catch (error) {return apiError(error);}
 }

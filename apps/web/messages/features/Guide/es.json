@@ -1,0 +1,52 @@
+{
+  "replay": "Ver consejos de esta página",
+  "next": "Siguiente",
+  "previous": "Atrás",
+  "done": "Listo",
+  "progress": "{{current}} de {{total}}",
+  "account": {
+    "homeTitle": "Tu espacio de baile",
+    "homeText": "Empieza por tu perfil y usa estos accesos para eventos, mensajes, búsqueda de pareja e historias. Cada sección tiene su propia guía breve la primera vez que la visitas.",
+    "eventsTitle": "Organiza un evento de baile",
+    "eventsText": "Crea una social, clase regular, taller o masterclass. Puedes añadir ubicación, horario y estilos.",
+    "schoolsTitle": "Gestiona el perfil de una escuela",
+    "schoolsText": "Cambia el tipo de perfil a Escuela y publica clases y eventos con su nombre. Quienes la administran también pueden publicar historias y gestionar sus recursos desde el panel.",
+    "shareTitle": "Crea una publicación para compartir",
+    "shareText": "Abre el Estudio de anuncios para crear un PNG vertical, cuadrado o para stories. En el móvil, usa Compartir imagen para abrir el menú del sistema.",
+    "profileTitle": "Completa tu perfil de baile",
+    "profileText": "Añade tu ciudad y estilos. Tú decides por separado si cada estilo aparece en la búsqueda de pareja.",
+    "communityTitle": "Encuentra tu comunidad",
+    "communityText": "Explora eventos, clases y escuelas sin tener que completar todo a la vez. Abre una sección para recibir consejos sobre esa tarea."
+  },
+  "event": {
+    "introTitle": "Empieza con el texto o manualmente",
+    "introText": "Si el analizador está disponible, pega el anuncio de WhatsApp o Instagram y revisa las sugerencias. También puedes completar el formulario manualmente.",
+    "detailsTitle": "Añade los detalles del evento",
+    "detailsText": "Elige un título claro, ciudad y estilo. Añade etiquetas de formato, nivel e intensidad para facilitar los filtros.",
+    "placeTitle": "Marca el lugar exacto",
+    "placeText": "Elige un local o marca un punto en el mapa para parques y bailes al aire libre. Comprueba la ubicación antes de publicar.",
+    "scheduleTitle": "Define el horario y la repetición",
+    "scheduleText": "Indica la fecha y hora local de la ciudad y elige si será una vez o un evento recurrente.",
+    "publishTitle": "Revisa y guarda",
+    "publishText": "Puedes guardar un borrador o publicar. Las sugerencias del analizador siempre requieren tu revisión y confirmación."
+  },
+  "schools": {
+    "createTitle": "Crea el perfil de tu escuela",
+    "createText": "No hay un formulario separado para escuelas. Cambia el tipo de tu perfil a Escuela, añade sus datos públicos y publica clases o eventos con su nombre.",
+    "createAction": "Configurar perfil",
+    "listTitle": "Encuentra una escuela",
+    "listText": "Filtra por ciudad, abre un perfil y consulta su horario semanal, eventos especiales y espacios.",
+    "claimTitle": "Solicita un perfil existente",
+    "claimText": "Abre el perfil sin propietario y solicita su gestión. Un moderador revisa la solicitud antes de conceder acceso.",
+    "adminTitle": "Administra tu escuela",
+    "adminText": "Quien posee el perfil de la escuela puede publicar clases, eventos e historias con su nombre. La gestión de recursos y administradores está en el panel separado; el propietario de la plataforma o un administrador global debe conceder primero el rol Administrador de escuela. El enlace al panel aparecerá en la cabecera cuando tengas acceso."
+  },
+  "share": {
+    "fieldsTitle": "Escribe el anuncio",
+    "fieldsText": "Añade título, fecha, lugar y una descripción breve. Puedes incluir una foto y ajustar el recorte.",
+    "sizeTitle": "Elige el formato social",
+    "sizeText": "Usa formato publicación, story o cuadrado según dónde quieras compartirlo.",
+    "exportTitle": "Comparte o guarda la imagen",
+    "exportText": "En móviles compatibles, Compartir imagen abre el menú del sistema para elegir Instagram o WhatsApp. Como alternativa, descarga el PNG y copia el texto."
+  }
+}

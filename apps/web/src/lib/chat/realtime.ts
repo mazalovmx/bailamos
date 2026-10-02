@@ -87,13 +87,12 @@ export async function onlineProfiles(profileIds: string[]) {
   return new Set(profileIds.filter((_, index) => found?.[index]));
 }
 // Burst guard for notifications; the durable rule ("one unread notification per conversation") is checked in the database.
-const notifyKey = (conversationId: string, userId: string) => 'chat:n:' + conversationId + ':' + userId;
-export async function claimNotification(conversationId: string, userId: string) {
-  const result = await withRedis(redis => redis.set(notifyKey(conversationId, userId), '1', 'EX', 30, 'NX'));
+// The key carries the recipient's read mark: once they read the conversation the next burst uses a new key, so a claim
+// that could not be removed (Redis briefly unreachable) can never swallow a later notification.
+const notifyKey = (conversationId: string, userId: string, epoch: number) => 'chat:n:' + conversationId + ':' + userId + ':' + epoch;
+export async function claimNotification(conversationId: string, userId: string, epoch = 0) {
+  const result = await withRedis(redis => redis.set(notifyKey(conversationId, userId, epoch), '1', 'EX', 30, 'NX'));
   return result !== null;
-}
-export async function releaseNotification(conversationId: string, userId: string) {
-  await withRedis(redis => redis.del(notifyKey(conversationId, userId)));
 }
 /** Test helper: closes the subscriber connection so the process can exit. */
 export async function closeChatRealtime() {

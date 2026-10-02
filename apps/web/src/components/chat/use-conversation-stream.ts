@@ -1,6 +1,6 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
-import type {ChatEvent} from '../../lib/chat/types';
+import {chatEventTypes, type ChatEvent} from '../../lib/chat/types';
 export type StreamMode = 'connecting' | 'live' | 'polling';
 type Options = {
   /** Only events of this conversation are delivered; without it every event of the viewer's conversations is. */
@@ -10,7 +10,6 @@ type Options = {
   poll: () => Promise<void>;
   pollMs?: number;
 };
-const eventTypes = ['message', 'hidden', 'conversation'] as const;
 /**
  * Live updates over Server-Sent Events with an automatic fallback: when the stream cannot be opened or drops (no Redis, a proxy
  * that buffers, offline), the hook polls every `pollMs` and keeps retrying the stream with exponential backoff up to one minute.
@@ -39,7 +38,7 @@ export function useConversationStream({conversationId, onEvent, poll, pollMs = 5
         // Anything sent between the last poll and the subscription is picked up here.
         runPoll();
       });
-      for (const type of eventTypes) stream.addEventListener(type, message => {
+      for (const type of chatEventTypes) stream.addEventListener(type, message => {
         try {
           const event = JSON.parse((message as MessageEvent<string>).data) as ChatEvent;
           if (!conversationId || event.conversationId === conversationId) handlers.current.onEvent(event);

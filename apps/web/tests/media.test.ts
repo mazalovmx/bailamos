@@ -7,7 +7,7 @@ import {join} from 'node:path';
 import sharp from 'sharp';
 import {clearEmbedMemoryCache, fetchOEmbed, parseInstagramUrl, resolveEmbed, type EmbedEntry, type EmbedStore} from '../src/lib/embeds/instagram';
 import {MediaError} from '../src/lib/media/errors';
-import {baseKey, parseRawKey, parseVariantKey, rawKey, variantKeys} from '../src/lib/media/keys';
+import {baseKey, chatBaseKey, chatPrefix, isBaseKey, parseChatKey, parseRawKey, parseVariantKey, rawKey, variantKey, variantKeys} from '../src/lib/media/keys';
 import {processImage} from '../src/lib/media/process';
 import {mediaUrl, variants} from '../src/lib/media/url';
 import {rateLimit, resetMemoryRateLimits} from '../src/lib/rate-limit';
@@ -244,6 +244,21 @@ test('upload keys bind the uploader and target; variant keys and URLs are derive
   process.env.S3_PUBLIC_URL = 'https://cdn.example.test/media/';
   assert.equal(mediaUrl(base, 320, 'avif'), 'https://cdn.example.test/media/' + base + '/320.avif');
   delete process.env.S3_PUBLIC_URL;
+});
+
+test('chat attachment keys: bound to conversation and uploader, and invisible to the public file route', () => {
+  const raw = rawKey('profile1', 'chat', 'conv1', uuid);
+  assert.deepEqual(parseRawKey(raw), {profileId: 'profile1', target: 'chat', targetId: 'conv1', uuid});
+  const base = chatBaseKey('conv1', 'profile1', uuid);
+  assert.equal(base, 'chat/conv1/profile1/' + uuid);
+  assert.ok(base.startsWith(chatPrefix('conv1')));
+  assert.deepEqual(parseChatKey(base), {conversationId: 'conv1', profileId: 'profile1', uuid});
+  for (const bad of [baseKey('profile1', uuid), 'chat/conv1/' + uuid, base + '/800.webp', 'chat/../img/profile1/' + uuid, 'chat/conv1/profile1/not-a-uuid', raw])
+    assert.equal(parseChatKey(bad), null, bad);
+  // /api/media/file serves only what isBaseKey and parseVariantKey accept, and neither accepts the chat prefix.
+  assert.equal(isBaseKey(base), false);
+  for (const key of variantKeys(base)) assert.equal(parseVariantKey(key), null, key);
+  assert.equal(parseVariantKey(variantKey(baseKey('profile1', uuid), 800, 'webp'))?.width, 800);
 });
 
 test('image processing: re-encodes to WebP and AVIF, applies orientation and strips EXIF/GPS', async () => {

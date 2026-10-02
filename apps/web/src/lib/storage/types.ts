@@ -1,6 +1,8 @@
 export type Presigned = {url: string; method: 'PUT'; headers: Record<string, string>; expiresAt: number};
 export type StoredObject = {body: ReadableStream<Uint8Array>; size?: number; contentType?: string};
 export type PresignOptions = {mime: string; size: number; expiresSec?: number};
+export type ListedObject = {key: string; modified: Date; size?: number};
+export type ListOptions = {limit?: number; after?: string};
 export interface Storage {
   driver: 's3' | 'local';
   /** A short-lived URL the browser can PUT exactly one object of the declared type and size to. */
@@ -12,6 +14,13 @@ export interface Storage {
   /** Removes every object whose key starts with `prefix` (a directory-like prefix ending in "/"). */
   deletePrefix(prefix: string): Promise<void>;
   exists(key: string): Promise<boolean>;
+  /**
+   * Objects whose key starts with `prefix` (ending in "/"), in ascending key order, at most `limit` (default 1000).
+   * `after` continues a listing: only keys greater than it are returned.
+   */
+  list(prefix: string, options?: ListOptions): Promise<ListedObject[]>;
+  /** Stores a file from disk without reading it into memory (database dumps). The object is private: no cache headers. */
+  putFile(key: string, path: string, contentType: string): Promise<void>;
 }
 export const UPLOAD_TTL_SEC = 300;
 const KEY = /^[A-Za-z0-9_-]+(\/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*\/?$/;

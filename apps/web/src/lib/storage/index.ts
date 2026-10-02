@@ -1,7 +1,7 @@
 import {diskStorage} from './local';
 import {s3Settings, s3Storage} from './s3';
 import {readStream, type Storage} from './types';
-export type {Presigned, PresignOptions, Storage, StoredObject} from './types';
+export type {ListedObject, ListOptions, Presigned, PresignOptions, Storage, StoredObject} from './types';
 export {assertKey, readStream, UPLOAD_TTL_SEC} from './types';
 let cached: {signature: string; storage: Storage} | undefined;
 /**

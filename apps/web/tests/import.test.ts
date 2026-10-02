@@ -21,6 +21,9 @@ import {processApproved, readState, runSource} from '../src/lib/import/run';
 import {approveItem, rejectItem, ReviewError} from '../src/lib/import/review';
 import {importJobs, isDue, pruneNews} from '../src/lib/import/jobs';
 import {secretMatches} from '../src/lib/import/secret';
+import {clearRobotsMemory, isAllowed, parseRobots, productToken, robotsVerdict, rulesFor} from '../src/lib/import/robots';
+import {contentHash, futureDates, readSync, type Payload} from '../src/lib/import/create';
+import {describeChange} from '../src/lib/import/sync';
 import {schedule} from '../src/lib/schedule';
 import {esc} from '../src/lib/telegram/api';
 import {fuzzyPick, handleUpdate, range} from '../src/lib/telegram/bot';
@@ -203,6 +206,66 @@ test('fetcher: honest User-Agent, conditional GET, size limit, charset and per-h
   assert.ok(requests[1].at - requests[0].at >= 100, 'the same host waits');
   assert.ok(requests[2].at - requests[1].at < 100, 'another host does not');
   setImportNet({delayMs: 0});
+});
+test('robots.txt: groups, our User-Agent before "*", longest match, Allow on a tie, wildcards', () => {
+  const groups = parseRobots([
+    '# comment', 'Disallow: /orphan-rule-before-any-group', '',
+    'User-agent: *', 'Disallow: /private/', 'Disallow: /*.pdf$', 'Allow: /private/agenda', 'Disallow: /search?q=', 'Crawl-delay: 10', 'Sitemap: https://example.org/sitemap.xml', '',
+    'User-agent: BadBot', 'User-agent: Dance-Test-Importer', 'Disallow: /events/drafts', 'Allow: /events/', 'Disallow: /', '',
+    'User-agent: dance-test-importer   # a second group for the same agent is merged', 'Allow: /agenda$', 'Disallow:', 'not a rule at all'].join('\r\n'));
+  assert.deepEqual(groups.map(group => [group.agents, group.rules.length]), [[['*'], 4], [['badbot', 'dance-test-importer'], 3], [['dance-test-importer'], 1]]);
+  assert.equal(productToken('dance-test-importer/1.0 (+https://dance.example/bot)'), 'dance-test-importer');
+  const mine = rulesFor(groups, 'dance-test-importer/1.0 (+https://dance.example/bot)'), others = rulesFor(groups, 'other-crawler/2.0');
+  assert.equal(mine.length, 4, 'both groups naming us, not the "*" group');
+  // Longest match wins: /events/ (8) beats / (1), /events/drafts (14) beats /events/.
+  assert.deepEqual(['/', '/events/', '/events/2026/jam', '/events/drafts', '/events/drafts/1', '/agenda', '/agenda/2', '/private/agenda'].map(path => isAllowed(mine, path)),
+    [false, true, true, false, false, true, false, false]);
+  assert.deepEqual(['/', '/private/', '/private/x', '/private/agenda', '/private/agenda/may', '/files/flyer.pdf', '/files/flyer.pdf?download=1', '/search?q=tango', '/search', '/events/drafts'].map(path => isAllowed(others, path)),
+    [true, false, false, true, true, false, true, false, true, true]);
+  // Equal length: Allow wins. Percent-encoding is compared in one form. No rules, or no group for us: everything is open.
+  assert.equal(isAllowed([{allow: false, path: '/page'}, {allow: true, path: '/page'}], '/page'), true);
+  assert.equal(isAllowed([{allow: false, path: '/caf%c3%a9'}], '/caf%C3%A9/menu'), false);
+  assert.equal(isAllowed([{allow: false, path: '/a%2Fb'}], '/a/b'), true, 'an encoded slash is not a path separator');
+  assert.equal(isAllowed([], '/anything'), true);
+  assert.deepEqual(rulesFor(parseRobots('User-agent: googlebot\nDisallow: /'), 'dance-test-importer/1.0'), []);
+  assert.deepEqual(parseRobots('<html><body>404</body></html>'), []);
+  // A hostile file cannot make the matcher explode: wildcards are plain ".*", the rest is escaped.
+  assert.equal(isAllowed([{allow: false, path: '/(a+)+$*[x'}], '/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!'), true);
+});
+test('robots.txt is fetched once per host, honoured for Schema.org pages and their redirects, not for feeds', async () => {
+  const hits: string[] = [], host = 'robots-' + tag + '.example.org';
+  let robots: TransportResponse | Error = ok('User-agent: *\nDisallow: /closed/\n');
+  setImportNet({resolve: async () => PUBLIC, delayMs: 0, transport: async url => {
+    hits.push(url.pathname);
+    if (url.pathname === '/robots.txt') {if (robots instanceof Error) throw robots; return robots;}
+    if (url.pathname === '/open/moved') return {status: 302, headers: {location: '/closed/page'}, body: Buffer.alloc(0)};
+    return ok(url.pathname.endsWith('.ics') ? 'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n' : jsonLd([]));
+  }});
+  clearRobotsMemory();
+  const sources = await Promise.all([['SCHEMA_ORG', '/closed/agenda'], ['SCHEMA_ORG', '/open/agenda'], ['SCHEMA_ORG', '/open/moved'], ['ICAL', '/closed/calendar.ics']].map(([kind, path]) =>
+    db.importSource.create({data: {kind: kind as 'SCHEMA_ORG' | 'ICAL', url: 'https://' + host + path, name: 'Robots ' + tag + path}})));
+  cleanup.sources.push(...sources.map(source => source.id));
+  try {
+    const [closed, open, moved, calendar] = [await runSource(sources[0].id), await runSource(sources[1].id), await runSource(sources[2].id), await runSource(sources[3].id)];
+    assert.deepEqual([closed.ok, closed.error], [false, 'ROBOTS_DISALLOWED']);
+    assert.equal(readState((await db.importSource.findUniqueOrThrow({where: {id: sources[0].id}})).lastStatus).error, 'ROBOTS_DISALLOWED');
+    assert.equal(open.ok, true);
+    assert.deepEqual([moved.ok, moved.error], [false, 'ROBOTS_DISALLOWED'], 'a redirect into a closed path is refused too');
+    assert.equal(calendar.ok, true, 'a published calendar feed is fetched regardless');
+    assert.deepEqual(hits, ['/robots.txt', '/open/agenda', '/open/moved', '/closed/calendar.ics'], 'robots.txt once, the closed pages never');
+    assert.equal(await robotsVerdict(new URL('https://' + host + '/closed/x?y=1')), 'DISALLOWED');
+    // 4xx: no robots.txt, no restrictions. 5xx or no answer: assume closed, and ask again within the hour.
+    for (const [answer, verdict] of [[{status: 404, headers: {}, body: Buffer.alloc(0)}, 'ALLOWED'], [{status: 503, headers: {}, body: Buffer.alloc(0)}, 'UNREACHABLE'], [new ImportFetchError('TIMEOUT'), 'UNREACHABLE']] as const) {
+      robots = answer;
+      const other = 'robots-' + tag + '-' + hits.length + '.example.org';
+      assert.equal(await robotsVerdict(new URL('https://' + other + '/closed/agenda')), verdict);
+      assert.equal(await robotsVerdict(new URL('https://' + other + '/again')), verdict, 'cached');
+      assert.equal(hits.filter(path => path === '/robots.txt').length, hits.length - 3);
+    }
+  } finally {
+    clearRobotsMemory();
+    useFeedTransport();
+  }
 });
 // ---------- de-duplication ----------
 test('dedupe key: local day + ~100 m grid (or the city) + normalized title', () => {
@@ -469,6 +532,119 @@ test('POST /api/import/run exists only with CRON_SECRET and checks the bearer to
   }
 });
 // ---------- Telegram ----------
+// ---------- imported events follow their source ----------
+const syncEvents = () => db.event.findMany({where: {cityId: cleanup.cityId, sourceUrl: {startsWith: 'https://sync-' + tag}}, orderBy: {createdAt: 'asc'}, include: {occurrences: {orderBy: {startsAt: 'asc'}}, members: true}});
+test('imported events follow their source until a person takes over; cancelled and vanished entries cancel the event', async () => {
+  const origin = 'https://sync-' + tag + '.example.org', when = (days: number, hours = 0) => base.plus({days, hours}).toISO();
+  const entry = (id: string, name: string, startDate: string | null, extra: object = {}) => ({'@type': 'DanceEvent', '@id': id, name: name + ' ' + tag, startDate, url: origin + '/' + id, location: place(12.4, 23.5, 'Hall'), ...extra});
+  let listing = [entry('s1', 'Zouk Marathon', when(5), {description: 'Three rooms.'}), entry('s2', 'Kizomba Lake Party', when(6)), entry('s3', 'Forro Picnic', when(7)), entry('s4', 'Bachata Rooftop', when(8))];
+  setImportNet({resolve: async () => PUBLIC, delayMs: 0, transport: async () => ok(jsonLd(listing))});
+  clearRobotsMemory();
+  const source = await db.importSource.create({data: {kind: 'SCHEMA_ORG', url: origin + '/agenda', name: 'Sync ' + tag, cityId: cleanup.cityId}});
+  cleanup.sources.push(source.id);
+  const run = async () => (await runSource(source.id, {force: true})).counts;
+  const userId = 'sync-' + tag, saved = process.env.IMPORT_MISSING_RUNS;
+  try {
+    assert.deepEqual(await run(), {IMPORTED: 4});
+    const first = await itemsOf(source.id), [e1, e2, e3, e4] = ['s1', 's2', 's3', 's4'].map(id => first.get(id)!.eventId!);
+    // The item remembers what it wrote and when: the event's updatedAt after the importer's last write.
+    const before = await db.event.findUniqueOrThrow({where: {id: e1}});
+    assert.deepEqual(readSync(first.get('s1')!.payload), {hash: contentHash(first.get('s1')!.payload as Payload), writtenAt: before.updatedAt.toISOString()});
+    assert.match(before.shortCode || '', /^[a-z2-7]{6,8}$/);
+    assert.deepEqual(await run(), {SKIPPED: 4}, 'an unchanged feed writes nothing');
+    assert.equal((await db.event.findUniqueOrThrow({where: {id: e1}})).updatedAt.getTime(), before.updatedAt.getTime());
+    assert.deepEqual((await itemsOf(source.id)).get('s1')!.payload, first.get('s1')!.payload);
+    // People arrive: somebody plans to come to s4, an organizer claims s2, a moderator fixes the title of s3.
+    await db.user.create({data: {id: userId, name: 'Sync Guest', email: 'sync-' + tag + '@example.test', emailVerified: true, locale: 'en', notificationPreference: {create: {emailEvents: false}}}});
+    cleanup.users.push(userId);
+    const guest = await db.profile.create({data: {userId, type: 'DANCER', handle: 'sync-' + tag, name: 'Sync Guest', cityId: cleanup.cityId}});
+    await db.rsvp.createMany({data: [e1, e4].map(eventId => ({eventId, profileId: guest.id, status: 'GOING' as const}))});
+    await db.eventMembership.create({data: {eventId: e2, profileId: guest.id, role: 'OWNER'}});
+    await db.event.update({where: {id: e3}, data: {title: 'Forró Picnic (bring a blanket)'}});
+    // The source changes everything about s1, the title of s2, the time of s3, and cancels s4.
+    listing = [entry('s1', 'Zouk Marathon Deluxe', when(5, 1), {description: 'Four rooms now.', endDate: when(5, 5), location: place(12.41, 23.51, 'Bigger Hall')}),
+      entry('s2', 'Kizomba Lake Night', when(6)), entry('s3', 'Forro Picnic', when(7, 2)), entry('s4', 'Bachata Rooftop', when(8), {eventStatus: 'https://schema.org/EventCancelled'})];
+    assert.deepEqual(await run(), {UPDATED: 1, REVIEW: 2, CANCELLED: 1});
+    const second = await itemsOf(source.id), events = new Map((await syncEvents()).map(event => [event.id, event]));
+    assert.equal(events.size, 4, 'no event was created or removed');
+    const changed = events.get(e1)!;
+    assert.deepEqual([changed.title, changed.description, changed.lat, changed.lng, changed.status, changed.shortCode], ['Zouk Marathon Deluxe ' + tag, 'Four rooms now.\n\nBigger Hall', 12.41, 23.51, 'PUBLISHED', before.shortCode]);
+    assert.deepEqual(changed.occurrences.map(date => [date.startsAt.getTime(), date.endsAt?.getTime()]), [[base.plus({days: 5, hours: 1}).toMillis(), base.plus({days: 5, hours: 5}).toMillis()]]);
+    assert.equal(changed.startsAt.getTime(), base.plus({days: 5, hours: 1}).toMillis());
+    assert.deepEqual([second.get('s1')!.status, second.get('s1')!.eventId, second.get('s1')!.dedupeKey], ['IMPORTED', e1, changed.dedupeKey]);
+    assert.deepEqual(readSync(second.get('s1')!.payload), {hash: contentHash(second.get('s1')!.payload as Payload), writtenAt: changed.updatedAt.toISOString()});
+    assert.equal(await db.rsvp.count({where: {eventId: e1}}), 1, 'answers survive an update');
+    // Claimed or edited by a person: never overwritten, the difference waits for a reviewer.
+    assert.deepEqual([events.get(e2)!.title, events.get(e3)!.title, events.get(e3)!.startsAt.getTime()], ['Kizomba Lake Party ' + tag, 'Forró Picnic (bring a blanket)', base.plus({days: 7}).toMillis()]);
+    assert.deepEqual([second.get('s2')!.status, second.get('s2')!.note, second.get('s2')!.eventId], ['REVIEW', 'SOURCE_CHANGED title: "Kizomba Lake Party ' + tag + '" → "Kizomba Lake Night ' + tag + '"', e2]);
+    assert.equal(second.get('s3')!.status, 'REVIEW');
+    assert.match(second.get('s3')!.note || '', /^SOURCE_CHANGED time: \d{4}-.+ → \d{4}-/);
+    assert.equal(readSync(second.get('s2')!.payload).pending, 'UPDATE');
+    // Cancelled at the source: cancelled here, and the guest is told once.
+    assert.deepEqual([events.get(e4)!.status, second.get('s4')!.status, second.get('s4')!.note, second.get('s4')!.eventId], ['CANCELLED', 'REJECTED', 'CANCELLED', e4]);
+    const notices = () => db.notification.findMany({where: {userId, type: 'EVENT_CANCELLED'}, orderBy: {createdAt: 'asc'}});
+    assert.deepEqual((await notices()).map(notice => (notice.data as {eventId?: string}).eventId), [e4]);
+    assert.deepEqual(await run(), {SKIPPED: 4}, 'the same feed again changes nothing');
+    assert.equal((await notices()).length, 1);
+    assert.equal((await db.event.findUniqueOrThrow({where: {id: e1}})).updatedAt.getTime(), changed.updatedAt.getTime());
+    // A reviewer accepts the source's version of the claimed event: it is applied to that event, no second one appears.
+    const outcome = await approveItem(second.get('s2')!.id, 'staff-' + tag);
+    assert.deepEqual([outcome.status, outcome.eventId], ['IMPORTED', e2]);
+    assert.equal((await db.event.findUniqueOrThrow({where: {id: e2}})).title, 'Kizomba Lake Night ' + tag);
+    assert.equal((await syncEvents()).length, 4);
+    // s1 (untouched) and s2 (claimed) vanish from the page. Two runs only count; the third acts.
+    process.env.IMPORT_MISSING_RUNS = '3';
+    listing = listing.slice(2);
+    assert.deepEqual(await run(), {SKIPPED: 2, MISSING: 2});
+    assert.deepEqual([(await db.event.findUniqueOrThrow({where: {id: e1}})).status, readSync((await itemsOf(source.id)).get('s1')!.payload).missing], ['PUBLISHED', 1]);
+    assert.deepEqual(await run(), {SKIPPED: 2, MISSING: 2});
+    // An empty page, a failed fetch or "not modified" is not evidence that anything is gone.
+    const full = listing;
+    listing = [];
+    assert.deepEqual(await run(), {});
+    listing = full;
+    assert.deepEqual(await run(), {SKIPPED: 2, CANCELLED: 1, REVIEW: 1});
+    const last = await itemsOf(source.id);
+    assert.deepEqual([(await db.event.findUniqueOrThrow({where: {id: e1}})).status, last.get('s1')!.status, last.get('s1')!.note], ['CANCELLED', 'REJECTED', 'GONE_FROM_SOURCE']);
+    assert.deepEqual([(await db.event.findUniqueOrThrow({where: {id: e2}})).status, last.get('s2')!.status, last.get('s2')!.note, readSync(last.get('s2')!.payload).pending], ['PUBLISHED', 'REVIEW', 'SOURCE_GONE', 'CANCEL']);
+    assert.deepEqual((await notices()).map(notice => (notice.data as {eventId?: string}).eventId), [e4, e1]);
+    assert.deepEqual(await run(), {SKIPPED: 2});
+    assert.equal((await notices()).length, 2);
+    // An entry that reappears before the limit starts counting from zero again.
+    const again = await db.importedItem.update({where: {id: last.get('s3')!.id}, data: {status: 'IMPORTED', payload: {...(last.get('s3')!.payload as object), sync: {missing: 2}}}});
+    assert.equal(readSync(again.payload).missing, 2);
+    await db.event.update({where: {id: e3}, data: {startsAt: base.plus({days: 7, hours: 2}).toJSDate(), title: 'Forro Picnic ' + tag, occurrences: {deleteMany: {}, create: {startsAt: base.plus({days: 7, hours: 2}).toJSDate()}}}});
+    await run();
+    assert.equal(readSync((await itemsOf(source.id)).get('s3')!.payload).missing, undefined);
+  } finally {
+    if (saved === undefined) delete process.env.IMPORT_MISSING_RUNS; else process.env.IMPORT_MISSING_RUNS = saved;
+    clearRobotsMemory();
+    useFeedTransport();
+  }
+});
+test('change detection ignores what time does by itself: dates that pass and a weekly series rolling forward', () => {
+  const now = new Date('2031-05-05T12:00:00Z');
+  const single: Payload = {title: 'Jam', description: null, startsAt: '2031-05-10T18:00:00.000Z', endsAt: null, timezone: zone, cityId: 'c', venueName: 'Hall', address: null, lat: 1, lng: 2,
+    precise: true, url: null, rrule: null, sourceRrule: null, allDay: false, occurrences: [{startsAt: '2031-05-01T18:00:00.000Z', endsAt: null}, {startsAt: '2031-05-10T18:00:00.000Z', endsAt: null}]};
+  const later = {...single, occurrences: single.occurrences.slice(1)};
+  assert.equal(contentHash(single), contentHash(later));
+  assert.equal(futureDates(single, now), futureDates(later, now), 'a date that already passed is not a change');
+  assert.notEqual(futureDates(single, now), futureDates({...later, occurrences: [{startsAt: '2031-05-10T19:00:00.000Z', endsAt: null}]}, now));
+  assert.notEqual(contentHash(single), contentHash({...single, title: 'Jam!'}));
+  assert.notEqual(contentHash(single), contentHash({...single, venueName: 'Other hall'}));
+  // Weekly: next week's payload starts a week later and has one date fewer — the same series.
+  const weekly: Payload = {...single, rrule: 'FREQ=WEEKLY;COUNT=10;BYDAY=SA', sourceRrule: 'FREQ=WEEKLY;BYDAY=SA', startsAt: '2031-05-10T18:00:00.000Z', endsAt: '2031-05-10T20:00:00.000Z', occurrences: []};
+  const rolled = {...weekly, rrule: 'FREQ=WEEKLY;COUNT=9;BYDAY=SA', startsAt: '2031-05-17T18:00:00.000Z', endsAt: '2031-05-17T20:00:00.000Z'};
+  assert.equal(contentHash(weekly), contentHash(rolled));
+  assert.equal(futureDates(weekly, now), futureDates(rolled, now));
+  // Across the change to winter time the local hour stays, although the UTC hour moves.
+  assert.equal(contentHash(weekly), contentHash({...weekly, startsAt: '2031-11-01T19:00:00.000Z', endsAt: '2031-11-01T21:00:00.000Z'}));
+  assert.notEqual(contentHash(weekly), contentHash({...rolled, startsAt: '2031-05-17T19:00:00.000Z', endsAt: '2031-05-17T21:00:00.000Z'}), 'an hour later is a change');
+  assert.notEqual(contentHash(weekly), contentHash({...rolled, sourceRrule: 'FREQ=WEEKLY;BYDAY=SU'}));
+  assert.equal(describeChange(single, {...single, title: 'Jam night', description: 'New text'}, now), 'SOURCE_CHANGED title: "Jam" → "Jam night"; description');
+  assert.deepEqual(readSync({sync: {hash: 'h', writtenAt: 't', missing: 0, pending: 'DROP', other: 1}}), {hash: 'h', writtenAt: 't'});
+  assert.deepEqual(readSync(null), {});
+});
 const messageKeys = (locale: string) => JSON.parse(readFileSync(new URL('../src/lib/telegram/messages/' + locale + '.json', import.meta.url), 'utf8')) as Record<string, string>;
 test('bot messages: en, es and ru have the same keys and placeholders', () => {
   const [en, es, ru] = ['en', 'es', 'ru'].map(messageKeys), placeholders = (value: string) => (value.match(/\{\w+\}/g) || []).sort().join();

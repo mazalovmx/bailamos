@@ -8,8 +8,10 @@ export const loadEvent=cache((slug:string)=>db.event.findUnique({where:{slug},in
   members:{include:{profile:{select:{id:true,handle:true,name:true,type:true,userId:true,hiddenAt:true}}}}}}));
 export type LoadedEvent=NonNullable<Awaited<ReturnType<typeof loadEvent>>>;
 // The date a visitor is looking at: the one named in ?date=, else the next upcoming one, else the last one.
+// A link made before a date was moved names its original start and still finds it.
 export function pickOccurrence(event:Pick<LoadedEvent,'occurrences'>,requested?:string,now=new Date()) {
   return event.occurrences.find(o=>o.startsAt.toISOString()===requested)
+    ||event.occurrences.find(o=>!!requested&&o.originalStartsAt?.toISOString()===requested)
     ||event.occurrences.find(o=>!o.cancelled&&o.startsAt>=now)||event.occurrences.at(-1)||null;
 }
 export function eventLinks(slug:string,locale:string,shortCode?:string|null) {

@@ -14,7 +14,7 @@ export async function GET(request: Request, {params}: Context) {
     const {id}=await params,user=await viewer(request);
     const event=await db.event.findUnique({where:{id},include:{members:{select:{profileId:true,role:true}},city:{select:{id:true,name:true,countryCode:true}},
       venue:{select:{id:true,name:true,address:true,lat:true,lng:true,hiddenAt:true}},styles:{select:{styleId:true}},tags:{select:{tagId:true}},
-      occurrences:{orderBy:{startsAt:'asc'},select:{id:true,startsAt:true,endsAt:true,cancelled:true}}}});
+      occurrences:{orderBy:{startsAt:'asc'},select:{id:true,startsAt:true,endsAt:true,cancelled:true,originalStartsAt:true}}}});
     if (!event || (!isPublic(event) && !eventAbility(user?.profile?.id,event.members,managesSchool(user,event.schoolProfileId)).can('manage','Event'))) throw new ApiError('NOT_FOUND',404);
     const venue=event.venue&&!event.venue.hiddenAt?{id:event.venue.id,name:event.venue.name,address:event.venue.address,lat:event.venue.lat,lng:event.venue.lng}:null;
     return Response.json({id:event.id,slug:event.slug,shortCode:event.shortCode,title:event.title,description:event.description,status:event.status,

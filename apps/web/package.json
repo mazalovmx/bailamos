@@ -7,9 +7,10 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1 --port 3000",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test --test-concurrency=1 tests/domain.test.ts tests/account.test.ts tests/catalogue.test.ts tests/geo.test.ts tests/calendar.test.ts tests/media.test.ts tests/events.test.ts tests/moderation.test.ts tests/blog.test.ts tests/chat.test.ts tests/notifications.test.ts tests/matching.test.ts tests/courses.test.ts tests/import.test.ts tests/schools.test.ts",
+    "test": "tsx --test --test-concurrency=1 tests/domain.test.ts tests/account.test.ts tests/catalogue.test.ts tests/geo.test.ts tests/calendar.test.ts tests/media.test.ts tests/events.test.ts tests/moderation.test.ts tests/blog.test.ts tests/chat.test.ts tests/notifications.test.ts tests/matching.test.ts tests/courses.test.ts tests/import.test.ts tests/schools.test.ts tests/search.test.ts tests/ops.test.ts tests/parse.test.ts tests/mute.test.ts",
     "test:e2e": "tsx --test tests/workflow.test.ts",
-    "worker": "tsx src/worker/index.ts"
+    "worker": "tsx src/worker/index.ts",
+    "smoke:deepseek": "tsx scripts/deepseek-smoke.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1144.0",
@@ -32,6 +33,7 @@
     "bullmq": "6.3.11",
     "cheerio": "1.2.0",
     "dotenv": "18.0.5",
+    "driver.js": "1.8.0",
     "ical-generator": "11.1.2",
     "ioredis": "6.0.0",
     "luxon": "3.7.2",
@@ -46,9 +48,9 @@
     "rss-parser": "3.13.0",
     "sharp": "0.35.5",
     "supercluster": "9.1.0",
+    "tsx": "^4.23.15",
     "web-push": "3.6.7",
-    "zod": "4.6.5",
-    "tsx": "^4.23.15"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/luxon": "3.7.6",

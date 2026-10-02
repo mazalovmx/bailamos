@@ -20,14 +20,17 @@ export async function GET(request: Request, {params}: Context) {
       author: profile && {handle: profile.handle, name: profile.name}}, {headers: {'Cache-Control': 'no-store'}});
   } catch (error) {return blogFail(error);}
 }
-// PATCH {title?, content?, eventId?, published?} — saves and/or publishes or unpublishes, in one request.
+// PATCH {title?, content?, eventId?, published?, updatedAt?, autosave?} — saves and/or publishes or unpublishes, in one request.
+// `updatedAt` is the version the editor holds: an older one is refused with 409 STALE_POST. `autosave: true` is the
+// editor's background save; it is accepted for drafts only (409 AUTOSAVE_PUBLISHED otherwise) and has its own limit.
+// A page that is closing sends the same request with fetch keepalive.
 export async function PATCH(request: Request, {params}: Context) {
   try {
     const {id} = await params, user = await actor(request);
     const input = patchInput.parse(await postBody(request));
     const post = await postFor(user, id, input.published === undefined ? 'update' : 'publish');
-    await limited('post-save:' + user.id, {limit: 120, windowSec: 600});
-    const saved = await savePost(post, input);
+    await limited((input.autosave ? 'post-autosave:' : 'post-save:') + user.id, {limit: input.autosave ? 180 : 120, windowSec: 600});
+    const saved = await savePost(post, input, {actorProfileId: user.profile?.id, excludeNotificationUserId: user.id});
     return Response.json({id: saved.id, slug: saved.slug, handle: saved.profile.handle, title: saved.title, excerpt: saved.excerpt,
       eventId: saved.eventId, publishedAt: saved.publishedAt, updatedAt: saved.updatedAt});
   } catch (error) {return blogFail(error);}

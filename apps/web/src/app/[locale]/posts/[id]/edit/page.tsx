@@ -11,7 +11,7 @@ export const metadata = {robots: {index: false, follow: false}};
 export default async function EditPost({params}: {params: Promise<{locale: string; id: string}>}) {
   const {locale, id} = await params, user = await currentUser();
   if (!user) redirect('/' + locale + '/login');
-  const post = /^[A-Za-z0-9_-]{1,64}$/.test(id) ? await db.post.findUnique({where: {id}, include: {profile: {select: {handle: true}}}}) : null;
+  const post = /^[A-Za-z0-9_-]{1,64}$/.test(id) ? await db.post.findUnique({where: {id}, include: {profile: {select: {handle: true, name: true}}}}) : null;
   // Somebody else's post does not exist here, published or not.
   if (!post || !canPost(user, 'update', post)) notFound();
   const t = await getTranslations('Blog');
@@ -26,6 +26,6 @@ export default async function EditPost({params}: {params: Promise<{locale: strin
     <h1>{t('editPostTitle')}</h1>
     {post.hiddenAt && <p className="notice" role="status">{t('hiddenNotice')}</p>}
     <PostEditor events={options} post={{id: post.id, title: post.title, content: post.content, published: !!post.publishedAt, slug: post.slug,
-      handle: post.profile.handle, eventId: options.some(option => option.id === post.eventId) ? post.eventId : null}}/>
+      updatedAt: post.updatedAt.toISOString(), handle: post.profile.handle, publisher: post.profileId === user.profile?.id ? null : post.profile.name, eventId: options.some(option => option.id === post.eventId) ? post.eventId : null}}/>
   </main>;
 }

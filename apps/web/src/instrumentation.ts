@@ -9,11 +9,22 @@ function endpoint(dsn: string) {
     return {url: url.protocol + '//' + url.host + '/api/' + project + '/envelope/', key: url.username};
   } catch {return null;}
 }
+// Node.js server only: the modules behind these imports (Redis, Prisma, SMTP) do not exist in the Edge runtime, and the
+// literal comparison lets the bundler drop the branch there.
+export async function register() {
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    // The worker cannot report its own death, so the web process watches the heartbeat as well (lib/ops/alerts.ts).
+    const {startWebWatchdog} = await import('./lib/ops/alerts');
+    startWebWatchdog();
+  }
+}
 export async function onRequestError(error: unknown, request: RequestInfo, context: ErrorContext) {
   const err = error instanceof Error ? error : new Error(String(error));
   // The query string may carry tokens (invites, unsubscribe): only the path is recorded.
   const path = request.path.split('?')[0];
   console.error(JSON.stringify({level: 'error', event: 'request_error', message: err.message, path, method: request.method, route: context.routePath}));
+  // Counted for the error-rate alert; a failure to count must never mask the original error.
+  if (process.env.NEXT_RUNTIME === 'nodejs') await import('./lib/ops/alerts').then(ops => ops.recordError('request')).catch(() => undefined);
   const target = process.env.SENTRY_DSN ? endpoint(process.env.SENTRY_DSN) : null;
   if (!target) return;
   const eventId = crypto.randomUUID().replace(/-/g, ''), sentAt = new Date().toISOString();

@@ -56,12 +56,13 @@ export function CalendarView({locale, filters}: {locale: string; filters: Calend
         end: o.endsAt ? (mine ? wallClock(o.endsAt, zone) : o.localEnd!) : undefined,
         url: '/' + locale + '/events/' + o.slug + '?date=' + encodeURIComponent(o.startsAt),
         classNames: o.cancelled ? ['is-cancelled'] : [],
-        extendedProps: {zone: zoneLabel(o.startsAt, shown, locale), place: o.venue ? o.venue + ', ' + o.city.name : o.city.name, cancelled: o.cancelled}};
+        extendedProps: {zone: zoneLabel(o.startsAt, shown, locale), place: o.venue ? o.venue + ', ' + o.city.name : o.city.name, cancelled: o.cancelled, moved: o.moved}};
     });
   }, [query, mine, zone, locale]);
   function content(arg: EventContentArg) {
-    const {zone: label, place, cancelled} = arg.event.extendedProps as {zone: string; place: string; cancelled: boolean};
-    const flag = cancelled && <span className="cal-cancelled"> {t('cancelled')}</span>;
+    const {zone: label, place, cancelled, moved} = arg.event.extendedProps as {zone: string; place: string; cancelled: boolean; moved: boolean};
+    // A cancelled date says so; otherwise a date that was moved on its own is marked as rescheduled.
+    const flag = cancelled ? <span className="cal-cancelled"> {t('cancelled')}</span> : moved && <span className="cal-meta"> · {t('rescheduled')}</span>;
     // The list view has its own time column; its title cell needs a real link for keyboard users.
     if (arg.view.type.startsWith('list')) return <><a className="cal-title" href={arg.event.url}>{arg.event.title}</a><span className="cal-meta"> {place} · {label}</span>{flag}</>;
     return <><span className="cal-time">{arg.timeText} {label}</span> <span className="cal-title">{arg.event.title}</span><span className="cal-meta"> {place}</span>{flag}</>;

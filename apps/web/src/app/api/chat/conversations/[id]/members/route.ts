@@ -9,12 +9,11 @@ export async function POST(request: Request, {params}: Context) {
     return Response.json(await inviteMember(me, (await params).id, await jsonBody(request)), {status: 201});
   } catch (error) {return apiError(error);}
 }
-// {profileId} removes a member (group admins only); without it the caller leaves.
+// {profileId} or {handle} removes a member (group admins only); without either the caller leaves.
 export async function DELETE(request: Request, {params}: Context) {
   try {
     const me = await chatActor(request);
-    const {profileId} = removeInput.parse(await jsonBody(request));
-    await leaveConversation(me, (await params).id, profileId);
+    await leaveConversation(me, (await params).id, removeInput.parse(await jsonBody(request)));
     return Response.json({ok: true});
   } catch (error) {return apiError(error);}
 }

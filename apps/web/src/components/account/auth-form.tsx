@@ -11,8 +11,8 @@ export function AuthForm({mode, token, google = false, initialError, next}: {mod
   const [done, setDone] = useState<'' | 'register' | 'forgot' | 'reset' | 'magic'>('');
   const [magic, setMagic] = useState(false);
   const home = '/' + locale;
-  // Where a successful sign-in lands: the page that asked for it (validated on the server), else the profile.
-  const after = next || home + '/profile';
+  // Return to the requested page (validated on the server), otherwise open the account dashboard.
+  const after = next || home + '/account';
   const title = {login: 'loginTitle', register: 'registerTitle', forgot: 'forgotTitle', reset: 'resetTitle'}[mode];
   const doneText = {register: app('checkEmail'), forgot: app('resetSent'), reset: app('passwordSaved'), magic: t('magicSent')};
   const usePassword = mode === 'register' || mode === 'reset' || (mode === 'login' && !magic);

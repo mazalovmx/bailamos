@@ -6,6 +6,8 @@ import {INSTAGRAM_PERMALINK, safeHref} from './nodes';
 export type ImageProps = {storageKey: string; alt: string; width?: number | null; height?: number | null};
 export type InstagramProps = {permalink: string; meta: {author?: string; title?: string; thumbnailUrl?: string}};
 export type RenderComponents = {Image: ComponentType<ImageProps>; Instagram: ComponentType<InstagramProps>};
+/** Cached oEmbed fields by permalink, read from the MediaItem rows of the post; they win over what the body carries. */
+export type StoredEmbeds = ReadonlyMap<string, InstagramProps['meta']>;
 export const USER_LINK_REL = 'nofollow ugc noopener';
 type Node = {type?: unknown; text?: unknown; attrs?: Record<string, unknown>; marks?: unknown; content?: unknown};
 const str = (value: unknown) => typeof value === 'string' && value ? value : undefined;
@@ -22,9 +24,9 @@ function inline(node: Node, key: number): ReactNode {
   if (href) out = <a href={href} rel={USER_LINK_REL}>{out}</a>;
   return <Fragment key={key}>{out}</Fragment>;
 }
-function block(node: Node, key: number, parts: RenderComponents, depth: number): ReactNode {
+function block(node: Node, key: number, parts: RenderComponents, depth: number, embeds?: StoredEmbeds): ReactNode {
   if (depth > 14) return null;
-  const inlines = () => children(node).map(inline), blocks = () => children(node).map((child, index) => block(child, index, parts, depth + 1));
+  const inlines = () => children(node).map(inline), blocks = () => children(node).map((child, index) => block(child, index, parts, depth + 1, embeds));
   const attrs = node.attrs && typeof node.attrs === 'object' ? node.attrs : {};
   switch (node.type) {
     case 'paragraph': return <p key={key}>{inlines()}</p>;
@@ -41,12 +43,12 @@ function block(node: Node, key: number, parts: RenderComponents, depth: number):
     case 'instagram': {
       const permalink = str(attrs.permalink);
       return permalink && INSTAGRAM_PERMALINK.test(permalink) ? <div key={key} className="post-embed">
-        <parts.Instagram permalink={permalink} meta={{author: str(attrs.author), title: str(attrs.title), thumbnailUrl: str(attrs.thumbnailUrl)}}/></div> : null;
+        <parts.Instagram permalink={permalink} meta={embeds?.get(permalink) ?? {author: str(attrs.author), title: str(attrs.title), thumbnailUrl: str(attrs.thumbnailUrl)}}/></div> : null;
     }
     default: return null;
   }
 }
-export function renderContent(doc: unknown, parts: RenderComponents): ReactNode {
+export function renderContent(doc: unknown, parts: RenderComponents, embeds?: StoredEmbeds): ReactNode {
   if (!doc || typeof doc !== 'object' || (doc as Node).type !== 'doc') return null;
-  return children(doc as Node).map((node, index) => block(node, index, parts, 0));
+  return children(doc as Node).map((node, index) => block(node, index, parts, 0, embeds));
 }

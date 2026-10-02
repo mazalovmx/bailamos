@@ -10,7 +10,8 @@ import {EventCard} from '../../../../../../components/event-card';
 import {ReportButton} from '../../../../../../components/moderation/report-button';
 import {postJsonLd, safeJson} from '../../../../../../lib/blog/jsonld';
 import {absoluteUrl, alternates, postPath, postsPath, rssPath} from '../../../../../../lib/blog/links';
-import {firstImage, withoutImages} from '../../../../../../lib/blog/nodes';
+import {readEmbeds, refreshEmbeds} from '../../../../../../lib/blog/embeds';
+import {firstImage, withoutEmbeds, withoutImages} from '../../../../../../lib/blog/nodes';
 import {canPost} from '../../../../../../lib/blog/permissions';
 import {publicPostWhere} from '../../../../../../lib/blog/posts';
 import {isFollowing} from '../../../../../../lib/catalogue/follows';
@@ -26,12 +27,17 @@ const publicPost = cache(async (handle: string, slug: string) => {
     id: true, slug: true, title: true, excerpt: true, content: true, publishedAt: true, updatedAt: true, hiddenAt: true, profileId: true,
     profile: {select: {id: true, handle: true, name: true, type: true}},
     event: {include: {city: true, styles: {include: {style: true}}}},
-    // Photos hidden by moderation leave the page even though the stored body still names them.
-    media: {where: {hiddenAt: {not: null}}, select: {id: true}}}});
+    // Photos and embeds hidden by moderation leave the page even though the stored body still names them.
+    // The Instagram cards are drawn from the rows stored with the post, so they survive an outage on Meta's side.
+    media: {where: {OR: [{hiddenAt: {not: null}}, {kind: 'instagram'}]},
+      select: {id: true, kind: true, sourceUrl: true, embedMeta: true, embedFetched: true, hiddenAt: true}}}});
   if (!post?.publishedAt || !post.slug) return null;
-  const content = withoutImages(post.content, new Set(post.media.map(item => item.id)));
+  const {embeds, hidden, stale} = readEmbeds(post.media);
+  const content = withoutEmbeds(withoutImages(post.content, new Set(post.media.filter(item => item.kind === 'upload').map(item => item.id))), hidden);
+  // Copies older than a day are refreshed in the background; a failure keeps the stored copy.
+  if (stale.length) void refreshEmbeds(stale).catch(() => undefined);
   const event = post.event && post.event.status !== 'DRAFT' && !post.event.hiddenAt ? post.event : null;
-  return {...post, publishedAt: post.publishedAt, slug: post.slug, content, event};
+  return {...post, publishedAt: post.publishedAt, slug: post.slug, content, event, embeds};
 });
 export async function generateMetadata({params}: Params): Promise<Metadata> {
   const {locale, handle, slug} = await params, post = await publicPost(handle, slug);
@@ -68,7 +74,7 @@ export default async function PostPage({params}: Params) {
             {new Intl.DateTimeFormat(locale, {dateStyle: 'long', timeZone: 'UTC'}).format(post.publishedAt)}</time>
         </p>
       </header>
-      <PostBody content={post.content}/>
+      <PostBody content={post.content} embeds={post.embeds}/>
     </article>
     {post.event && <section className="post-section" aria-labelledby="post-event-title">
       <h2 id="post-event-title">{t('wasHere')}</h2>

@@ -47,6 +47,9 @@ importers:
       dotenv:
         specifier: 18.0.5
         version: 18.0.5
+      driver.js:
+        specifier: 1.8.0
+        version: 1.8.0
       next:
         specifier: 15.5.27
         version: 15.5.27(@types/node@22.20.4)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -132,6 +135,9 @@ importers:
       dotenv:
         specifier: 18.0.5
         version: 18.0.5
+      driver.js:
+        specifier: 1.8.0
+        version: 1.8.0
       ical-generator:
         specifier: 11.1.2
         version: 11.1.2(@types/luxon@3.7.6)(@types/node@22.20.4)(luxon@3.7.2)(rrule@2.8.1)
@@ -1755,6 +1761,9 @@ packages:
     resolution: {integrity: sha512-aBrGvt6KhjxbEnatqMWOMidftwsrCiCvqh1yNIGB9QyF0J+VcWkKDMsvYOEm7ZS82oiV+BT1sTOtIlAmUlTpwQ==}
     engines: {node: '>=12'}
     hasBin: true
+
+  driver.js@1.8.0:
+    resolution: {integrity: sha512-+8/IO7h1v14IzWh2GP60N7T3PFZweXwdn5e5POuxRSBoCYUojsBxzqawPeXh3YZIibRy7EehYNEyxe7slwwtdg==}
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -4084,6 +4093,8 @@ snapshots:
   dotenv@16.6.1: {}
 
   dotenv@18.0.5: {}
+
+  driver.js@1.8.0: {}
 
   dunder-proto@1.0.1:
     dependencies:

@@ -4,6 +4,7 @@ import {pageStaff} from '../../lib/guard';
 import {schoolList,schoolResources} from '../../lib/schools';
 import {SchoolsPanel} from '../../components/schools-panel';
 import {webOrigin} from '../../lib/env';
+import {SchoolGuide} from '../../components/school-guide';
 export const dynamic='force-dynamic';
 export default async function Schools({searchParams}:{searchParams:Promise<{school?:string}>}){
   const user=await pageStaff(true);
@@ -16,5 +17,5 @@ export default async function Schools({searchParams}:{searchParams:Promise<{scho
     db.city.findMany({select:{id:true,name:true},orderBy:{name:'asc'}}),
     db.danceStyle.findMany({select:{id:true,name:true},orderBy:{name:'asc'}}),
     global&&schoolId?db.schoolAdmin.findMany({where:{schoolProfileId:schoolId},select:{user:{select:{email:true,name:true}}}}):[]]);
-  return <SchoolsPanel webUrl={webOrigin()} global={global} schools={schools} schoolId={schoolId} data={JSON.parse(JSON.stringify(data))} cities={cities} styles={styles} admins={admins.map(a=>a.user)}/>;
+  return <><SchoolGuide userId={user.id} global={global}/><SchoolsPanel webUrl={webOrigin()} global={global} schools={schools} schoolId={schoolId} data={JSON.parse(JSON.stringify(data))} cities={cities} styles={styles} admins={admins.map(a=>a.user)}/></>;
 }

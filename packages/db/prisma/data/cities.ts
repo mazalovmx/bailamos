@@ -1,9 +1,47 @@
 import {additionalCities} from '../catalogue-additions';
 // Cities available for publishing and navigation. Slugs are permanent (they double as ids for seeded rows).
 // Coordinates are approximate city centres, never event venues. Time zones are IANA identifiers.
-export type CityRow = {slug: string; name: string; countryCode: string; timezone: string; lat: number; lng: number};
-const c = (slug: string, name: string, countryCode: string, timezone: string, lat: number, lng: number): CityRow => ({slug, name, countryCode, timezone, lat, lng});
-export const cities: readonly CityRow[] = [
+// Names per interface language as [en, es, ru]; `name` stays the local spelling and the fallback.
+export type CityNames = {en: string; es: string; ru: string};
+const localized: Record<string, [string, string, string]> = {
+  'mexico-city':['Mexico City','Ciudad de México','Мехико'],'madrid':['Madrid','Madrid','Мадрид'],'moscow':['Moscow','Moscú','Москва'],
+  'barcelona':['Barcelona','Barcelona','Барселона'],'valencia':['Valencia','Valencia','Валенсия'],'seville':['Seville','Sevilla','Севилья'],
+  'guadalajara':['Guadalajara','Guadalajara','Гвадалахара'],'monterrey':['Monterrey','Monterrey','Монтеррей'],'saint-petersburg':['Saint Petersburg','San Petersburgo','Санкт-Петербург'],
+  'kazan':['Kazan','Kazán','Казань'],'berlin':['Berlin','Berlín','Берлин'],'paris':['Paris','París','Париж'],
+  'london':['London','Londres','Лондон'],'lisbon':['Lisbon','Lisboa','Лиссабон'],'stockholm':['Stockholm','Estocolmo','Стокгольм'],
+  'new-york':['New York','Nueva York','Нью-Йорк'],'buenos-aires':['Buenos Aires','Buenos Aires','Буэнос-Айрес'],'bogota':['Bogotá','Bogotá','Богота'],
+  'malaga':['Málaga','Málaga','Малага'],'bilbao':['Bilbao','Bilbao','Бильбао'],'porto':['Porto','Oporto','Порту'],
+  'lyon':['Lyon','Lyon','Лион'],'toulouse':['Toulouse','Toulouse','Тулуза'],'amsterdam':['Amsterdam','Ámsterdam','Амстердам'],
+  'brussels':['Brussels','Bruselas','Брюссель'],'munich':['Munich','Múnich','Мюнхен'],'hamburg':['Hamburg','Hamburgo','Гамбург'],
+  'cologne':['Cologne','Colonia','Кёльн'],'vienna':['Vienna','Viena','Вена'],'zurich':['Zurich','Zúrich','Цюрих'],
+  'rome':['Rome','Roma','Рим'],'milan':['Milan','Milán','Милан'],'manchester':['Manchester','Mánchester','Манчестер'],
+  'edinburgh':['Edinburgh','Edimburgo','Эдинбург'],'dublin':['Dublin','Dublín','Дублин'],'copenhagen':['Copenhagen','Copenhague','Копенгаген'],
+  'oslo':['Oslo','Oslo','Осло'],'gothenburg':['Gothenburg','Gotemburgo','Гётеборг'],'helsinki':['Helsinki','Helsinki','Хельсинки'],
+  'warsaw':['Warsaw','Varsovia','Варшава'],'krakow':['Kraków','Cracovia','Краков'],'prague':['Prague','Praga','Прага'],
+  'budapest':['Budapest','Budapest','Будапешт'],'bucharest':['Bucharest','Bucarest','Бухарест'],'sofia':['Sofia','Sofía','София'],
+  'athens':['Athens','Atenas','Афины'],'belgrade':['Belgrade','Belgrado','Белград'],'zagreb':['Zagreb','Zagreb','Загреб'],
+  'ljubljana':['Ljubljana','Liubliana','Любляна'],'vilnius':['Vilnius','Vilna','Вильнюс'],'riga':['Riga','Riga','Рига'],
+  'tallinn':['Tallinn','Tallin','Таллин'],'istanbul':['Istanbul','Estambul','Стамбул'],'novosibirsk':['Novosibirsk','Novosibirsk','Новосибирск'],
+  'yekaterinburg':['Yekaterinburg','Ekaterimburgo','Екатеринбург'],'nizhny-novgorod':['Nizhny Novgorod','Nizhni Nóvgorod','Нижний Новгород'],'krasnodar':['Krasnodar','Krasnodar','Краснодар'],
+  'rostov-on-don':['Rostov-on-Don','Rostov del Don','Ростов-на-Дону'],'samara':['Samara','Samara','Самара'],'minsk':['Minsk','Minsk','Минск'],
+  'kyiv':['Kyiv','Kiev','Киев'],'almaty':['Almaty','Almaty','Алматы'],'astana':['Astana','Astaná','Астана'],
+  'tashkent':['Tashkent','Taskent','Ташкент'],'tbilisi':['Tbilisi','Tiflis','Тбилиси'],'yerevan':['Yerevan','Ereván','Ереван'],
+  'baku':['Baku','Bakú','Баку'],'los-angeles':['Los Angeles','Los Ángeles','Лос-Анджелес'],'san-francisco':['San Francisco','San Francisco','Сан-Франциско'],
+  'seattle':['Seattle','Seattle','Сиэтл'],'chicago':['Chicago','Chicago','Чикаго'],'austin':['Austin','Austin','Остин'],
+  'new-orleans':['New Orleans','Nueva Orleans','Новый Орлеан'],'miami':['Miami','Miami','Майами'],'washington-dc':['Washington, D.C.','Washington D. C.','Вашингтон'],
+  'boston':['Boston','Boston','Бостон'],'toronto':['Toronto','Toronto','Торонто'],'montreal':['Montreal','Montreal','Монреаль'],
+  'vancouver':['Vancouver','Vancouver','Ванкувер'],'puebla':['Puebla','Puebla','Пуэбла'],'tijuana':['Tijuana','Tijuana','Тихуана'],
+  'havana':['Havana','La Habana','Гавана'],'santo-domingo':['Santo Domingo','Santo Domingo','Санто-Доминго'],'san-juan':['San Juan','San Juan','Сан-Хуан'],
+  'panama-city':['Panama City','Ciudad de Panamá','Панама'],'medellin':['Medellín','Medellín','Медельин'],'cali':['Cali','Cali','Кали'],
+  'caracas':['Caracas','Caracas','Каракас'],'quito':['Quito','Quito','Кито'],'lima':['Lima','Lima','Лима'],
+  'santiago':['Santiago','Santiago','Сантьяго'],'montevideo':['Montevideo','Montevideo','Монтевидео'],'cordoba':['Córdoba','Córdoba','Кордова'],
+  'sao-paulo':['São Paulo','São Paulo','Сан-Паулу'],'rio-de-janeiro':['Rio de Janeiro','Río de Janeiro','Рио-де-Жанейро'],'tel-aviv':['Tel Aviv','Tel Aviv','Тель-Авив'],
+  'seoul':['Seoul','Seúl','Сеул']
+};
+type BaseRow = {slug: string; name: string; countryCode: string; timezone: string; lat: number; lng: number};
+export type CityRow = BaseRow & {names: CityNames};
+const c = (slug: string, name: string, countryCode: string, timezone: string, lat: number, lng: number): BaseRow => ({slug, name, countryCode, timezone, lat, lng});
+const base: readonly BaseRow[] = [
   c('mexico-city','Ciudad de México','MX','America/Mexico_City',19.4326,-99.1332),
   c('madrid','Madrid','ES','Europe/Madrid',40.4168,-3.7038),
   c('moscow','Москва','RU','Europe/Moscow',55.7558,37.6173),
@@ -93,3 +131,8 @@ export const cities: readonly CityRow[] = [
   c('tel-aviv','Tel Aviv','IL','Asia/Jerusalem',32.0853,34.7818),
   c('seoul','Seoul','KR','Asia/Seoul',37.5665,126.978)
 ];
+export const cities: readonly CityRow[] = base.map(city => {
+  const names = localized[city.slug];
+  if (!names) throw new Error('City without localized names: ' + city.slug);
+  return {...city, names: {en: names[0], es: names[1], ru: names[2]}};
+});

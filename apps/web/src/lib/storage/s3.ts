@@ -1,8 +1,10 @@
 import {
   DeleteObjectsCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client
 } from '@aws-sdk/client-s3';
+import {createReadStream} from 'node:fs';
+import {stat} from 'node:fs/promises';
 import {getSignedUrl} from '@aws-sdk/s3-request-presigner';
-import {assertKey, UPLOAD_TTL_SEC, type Storage} from './types';
+import {assertKey, UPLOAD_TTL_SEC, type ListedObject, type Storage} from './types';
 export type S3Settings = {
   endpoint?: string; region: string; bucket: string; accessKeyId: string; secretAccessKey: string; forcePathStyle: boolean
 };
@@ -72,6 +74,23 @@ export function s3Storage(settings: S3Settings): Storage {
         if (missing(error)) return false;
         throw error;
       }
+    },
+    async list(prefix, {limit = 1000, after} = {}) {
+      if (!prefix.endsWith('/')) throw new Error('INVALID_STORAGE_KEY');
+      const found: ListedObject[] = [];
+      let token: string | undefined;
+      do {
+        const page = await client.send(new ListObjectsV2Command({Bucket, Prefix: assertKey(prefix), ContinuationToken: token,
+          MaxKeys: Math.min(1000, Math.max(limit - found.length, 1)), ...(after && !token ? {StartAfter: after} : {})}));
+        for (const object of page.Contents || []) if (object.Key && object.LastModified) found.push({key: object.Key, modified: object.LastModified, size: object.Size});
+        token = page.IsTruncated && found.length < limit ? page.NextContinuationToken : undefined;
+      } while (token);
+      return found.slice(0, Math.max(limit, 0));
+    },
+    async putFile(key, path, contentType) {
+      // The length is sent up front, so the SDK streams the file in one PUT instead of buffering it.
+      const {size} = await stat(path);
+      await client.send(new PutObjectCommand({Bucket, Key: assertKey(key), Body: createReadStream(path), ContentLength: size, ContentType: contentType}));
     }
   };
 }

@@ -119,7 +119,9 @@ function decode(body: Buffer, contentType: string | undefined) {
     || /^<\?xml[^>]*encoding=["']([\w-]+)["']/i.exec(body.subarray(0, 200).toString('latin1'))?.[1] || 'utf-8';
   try {return new TextDecoder(label).decode(body);} catch {return new TextDecoder('utf-8').decode(body);}
 }
-export type FetchOptions = {etag?: string | null; lastModified?: string | null; accept?: string; timeoutMs?: number; maxBytes?: number};
+// `check` runs for every hop (the address itself and each redirect target) after the SSRF guard and before the request;
+// it refuses by throwing. The importer uses it for robots.txt.
+export type FetchOptions = {etag?: string | null; lastModified?: string | null; accept?: string; timeoutMs?: number; maxBytes?: number; check?: (url: URL) => Promise<void>};
 export type FetchResult = {status: number; notModified: boolean; body: string; etag: string | null; lastModified: string | null; url: string};
 const MAX_REDIRECTS = 3;
 export async function safeFetch(address: string, options: FetchOptions = {}): Promise<FetchResult> {
@@ -129,6 +131,7 @@ export async function safeFetch(address: string, options: FetchOptions = {}): Pr
   const deadline = Date.now() + timeoutMs * 2;
   for (let hop = 0; ; hop++) {
     const addresses = await assertPublicUrl(url);
+    if (options.check) await options.check(url);
     await polite(url.hostname);
     const headers: Record<string, string> = {'User-Agent': importUserAgent(), Accept: options.accept || '*/*', 'Accept-Encoding': 'gzip, deflate, br'};
     if (options.etag) headers['If-None-Match'] = options.etag;

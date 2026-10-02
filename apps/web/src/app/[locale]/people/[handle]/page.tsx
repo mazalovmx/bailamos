@@ -2,6 +2,8 @@ import {db} from '@dance/db';
 import {cache} from 'react';
 import type {Metadata} from 'next';
 import {getTranslations} from 'next-intl/server';
+import {cityLabeler} from '../../../../lib/catalogue/data';
+
 import {notFound} from 'next/navigation';
 import Link from 'next/link';
 import {currentUser} from '../../../../lib/session';
@@ -27,7 +29,7 @@ export async function generateMetadata({params}: Params): Promise<Metadata> {
   if (!profile) return {robots: {index: false}};
   const t = await getTranslations({locale, namespace: 'Account'}), app = await getTranslations({locale, namespace: 'App'});
   const origin = siteUrl(), canonical = origin + '/@' + profile.handle;
-  const place = [profile.city?.name, profile.district].filter(Boolean).join(', ');
+  const place = [(await cityLabeler(locale))(profile.city?.name), profile.district].filter(Boolean).join(', ');
   const description = (profile.bio || (place ? t('metaDescription', {name: profile.name, type: app(profile.type), place}) :
     t('metaDescriptionNoPlace', {name: profile.name, type: app(profile.type)}))).slice(0, 160);
   const title = profile.name + ' (@' + profile.handle + ')';
@@ -49,7 +51,7 @@ export default async function PublicProfile({params}: Params) {
   const stub = profile.userId === null, own = !!user && canEditProfile(user.id, profile);
   const claim = stub && user ? await db.profileClaim.findUnique({where: {profileId_userId: {profileId: profile.id, userId: user.id}}, select: {status: true}}) : null;
   const upcoming = events.map(e => ({...e, next: e.occurrences[0]?.startsAt ?? e.startsAt})).sort((a, b) => a.next.getTime() - b.next.getTime());
-  const place = [profile.city?.name, profile.district].filter(Boolean).join(' · ');
+  const label = await cityLabeler(locale), place = [label(profile.city?.name), profile.district].filter(Boolean).join(' · ');
   return <main className="detail-page">
     {/* JSON-LD is a data block, not executable script, so it is CSP-safe; "<" is escaped so user text cannot close the element. */}
     <script type="application/ld+json" dangerouslySetInnerHTML={{__html: safeJson(profileJsonLd(profile, siteUrl()))}}/>
@@ -74,7 +76,7 @@ export default async function PublicProfile({params}: Params) {
       <div className="tags">{profile.skills.map((s, i) => <span key={i}>{s.style.name} · {app(s.role)} · {app(s.level)}</span>)}</div></section>}
     <section className="profile-section" aria-labelledby="events-title"><h2 id="events-title">{t('upcomingEvents')}</h2>
       {upcoming.length ? <ul className="profile-events">{upcoming.map(e => <li key={e.id}><Link href={'/' + locale + '/events/' + e.slug}>
-        <strong>{e.title}</strong><time dateTime={e.next.toISOString()}>{new Intl.DateTimeFormat(locale, {dateStyle: 'full', timeStyle: 'short', timeZone: e.timezone}).format(e.next)} · {e.city.name}</time>
+        <strong>{e.title}</strong><time dateTime={e.next.toISOString()}>{new Intl.DateTimeFormat(locale, {dateStyle: 'full', timeStyle: 'short', timeZone: e.timezone}).format(e.next)} · {label(e.city.name)}</time>
       </Link></li>)}</ul> : <p className="field-note">{t('noUpcomingEvents')}</p>}
     </section>
     <ProfilePosts profileId={profile.id} handle={profile.handle} locale={locale} own={own}/>

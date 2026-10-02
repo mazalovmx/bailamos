@@ -14,12 +14,12 @@ export default async function Conversation({params}: {params: Promise<{locale: s
   const {locale, id} = await params, user = await currentUser();
   if (!user) redirect('/' + locale + '/login');
   if (!user.profile) redirect('/' + locale + '/messages');
-  const me = {userId: user.id, profileId: user.profile.id, role: user.role, name: user.profile.name};
+  const me = {userId: user.id, profileId: user.profile.id, role: user.role, name: user.profile.name, schoolIds: user.schoolIds};
   // Both calls pass the membership gate; a conversation the viewer does not belong to is a plain 404.
   const loaded = await Promise.all([conversationDetail(me, id), listMessages(me, id)]).catch(error => {
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
   });
   if (!loaded) notFound();
-  return <main className="form-page chat-page"><Thread initial={loaded[0]} initialPage={loaded[1]} myProfileId={me.profileId}/></main>;
+  return <main className="form-page chat-page"><Thread initial={loaded[0]} initialPage={loaded[1]}/></main>;
 }
