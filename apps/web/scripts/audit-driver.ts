@@ -76,6 +76,13 @@ export async function openBrowser(origin: string, outDir: string, port = 9444, w
       for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', {type, x: box.x, y: box.y, button: 'left', clickCount: 1});
       await sleep(400);
     },
+    // Chooses a local file in a file input, as the file dialog would.
+    async setFile(selector: string, file: string) {
+      const {root} = await send<{root: {nodeId: number}}>('DOM.getDocument'), {nodeId} = await send<{nodeId: number}>('DOM.querySelector', {nodeId: root.nodeId, selector});
+      if (!nodeId) throw new Error('setFile: not found ' + selector);
+      await send('DOM.setFileInputFiles', {nodeId, files: [file]});
+      await sleep(300);
+    },
     inputValue: (selector: string) => evaluate<string>(`(document.querySelector(${JSON.stringify(selector)})?.value||'')`),
     exists: (selector: string) => evaluate<boolean>(`!!document.querySelector(${JSON.stringify(selector)})`),
     text: (selector: string) => evaluate<string>(`(document.querySelector(${JSON.stringify(selector)})?.innerText||'').trim()`),
@@ -90,8 +97,9 @@ export async function openBrowser(origin: string, outDir: string, port = 9444, w
           actions:[...main.querySelectorAll('button,a.button,summary')].filter(vis).map(t).filter(Boolean).slice(0,40),
           overflowX:document.documentElement.scrollWidth>innerWidth+1}})()`);
     },
-    async shot(name: string) {
-      const {data} = await send<{data: string}>('Page.captureScreenshot', {format: 'jpeg', quality: 62, captureBeyondViewport: true});
+    // `full` captures the whole page by resizing the viewport, which also resizes maps; pass false to keep a map as it is.
+    async shot(name: string, full = true) {
+      const {data} = await send<{data: string}>('Page.captureScreenshot', {format: 'jpeg', quality: 62, captureBeyondViewport: full});
       const file = join(outDir, String(++step).padStart(2, '0') + '-' + name + '.jpg');
       await writeFile(file, Buffer.from(data, 'base64'));
       return file;

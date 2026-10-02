@@ -7,7 +7,7 @@ export const TARGETS = ['event', 'post', 'avatar', 'cover', 'chat', 'eventmap'] 
 export type UploadTarget = typeof TARGETS[number];
 const ID = '[A-Za-z0-9_-]{1,64}';
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const RAW = new RegExp('^raw/(' + ID + ')/(event|post|avatar|cover|chat)/(' + ID + ')/(' + UUID + ')$');
+const RAW = new RegExp('^raw/(' + ID + ')/(' + TARGETS.join('|') + ')/(' + ID + ')/(' + UUID + ')$');
 const BASE = new RegExp('^img/(' + ID + ')/(' + UUID + ')$');
 const VARIANT = new RegExp('^(img/' + ID + '/' + UUID + ')/(320|800|1600)\\.(avif|webp)$');
 /**

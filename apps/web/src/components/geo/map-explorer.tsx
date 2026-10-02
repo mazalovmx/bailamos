@@ -50,10 +50,21 @@ export function MapExplorer({locale, cities, styles, initial, defaults, centre}:
     }
     node.append(list);
     // One event: its photo and note are fetched on demand and added as plain elements, never as markup.
+    // The popup grows once they arrive, so the map is then moved until the whole popup is inside it.
+    const fit = () => {
+      const instance = map.current, element = popup.current?.getElement();
+      if (!instance || !element?.isConnected) return;
+      const inner = element.getBoundingClientRect(), outer = instance.getContainer().getBoundingClientRect(), gap = 12;
+      const dx = inner.right > outer.right - gap ? inner.right - outer.right + gap : inner.left < outer.left + gap ? inner.left - outer.left - gap : 0;
+      // The bottom edge keeps room for the attribution line, which sits on top of the map.
+      const dy = inner.bottom > outer.bottom - 52 ? inner.bottom - outer.bottom + 52 : inner.top < outer.top + gap ? inner.top - outer.top - gap : 0;
+      if (dx || dy) instance.panBy([dx, dy]);
+    };
     if (items.length === 1) fetch('/api/events/' + encodeURIComponent(items[0].id) + '/place').then(response => response.ok ? response.json() : null).then((place: {note: string | null; image: string | null} | null) => {
       if (!place || !node.isConnected) return;
-      if (place.image) { const image = document.createElement('img'); image.src = place.image; image.alt = t('popupPhotoAlt'); image.loading = 'lazy'; image.className = 'geo-popup-photo'; node.append(image); }
+      if (place.image) { const image = document.createElement('img'); image.src = place.image; image.alt = t('popupPhotoAlt'); image.className = 'geo-popup-photo'; image.onload = fit; node.append(image); }
       if (place.note) { const note = document.createElement('p'); note.className = 'geo-popup-note'; note.textContent = place.note; node.append(note); }
+      fit();
     }).catch(() => undefined);
     popup.current?.remove();
     popup.current = new lib.current.Popup({maxWidth: 'min(320px, 80vw)', offset: 12}).setLngLat(at).setDOMContent(node).addTo(map.current);

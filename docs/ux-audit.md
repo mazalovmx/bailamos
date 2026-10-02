@@ -62,3 +62,5 @@ Still open, in addition to the list above: the admin panel was crawled and its q
 ## Event place — 2 October 2026
 
 The announcement parser was removed at the product owner's request, so the parser findings above no longer apply. The new-event form now has one place block: country → city → address or venue, or a click on the map that fills in city and country. An exact marker is required. Scenario S9 of `audit-full.ts` covers it: a map click sets the marker and the city, the event is saved with coordinates, address and map note, and the public page and the map card endpoint show the note. Both audit scripts pass with no findings.
+
+Map photo check (`pnpm exec tsx scripts/audit-mapcard.ts`): upload in the form, preview, saved key, served file, editor, event page, and the popup on the public map at 1280 and 390 px. It found two defects, both fixed: the upload of a map photo was refused (the raw key pattern did not know the `eventmap` target), and the popup was cut off by the map edge and by its own 260 px height limit (the map now pans so the whole popup is visible).

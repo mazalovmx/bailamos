@@ -7,7 +7,7 @@ import {join} from 'node:path';
 import sharp from 'sharp';
 import {clearEmbedMemoryCache, fetchOEmbed, parseInstagramUrl, resolveEmbed, type EmbedEntry, type EmbedStore} from '../src/lib/embeds/instagram';
 import {MediaError} from '../src/lib/media/errors';
-import {baseKey, chatBaseKey, chatPrefix, isBaseKey, parseChatKey, parseRawKey, parseVariantKey, rawKey, variantKey, variantKeys} from '../src/lib/media/keys';
+import {TARGETS, baseKey, chatBaseKey, chatPrefix, isBaseKey, parseChatKey, parseRawKey, parseVariantKey, rawKey, variantKey, variantKeys} from '../src/lib/media/keys';
 import {processImage} from '../src/lib/media/process';
 import {mediaUrl, variants} from '../src/lib/media/url';
 import {rateLimit, resetMemoryRateLimits} from '../src/lib/rate-limit';
@@ -230,6 +230,8 @@ test('upload keys bind the uploader and target; variant keys and URLs are derive
   const key = rawKey('profile1', 'event', 'event1', uuid);
   assert.deepEqual(parseRawKey(key), {profileId: 'profile1', target: 'event', targetId: 'event1', uuid});
   assert.deepEqual(parseRawKey(rawKey('profile1', 'cover', undefined, uuid)), {profileId: 'profile1', target: 'cover', targetId: undefined, uuid});
+  // Every upload target must round-trip: a target missing here is refused when the file arrives.
+  for (const target of TARGETS) assert.equal(parseRawKey(rawKey('profile1', target, undefined, uuid))?.target, target, target);
   for (const bad of ['raw/profile1/event/event1/not-a-uuid', 'img/profile1/' + uuid, 'raw/profile1/video/x/' + uuid, key + '/extra', '../' + key])
     assert.equal(parseRawKey(bad), null, bad);
   const base = baseKey('profile1', uuid);
