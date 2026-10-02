@@ -1,3 +1,4 @@
+import {loginPath} from '../../../../../lib/login-path';
 import {db} from '@dance/db';
 import {getTranslations} from 'next-intl/server';
 import {notFound,redirect} from 'next/navigation';
@@ -14,7 +15,7 @@ import '../../../../styles/events.css';
 export async function generateMetadata(){const t=await getTranslations('App');return {title:t('editEvent'),robots:{index:false,follow:false}};}
 export default async function Edit({params,searchParams}:{params:Promise<{locale:string;slug:string}>;searchParams:Promise<{created?:string}>}) {
   const {locale,slug}=await params,user=await currentUser();
-  if(!user) redirect('/'+locale+'/login');
+  if(!user) redirect(loginPath(locale, '/events/'+slug+'/edit'));
   const event=await db.event.findUnique({where:{slug},include:{styles:true,tags:true,occurrences:{orderBy:{startsAt:'asc'}},
     members:{include:{profile:{select:{id:true,handle:true,name:true,type:true,userId:true}}}}}});
   const ability=eventAbility(user.profile?.id,event?.members||[],managesSchool(user,event?.schoolProfileId));

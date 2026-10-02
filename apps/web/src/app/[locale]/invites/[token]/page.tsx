@@ -5,7 +5,7 @@ import {findInvite,inviteState,inviteMatches} from '../../../../lib/events/invit
 import {InviteAnswer} from '../../../../components/events/manage';
 import '../../../styles/events.css';
 // The token is a secret: keep the page out of indexes and do not send it on as a referrer.
-export const metadata={robots:{index:false,follow:false},referrer:'no-referrer' as const};
+export async function generateMetadata(){const x=await getTranslations('EventsX');return {title:x('inviteTitle'),robots:{index:false,follow:false},referrer:'no-referrer' as const};}
 export default async function InvitePage({params}:{params:Promise<{locale:string;token:string}>}) {
   const {locale,token}=await params,x=await getTranslations('EventsX'),t=await getTranslations('App');
   const user=await currentUser();

@@ -1,3 +1,4 @@
+import {loginPath} from '../../../../lib/login-path';
 import {getTranslations} from 'next-intl/server';
 import {notFound, redirect} from 'next/navigation';
 import {currentUser} from '../../../../lib/session';
@@ -12,7 +13,7 @@ export async function generateMetadata() {
 }
 export default async function Conversation({params}: {params: Promise<{locale: string; id: string}>}) {
   const {locale, id} = await params, user = await currentUser();
-  if (!user) redirect('/' + locale + '/login');
+  if (!user) redirect(loginPath(locale, '/messages/' + id));
   if (!user.profile) redirect('/' + locale + '/messages');
   const me = {userId: user.id, profileId: user.profile.id, role: user.role, name: user.profile.name, schoolIds: user.schoolIds};
   // Both calls pass the membership gate; a conversation the viewer does not belong to is a plain 404.

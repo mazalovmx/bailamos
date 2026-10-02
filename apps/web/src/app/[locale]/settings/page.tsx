@@ -1,3 +1,4 @@
+import {loginPath} from '../../../lib/login-path';
 import {db} from '@dance/db';
 import {getTranslations} from 'next-intl/server';
 import {headers} from 'next/headers';
@@ -17,7 +18,7 @@ export async function generateMetadata() {
 }
 export default async function Settings({params, searchParams}: {params: Promise<{locale: string}>; searchParams: Promise<{emailChanged?: string; error?: string}>}) {
   const {locale} = await params, query = await searchParams, user = await currentUser();
-  if (!user) redirect('/' + locale + '/login');
+  if (!user) redirect(loginPath(locale, '/settings'));
   const t = await getTranslations('Account');
   const [accounts, consents, sessions, current] = await Promise.all([
     db.account.findMany({where: {userId: user.id}, select: {providerId: true, password: true}}),

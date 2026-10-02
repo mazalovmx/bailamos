@@ -36,3 +36,25 @@ After the fixes both journeys run with no console errors and no failed requests.
 ## Not covered
 
 Admin panel screens, chat between two live users, the announcement parser with a real model key, push, PWA installation, and anything on a real phone. Screens were checked at 1280 px and 390 px only.
+
+## Signed-in pass — 2 October 2026
+
+Run with `pnpm exec tsx scripts/audit-full.ts` from `apps/web`. It signs in with the `login` / `password` entries of `.env` (never printed), crawls the site and the admin panel as that account, and drives ten scenarios in a headless browser with throwaway accounts that it deletes afterwards.
+
+Crawl: 450 site pages as the owner account, 120 as a school owner, 26 admin pages — no errors, no redirects to sign-in, no broken text.
+
+Scenarios that pass end to end: co-organizer invitation (notification → invitation page → accept → editor), cancelling one date of a series, creating an artist without a profile and its claimable page, writing and publishing a post (public page, RSS), following a school and a city and the feed, a message request (accept, reply), partner search with mutual interest and its notification, report → admin moderation queue, data export, the announcement parser against the real model, short link, .ics file, city calendar feed, twelve pages at phone width.
+
+Fixed in this pass:
+
+| Problem | Fix |
+| --- | --- |
+| Twelve personal pages (account, messages, notifications, settings, posts, profile, my events, editors) sent a signed-out visitor to sign-in without the way back | All of them return to the page that asked |
+| Posts, new post, post editor, invitation, announcement studio, sign-in and registration had no page title | Titles added |
+| An accepted invitation stayed an unread notification | It is marked read when answered |
+| The parser left the event type on "Class" for a social and failed to place "venue name, street, city" on the map | The type is read from the text; the street address is geocoded first |
+| The admin panel asked for a missing favicon on every page | Icon added |
+
+Not a defect, by design: no notification about a chat reply while the recipient was in the conversation less than a minute ago.
+
+Still open, in addition to the list above: the first-visit guide overlay covers the parser result on the new-event page; the parser leaves the required end time empty; the admin panel was crawled and its queue opened, but no moderation decision was applied.

@@ -72,6 +72,8 @@ export async function answerInvite(token:string,user:Invitee,action:'accept'|'de
     if(!owner) await tx.eventMembership.upsert({where:{eventId_profileId_role:{eventId:invite.eventId,profileId,role:'CO_ORGANIZER'}},
       create:{eventId:invite.eventId,profileId,role:'CO_ORGANIZER'},update:{}});
   });
+  // The notification that carried the invitation has done its job.
+  await db.notification.updateMany({where:{userId:user.id,type:'EVENT_INVITE',readAt:null,url:{endsWith:'/invites/'+token}},data:{readAt:now}});
   return {status:'ACCEPTED' as const,slug:invite.event.slug};
 }
 // Pending invitations for the owner's team panel. Tokens are never listed.

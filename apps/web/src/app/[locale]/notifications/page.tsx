@@ -1,3 +1,4 @@
+import {loginPath} from '../../../lib/login-path';
 import {getTranslations} from 'next-intl/server';
 import {redirect} from 'next/navigation';
 import Link from 'next/link';
@@ -11,7 +12,7 @@ export async function generateMetadata() {
 }
 export default async function Notifications({params}: {params: Promise<{locale: string}>}) {
   const {locale} = await params, user = await currentUser();
-  if (!user) redirect('/' + locale + '/login');
+  if (!user) redirect(loginPath(locale, '/notifications'));
   const t = await getTranslations('Notifications');
   const [page, unread] = await Promise.all([listNotifications(user.id, locale), unreadCount(user.id)]);
   return <main className="form-page note-page"><h1>{t('title')}</h1><p className="intro">{t('intro')}</p>

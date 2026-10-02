@@ -34,6 +34,20 @@ const LEVELS: [string, RegExp][] = [
   ['ADVANCED', /\b(advanced|avanzado)\b|продвинут/],
   ['PRO', /\b(professional|pro|profesional)\b|профессионал/]
 ];
+// The event type is read from the source text itself: the model contract has no such field.
+const KINDS: [string, RegExp][] = [
+  ['FESTIVAL', /\bfestival\b|фестивал/],
+  ['WORKSHOP', /\b(workshop|taller)\b|воркшоп|семинар/],
+  ['MASTERCLASS', /\bmaster ?class\b|мастер-?класс/],
+  ['INTENSIVE', /\b(intensive|intensivo)\b|интенсив/],
+  ['PRACTICE', /\b(practice|pr[aá]ctica|practica)\b|практик/],
+  ['SOCIAL', /\b(social|party|fiesta|milonga|night|noche)\b|вечеринк|танцевальный вечер/],
+  ['CLASS', /\b(class|classes|lesson|course|clase|clases|curso)\b|занят|урок|курс/]
+];
+export function matchKind(source: string) {
+  const text = source.toLocaleLowerCase();
+  return KINDS.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
+}
 export function matchLevel(value: string | null) {
   const text = (value || '').toLocaleLowerCase();
   return text ? LEVELS.find(([, pattern]) => pattern.test(text))?.[0] ?? null : null;
@@ -72,6 +86,8 @@ export async function toSuggestion(parsed: ParsedAnnouncement, source: string, c
   if (parsed.recurrence === 'monthly') warnings.push('RECURS_MONTHLY');
   const {matched, unmatched} = matchStyles(parsed.styles, context.styles);
   if (matched[0]) fields.styleId = matched[0].id;
+  const kind = matchKind(source);
+  if (kind) fields.kind = kind;
   const level = matchLevel(parsed.level);
   if (level) fields.level = level;
   // The price stays a string exactly as written: splitting it into amount and currency is too error-prone.
@@ -81,8 +97,15 @@ export async function toSuggestion(parsed: ParsedAnnouncement, source: string, c
   const venue = venueKey.length >= 3 ? context.venues.find(item => normalize(item.name) === venueKey) : undefined;
   if (venue) fields.venueId = venue.id;
   else if (parsed.address || parsed.venueName) {
-    const query = [parsed.venueName, parsed.address, city.name].filter(Boolean).join(', ');
-    const point = await context.geocode(query, {countryCode: city.countryCode}).catch(() => null);
+    // The street address is tried first: a venue name in front of it often confuses the geocoder.
+    const queries = [...new Set([[parsed.address, city.name], [parsed.venueName, parsed.address, city.name], [parsed.venueName, city.name]]
+      .filter(parts => parts[0]).map(parts => parts.filter(Boolean).join(', ')))];
+    let point: {lat: number; lng: number} | null = null;
+    for (const query of queries) {
+      point = await context.geocode(query, {countryCode: city.countryCode}).catch(() => null);
+      if (point && haversine(point, city) <= 150000) break;
+      point = null;
+    }
     if (point && haversine(point, city) <= 150000) {fields.lat = String(point.lat); fields.lng = String(point.lng);}
     else warnings.push('ADDRESS_NOT_FOUND');
   }

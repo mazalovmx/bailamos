@@ -86,6 +86,14 @@ export async function openBrowser(origin: string, outDir: string, port = 9444, w
       return file;
     },
     async width(value: number) {await send('Emulation.setDeviceMetricsOverride', {width: value, height: 900, deviceScaleFactor: 1, mobile: value < 600});},
+    // Signs the browser in as another account: replaces all cookies with the given Cookie header.
+    async setCookies(header: string) {
+      await send('Network.clearBrowserCookies');
+      for (const pair of header.split('; ').filter(Boolean)) {const at = pair.indexOf('='); await send('Network.setCookie', {name: pair.slice(0, at), value: pair.slice(at + 1), url: origin});}
+    },
+    // Types into the focused element, as the keyboard would (rich-text editors ignore programmatic value changes).
+    focus: (selector: string) => evaluate<boolean>(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)return false;e.focus();const r=document.createRange();r.selectNodeContents(e);r.collapse(false);const g=getSelection();g.removeAllRanges();g.addRange(r);return true})()`),
+    async type(text: string) {await send('Input.insertText', {text}); await sleep(200);},
     async close() {socket.close(); child.kill(); await sleep(400); await rm(profile, {recursive: true, force: true}).catch(() => undefined);}
   };
   return page;

@@ -198,5 +198,6 @@
   "parseField_priceText": "Precio",
   "parseField_location": "Lugar",
   "error_PARSE_CONFIRM_REQUIRED": "Confirma que has revisado los datos rellenados a partir de tu texto.",
-  "error_PARSE_LIMIT": "Demasiados textos en una hora. Rellena el formulario a mano o inténtalo más tarde."
+  "error_PARSE_LIMIT": "Demasiados textos en una hora. Rellena el formulario a mano o inténtalo más tarde.",
+  "parseField_kind": "Tipo de evento"
 }

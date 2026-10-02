@@ -43,7 +43,7 @@ test('normalization: dates checked in the city zone, venue matched, address geoc
   const base = parsedAnnouncement.parse(JSON.parse(answer({endsAtLocal: '2026-10-15T02:00', level: 'beginners', venueName: 'big mama ballroom'})));
   const withVenue = await toSuggestion(base, 'Swing Night at Big Mama, 22:00', {city, styles, venues, geocode: noGeo, now});
   assert.deepEqual(withVenue.fields, {title: 'Swing Night', description: 'Swing Night at Big Mama, 22:00', startsLocal: '2026-10-14T22:00', endsLocal: '2026-10-15T02:00',
-    styleId: 'lindy-hop', level: 'BEGINNER', priceText: '10 €', venueId: 'v1'});
+    styleId: 'lindy-hop', kind: 'SOCIAL', level: 'BEGINNER', priceText: '10 €', venueId: 'v1'});
   const near = await toSuggestion({...base, venueName: null, address: 'Gran Vía 10'}, 'x'.repeat(20), {city, styles, venues, now, geocode: async () => ({lat: 40.42, lng: -3.70})});
   assert.equal(near.fields.lat, '40.42');
   const far = await toSuggestion({...base, venueName: null, address: 'Somewhere'}, 'x'.repeat(20), {city, styles, venues, now, geocode: async () => ({lat: 48.85, lng: 2.35})});

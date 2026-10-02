@@ -198,5 +198,6 @@
   "parseField_priceText": "Price",
   "parseField_location": "Place",
   "error_PARSE_CONFIRM_REQUIRED": "Confirm that you checked the details filled in from your text.",
-  "error_PARSE_LIMIT": "Too many texts in one hour. Fill in the form by hand or try again later."
+  "error_PARSE_LIMIT": "Too many texts in one hour. Fill in the form by hand or try again later.",
+  "parseField_kind": "Event type"
 }
