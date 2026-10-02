@@ -58,7 +58,8 @@ function thumbnail(value: unknown) {
     return url.protocol === 'https:' && THUMBNAIL_HOSTS.test(url.hostname) && url.href.length <= 2000 ? url.href : undefined;
   } catch {return undefined;}
 }
-type Fetched = {ok: true; meta: EmbedMeta; html?: string} | {ok: false; retrySec: number; gone: boolean};
+// `status` is the upstream HTTP status of a refusal (absent for timeouts, network errors and unreadable answers).
+export type Fetched = {ok: true; meta: EmbedMeta; html?: string} | {ok: false; retrySec: number; gone: boolean; status?: number};
 /** One upstream call with a timeout; every failure is a value, never an exception. The permalink must already be canonical. */
 export async function fetchOEmbed(permalink: string, fetchImpl: typeof fetch = fetch): Promise<Fetched> {
   const url = endpoint();
@@ -73,7 +74,7 @@ export async function fetchOEmbed(permalink: string, fetchImpl: typeof fetch = f
       await response.body?.cancel().catch(() => {});
       // 404: the post is gone or private. Other 4xx (including "token required"): ask again later, but not on every view.
       const client = response.status >= 400 && response.status < 500 && response.status !== 429;
-      return {ok: false, gone: response.status === 404, retrySec: response.status === 404 ? 3600 : client ? 900 : 300};
+      return {ok: false, gone: response.status === 404, retrySec: response.status === 404 ? 3600 : client ? 900 : 300, status: response.status};
     }
     const body = await response.text();
     if (body.length > 200_000) return {ok: false, gone: false, retrySec: 300};
@@ -108,6 +109,8 @@ async function cacheSet(permalink: string, entry: EmbedEntry, ttlSec: number, no
   await withRedis(redis => redis.set(key, JSON.stringify(entry), 'EX', ttl));
 }
 export const clearEmbedMemoryCache = () => memory.clear();
+/** Puts an answer into the cache pages read from (the background refresh warms it, so a page view never waits for Meta). */
+export const warmEmbedCache = (permalink: string, entry: EmbedEntry, ttlSec = DAY_SEC, now = Date.now()) => cacheSet(permalink, entry, ttlSec, now);
 const inflight = new Map<string, Promise<EmbedEntry>>();
 async function defaultStore(): Promise<EmbedStore> {return (await import('./store')).dbEmbedStore;}
 async function load(permalink: string, deps: EmbedDeps, now: number): Promise<EmbedEntry> {

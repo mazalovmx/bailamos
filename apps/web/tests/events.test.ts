@@ -6,7 +6,7 @@ import {config} from 'dotenv';
 import {DateTime} from 'luxon';
 import {eventAbility} from '../src/lib/permissions';
 import {schedule, parseRecurrence, previewDates} from '../src/lib/schedule';
-import {canSeeAttendees} from '../src/lib/events/attendees';
+import {canSeeAttendees, effectiveAnswer} from '../src/lib/events/attendees';
 import {sameWallClock, zonedLabel} from '../src/lib/events/time';
 import {eventJsonLd, safeJson, offsetIso} from '../src/lib/events/jsonld';
 import {newShortCode, shortCodePattern, preferredLocale} from '../src/lib/events/short-code';
@@ -23,6 +23,10 @@ let codes: typeof import('../src/lib/events/short-code');
 let artists: typeof import('../src/lib/events/artists');
 let input: typeof import('../src/lib/event-input');
 let ApiError: typeof import('../src/lib/api')['ApiError'];
+let dateRsvp: typeof import('../src/lib/events/date-rsvp');
+let move: typeof import('../src/lib/events/move');
+let reminders: typeof import('../src/lib/notifications/reminders');
+let pageData: typeof import('../src/lib/events/page-data');
 const tag = randomUUID().slice(0, 8), mailpit = 'http://127.0.0.1:8025';
 const cityId = 'e4-city-' + tag, otherCityId = 'e4-other-' + tag, styleId = 'e4-style-' + tag;
 type Person = {userId: string; profileId: string; email: string; handle: string; name: string};
@@ -37,8 +41,11 @@ async function person(name: string, options: {locale?: string; emailEvents?: boo
   return people[name] = {userId, profileId: profile.id, email, handle, name: profile.name};
 }
 const asUser = (p: Person, verified = true) => ({id: p.userId, email: p.email, emailVerified: verified, profile: {id: p.profileId}});
-async function makeEvent(overrides: Record<string, unknown> = {}, weeks = 3) {
-  const start = DateTime.fromObject({year: 2031, month: 3, day: 4, hour: 19}, {zone: 'Europe/Madrid'});
+const defaultStart = DateTime.fromObject({year: 2031, month: 3, day: 4, hour: 19}, {zone: 'Europe/Madrid'});
+// A start nobody else uses: the reminder job claims every occurrence in its window, whoever created it.
+const lonelyStart = () => DateTime.fromObject({year: 2040, month: 1, day: 7, hour: 19}, {zone: 'Europe/Madrid'})
+  .plus({weeks: Math.floor(Math.random() * 400), minutes: Math.floor(Math.random() * 50)});
+async function makeEvent(overrides: Record<string, unknown> = {}, weeks = 3, start = defaultStart) {
   const event = await db.event.create({data: {slug: 'e4-' + randomUUID(), title: 'Weekly swing ' + tag, description: 'Test event for the E4 suite.',
     startsAt: start.toJSDate(), endsAt: start.plus({hours: 3}).toJSDate(), timezone: 'Europe/Madrid', cityId, status: 'PUBLISHED',
     rrule: weeks > 1 ? 'FREQ=WEEKLY;COUNT=' + weeks : null, members: {create: {profileId: people.owner.profileId, role: 'OWNER'}},
@@ -68,6 +75,10 @@ before(async () => {
   codes = await import('../src/lib/events/short-code');
   artists = await import('../src/lib/events/artists');
   input = await import('../src/lib/event-input');
+  dateRsvp = await import('../src/lib/events/date-rsvp');
+  move = await import('../src/lib/events/move');
+  reminders = await import('../src/lib/notifications/reminders');
+  pageData = await import('../src/lib/events/page-data');
   mailpitUp = await fetch(mailpit + '/api/v1/info', {signal: AbortSignal.timeout(1500)}).then(r => r.ok, () => false);
   await db.city.createMany({data: [{id: cityId, slug: cityId, name: 'Test City', countryCode: 'ES', timezone: 'Europe/Madrid', lat: 40.4, lng: -3.7},
     {id: otherCityId, slug: otherCityId, name: 'Other City', countryCode: 'US', timezone: 'America/New_York', lat: 40.7, lng: -74}]});
@@ -425,4 +436,237 @@ test('a viewer in another time zone sees their own clock; JSON-LD carries the ev
   assert.equal(html.includes('<'), false);
   assert.deepEqual(JSON.parse(html), JSON.parse(JSON.stringify(ld)));
   assert.equal(safeJson(String.fromCharCode(0x2028)), '"\\u2028"');
+});
+
+const ref = (p: Person) => ({id: p.profileId, handle: p.handle, name: p.name});
+
+test('effective answer: the answer for a date wins over the answer for the series', () => {
+  const answers = [null, 'GOING', 'INTERESTED', 'DECLINED'] as const;
+  for (const series of answers) for (const override of answers)
+    assert.equal(effectiveAnswer(series, override), override ?? series, series + ' / ' + override);
+  assert.equal(effectiveAnswer(undefined, undefined), null);
+  assert.equal(effectiveAnswer('GOING', 'DECLINED'), 'DECLINED', '"not this date" beats "going to the series"');
+  assert.equal(effectiveAnswer(null, 'GOING'), 'GOING', 'one date without a series answer');
+});
+
+test('counters and the attendee list are computed per date from effective answers; a one-off event is unchanged', async () => {
+  const event = await makeEvent(), {owner, going, interested, quiet, stranger} = people;
+  const [first, second, third] = event.occurrences;
+  const soon = new Date(first.startsAt.getTime() - 86400000);
+  await attendees.setRsvp(event, ref(going), 'GOING');
+  await attendees.setRsvp(event, ref(interested), 'INTERESTED');
+  // Second date only: one regular skips it, one "interested" firms up, one newcomer comes just for it.
+  assert.deepEqual(await dateRsvp.answerDate(event.id, second.id, ref(going), 'DECLINED', soon), {status: 'DECLINED', series: 'GOING', effective: 'DECLINED', going: 0, interested: 1});
+  assert.deepEqual(await dateRsvp.answerDate(event.id, second.id, ref(interested), 'GOING', soon), {status: 'GOING', series: 'INTERESTED', effective: 'GOING', going: 1, interested: 0});
+  assert.deepEqual(await dateRsvp.answerDate(event.id, second.id, ref(quiet), 'GOING', soon), {status: 'GOING', series: null, effective: 'GOING', going: 2, interested: 0});
+  const view = async (occurrenceId: string | null, viewer?: Person, visibility: 'PUBLIC' | 'ATTENDEES' | 'ORGANIZERS' = 'PUBLIC') => {
+    const r = await attendees.listAttendees({...event, attendeeVisibility: visibility}, viewer?.profileId, occurrenceId);
+    return {counts: [r.going, r.interested], names: r.visible ? r.attendees.map(a => a.handle + ':' + a.status).sort() : null, mine: [r.series, r.override, r.own]};
+  };
+  const seriesList = [going.handle + ':GOING', interested.handle + ':INTERESTED'].sort();
+  const secondList = [interested.handle + ':GOING', quiet.handle + ':GOING'].sort();
+  assert.deepEqual(await view(null), {counts: [1, 1], names: seriesList, mine: [null, null, null]}, 'without a date: the series answers');
+  assert.deepEqual(await view(first.id), {counts: [1, 1], names: seriesList, mine: [null, null, null]}, 'a date nobody answered separately');
+  assert.deepEqual(await view(third.id, going), {counts: [1, 1], names: seriesList, mine: ['GOING', null, 'GOING']});
+  assert.deepEqual(await view(second.id, going), {counts: [2, 0], names: secondList, mine: ['GOING', 'DECLINED', 'DECLINED']});
+  assert.deepEqual((await view(second.id, quiet)).mine, [null, 'GOING', 'GOING']);
+  assert.deepEqual((await view(second.id, interested)).mine, ['INTERESTED', 'GOING', 'GOING']);
+  // An occurrence id of another event changes nothing.
+  const other = await makeEvent();
+  assert.deepEqual((await view(other.occurrences[0].id)).counts, [1, 1]);
+  // Privacy per date: the counters stay public, the names follow the effective answer for that date.
+  assert.deepEqual(await view(second.id, stranger, 'ATTENDEES'), {counts: [2, 0], names: null, mine: [null, null, null]});
+  assert.deepEqual((await view(second.id, quiet, 'ATTENDEES')).names, secondList, 'going to this date only opens its list');
+  assert.equal((await view(third.id, quiet, 'ATTENDEES')).names, null, 'but not the list of a date they do not attend');
+  assert.deepEqual((await view(second.id, going, 'ATTENDEES')).names, secondList, 'a series attendee keeps access on a date they skip');
+  assert.equal((await view(second.id, quiet, 'ORGANIZERS')).names, null);
+  assert.deepEqual((await view(second.id, owner, 'ORGANIZERS')).names, secondList);
+  // Organizers hear once about a person who comes for a single date.
+  const told = await db.notification.findMany({where: {userId: owner.userId, type: 'NEW_ATTENDEE', data: {path: ['eventId'], equals: event.id}}});
+  assert.deepEqual(told.map(n => (n.data as {name: string}).name).sort(), [going.name, interested.name, quiet.name].sort());
+  // Withdrawing the series answer leaves the answer for the date; removing the date answer restores the series answer.
+  await attendees.setRsvp(event, ref(interested), 'DECLINED');
+  assert.deepEqual((await view(second.id, interested)).mine, [null, 'GOING', 'GOING']);
+  assert.deepEqual((await view(first.id)).counts, [1, 0]);
+  assert.deepEqual(await dateRsvp.answerDate(event.id, second.id, ref(going), null, soon), {status: null, series: 'GOING', effective: 'GOING', going: 3, interested: 0});
+  assert.equal(await db.occurrenceRsvp.count({where: {occurrenceId: second.id, profileId: going.profileId}}), 0);
+  // Rules of the endpoint.
+  const single = await makeEvent({}, 1), draft = await makeEvent({status: 'DRAFT'});
+  await rejects(() => dateRsvp.answerDate(single.id, single.occurrences[0].id, ref(going), 'GOING', soon), 'NOT_A_SERIES');
+  await rejects(() => dateRsvp.answerDate(event.id, other.occurrences[0].id, ref(going), 'GOING', soon), 'NOT_FOUND');
+  await rejects(() => dateRsvp.answerDate(draft.id, draft.occurrences[0].id, ref(going), 'GOING', soon), 'NOT_FOUND');
+  await rejects(() => dateRsvp.answerDate(event.id, first.id, ref(going), 'GOING', new Date(first.startsAt.getTime() + 1)), 'EVENT_UNAVAILABLE');
+  await db.eventOccurrence.update({where: {id: third.id}, data: {cancelled: true}});
+  await rejects(() => dateRsvp.answerDate(event.id, third.id, ref(going), 'INTERESTED', soon), 'EVENT_UNAVAILABLE');
+  // A one-off event has one answer and one list, as before.
+  await attendees.setRsvp(single, ref(going), 'GOING');
+  const once = await attendees.listAttendees(single, going.profileId);
+  assert.deepEqual([once.going, once.interested, once.own, once.series, once.override], [1, 0, 'GOING', 'GOING', null]);
+});
+
+test('reminders and single-date cancellations follow the effective answer for that date', async () => {
+  const event = await makeEvent({}, 3, lonelyStart()), {owner, going, interested, quiet, stranger, co} = people;
+  const [first, second] = event.occurrences;
+  await db.rsvp.createMany({data: [{eventId: event.id, profileId: going.profileId, status: 'GOING'}, {eventId: event.id, profileId: owner.profileId, status: 'GOING'},
+    {eventId: event.id, profileId: stranger.profileId, status: 'GOING'}, {eventId: event.id, profileId: interested.profileId, status: 'INTERESTED'}]});
+  await db.occurrenceRsvp.createMany({data: [{occurrenceId: second.id, profileId: going.profileId, status: 'DECLINED'}, {occurrenceId: second.id, profileId: stranger.profileId, status: 'INTERESTED'},
+    {occurrenceId: second.id, profileId: interested.profileId, status: 'GOING'}, {occurrenceId: second.id, profileId: quiet.profileId, status: 'GOING'},
+    {occurrenceId: second.id, profileId: co.profileId, status: 'INTERESTED'}]});
+  const everyone = [owner, going, interested, quiet, stranger, co];
+  const got = async (type: string, occurrenceId: string) => {
+    const rows = await db.notification.findMany({where: {userId: {in: everyone.map(p => p.userId)}, type, data: {path: ['occurrenceId'], equals: occurrenceId}}, select: {userId: true}});
+    return rows.map(r => everyone.find(p => p.userId === r.userId)!.name).sort();
+  };
+  const names = (...list: Person[]) => list.map(p => p.name).sort();
+  const before = (date: Date) => new Date(date.getTime() - 60 * 60000);
+  // First date: nobody answered separately, so everyone "going" to the series is reminded.
+  assert.ok((await reminders.sendEventReminders(before(first.startsAt))).occurrences >= 1);
+  assert.deepEqual(await got('EVENT_REMINDER', first.id), names(owner, going, stranger));
+  assert.deepEqual(await got('EVENT_REMINDER', second.id), []);
+  // Second date: "not this date" and a downgrade to "interested" silence it; "going" to this date only earns it.
+  await reminders.sendEventReminders(before(second.startsAt));
+  assert.deepEqual(await got('EVENT_REMINDER', second.id), names(owner, interested, quiet));
+  await reminders.sendEventReminders(before(second.startsAt));
+  assert.deepEqual(await got('EVENT_REMINDER', second.id), names(owner, interested, quiet), 'still once');
+  // Cancelling that date tells its effective "going" and "interested", not the regular who skips it.
+  const single = await cancel.announceCancellation(event.id, {occurrence: {id: second.id, startsAt: second.startsAt}, exceptUserId: owner.userId});
+  assert.equal(single.notified, 4);
+  assert.deepEqual(await got('EVENT_CANCELLED', second.id), names(interested, quiet, stranger, co));
+  // Cancelling the whole event also reaches people who answered for a single upcoming date only.
+  const whole = await cancel.announceCancellation(event.id, {exceptUserId: owner.userId});
+  assert.equal(whole.notified, 5, 'going, stranger, interested by series; quiet and co by a date');
+});
+
+test('moving one date: validation, DST, attendees are told, and saving the series again neither duplicates nor resurrects it', async () => {
+  const event = await makeEvent(), {owner, going, quiet} = people;
+  const mover = await person('mover', {locale: 'ru'});
+  const [first, second, third] = event.occurrences, soon = new Date(first.startsAt.getTime() - 86400000);
+  const row = (id: string) => db.eventOccurrence.findUniqueOrThrow({where: {id}});
+  await db.eventOccurrence.update({where: {id: second.id}, data: {reminderSentAt: new Date()}});
+  const stamped = (await db.event.findUniqueOrThrow({where: {id: event.id}})).updatedAt;
+  // Tuesday 11 March 19:00 becomes Wednesday 12 March 20:00–22:30, Madrid time (UTC+1).
+  const moved = await move.moveOccurrence(event, second.id, {startsLocal: '2031-03-12T20:00', endsLocal: '2031-03-12T22:30'}, soon);
+  assert.equal(moved.changed, true);
+  assert.deepEqual([moved.occurrence.startsAt.toISOString(), moved.occurrence.endsAt!.toISOString()], ['2031-03-12T19:00:00.000Z', '2031-03-12T21:30:00.000Z']);
+  assert.equal(moved.occurrence.originalStartsAt!.getTime(), second.startsAt.getTime());
+  assert.equal(moved.previous.startsAt.getTime(), second.startsAt.getTime());
+  assert.equal((await row(second.id)).reminderSentAt, null, 'a later start is reminded again');
+  assert.ok((await db.event.findUniqueOrThrow({where: {id: event.id}})).updatedAt > stamped, 'calendar exports see the change');
+  assert.equal(move.isMoved(await row(second.id)), true);
+  // Saving the same times again changes nothing and announces nothing.
+  assert.equal((await move.moveOccurrence(event, second.id, {startsLocal: '2031-03-12T20:00', endsLocal: '2031-03-12T22:30'}, soon)).changed, false);
+  // Moving earlier keeps a reminder that was already sent; the original slot is remembered through several moves.
+  await db.eventOccurrence.update({where: {id: second.id}, data: {reminderSentAt: new Date()}});
+  const earlier = await move.moveOccurrence(event, second.id, {startsLocal: '2031-03-10T20:00', endsLocal: '2031-03-10T22:00'}, soon);
+  assert.equal(earlier.occurrence.originalStartsAt!.getTime(), second.startsAt.getTime());
+  assert.notEqual((await row(second.id)).reminderSentAt, null);
+  // Not onto another date, not into the slot a moved date still stands for, not in the past, not a cancelled or one-off date.
+  await rejects(() => move.moveOccurrence(event, second.id, {startsLocal: '2031-03-18T19:00', endsLocal: '2031-03-18T22:00'}, soon), 'DATE_TAKEN');
+  await rejects(() => move.moveOccurrence(event, first.id, {startsLocal: '2031-03-11T19:00', endsLocal: '2031-03-11T22:00'}, soon), 'DATE_TAKEN');
+  await rejects(() => move.moveOccurrence(event, 'no-such-date', {startsLocal: '2031-03-12T20:00', endsLocal: '2031-03-12T22:00'}, soon), 'NOT_FOUND');
+  await rejects(() => move.moveOccurrence(event, first.id, {startsLocal: '2031-03-05T19:00', endsLocal: '2031-03-05T22:00'}, new Date(first.startsAt.getTime() + 1)), 'DATE_UNAVAILABLE');
+  await assert.rejects(() => move.moveOccurrence(event, third.id, {startsLocal: '2031-03-01T19:00', endsLocal: '2031-03-01T22:00'}, new Date(first.startsAt.getTime() + 1)), /INVALID_TIME/);
+  await assert.rejects(() => move.moveOccurrence(event, third.id, {startsLocal: '2031-03-19T22:00', endsLocal: '2031-03-19T19:00'}, soon), /INVALID_TIME/);
+  const single = await makeEvent({}, 1);
+  await rejects(() => move.moveOccurrence(single, single.occurrences[0].id, {startsLocal: '2031-03-05T19:00', endsLocal: '2031-03-05T22:00'}, soon), 'NOT_A_SERIES');
+  // DST in Madrid: 30 March 2031 has no 02:30, 26 October has it twice; the evening of 30 March is already UTC+2.
+  await assert.rejects(() => move.moveOccurrence(event, third.id, {startsLocal: '2031-03-30T02:30', endsLocal: '2031-03-30T04:00'}, soon), /INVALID_TIME/);
+  await assert.rejects(() => move.moveOccurrence(event, third.id, {startsLocal: '2031-10-26T02:30', endsLocal: '2031-10-26T04:00'}, soon), /INVALID_TIME/);
+  const summer = await move.moveOccurrence(event, third.id, {startsLocal: '2031-03-30T19:00', endsLocal: '2031-03-30T22:00'}, soon);
+  assert.equal(summer.occurrence.startsAt.toISOString(), '2031-03-30T17:00:00.000Z', '19:00 on the wall clock on the other side of the change');
+  assert.equal(DateTime.fromJSDate(summer.occurrence.startsAt, {zone: 'Europe/Madrid'}).hour, 19);
+  // Back to its slot with the usual length: an ordinary date of the series again.
+  const back = await move.moveOccurrence(event, third.id, {startsLocal: '2031-03-18T19:00', endsLocal: '2031-03-18T22:00'}, soon);
+  assert.deepEqual([back.occurrence.originalStartsAt, back.occurrence.startsAt.getTime()], [null, third.startsAt.getTime()]);
+  // A cancelled date is restored before it can be moved.
+  await db.eventOccurrence.update({where: {id: third.id}, data: {cancelled: true}});
+  await rejects(() => move.moveOccurrence(event, third.id, {startsLocal: '2031-03-19T19:00', endsLocal: '2031-03-19T22:00'}, soon), 'DATE_UNAVAILABLE');
+  await db.eventOccurrence.update({where: {id: third.id}, data: {cancelled: false}});
+  // A link that names the original start still opens the moved date.
+  const loaded = {occurrences: await db.eventOccurrence.findMany({where: {eventId: event.id}, orderBy: {startsAt: 'asc'}})};
+  assert.equal(pageData.pickOccurrence(loaded, second.startsAt.toISOString(), soon)!.id, second.id);
+  assert.equal(pageData.pickOccurrence(loaded, earlier.occurrence.startsAt.toISOString(), soon)!.id, second.id);
+  // The effective attendees of that date are told, in their language; the organizer who moved it and people who skip it are not.
+  await db.rsvp.createMany({data: [mover, going, owner].map(p => ({eventId: event.id, profileId: p.profileId, status: 'GOING' as const}))});
+  await db.occurrenceRsvp.createMany({data: [{occurrenceId: second.id, profileId: going.profileId, status: 'DECLINED'}, {occurrenceId: second.id, profileId: quiet.profileId, status: 'INTERESTED'}]});
+  const told = await move.announceMove(event.id, earlier.occurrence, second.startsAt, {exceptUserId: owner.userId});
+  assert.deepEqual(told, {notified: 2, mailed: 2});
+  const notices = await db.notification.findMany({where: {type: 'EVENT_MOVED', data: {path: ['occurrenceId'], equals: second.id}}});
+  assert.deepEqual(notices.map(n => n.userId).sort(), [mover.userId, quiet.userId].sort());
+  const note = notices.find(n => n.userId === mover.userId)!;
+  assert.deepEqual(note.data, {eventId: event.id, slug: event.slug, title: event.title, occurrenceId: second.id, startsAt: '2031-03-10T19:00:00.000Z',
+    previous: second.startsAt.toISOString(), timezone: 'Europe/Madrid'});
+  assert.equal(note.url, '/ru/events/' + event.slug + '?date=' + encodeURIComponent('2031-03-10T19:00:00.000Z'));
+  if (mailpitUp) {
+    const mail = await mailTo(mover.email);
+    assert.equal(mail.length, 1);
+    assert.match(mail[0].Subject, /^Дата перенесена: Weekly swing/);
+    const text = await (await fetch(mailpit + '/api/v1/message/' + mail[0].ID)).json() as {Text: string};
+    assert.match(text.Text, /Было: .*11 марта 2031.*19:00/);
+    assert.match(text.Text, /Стало: .*10 марта 2031.*20:00/);
+    assert.ok(text.Text.includes('/ru/events/' + event.slug + '?date='));
+  }
+  // The .ics download exports the new time under the same UID with a raised SEQUENCE.
+  const {GET} = await import('../src/app/api/events/[id]/ics/route');
+  const ics = (await (await GET(new Request('http://localhost:3000/api/events/' + event.id + '/ics'), {params: Promise.resolve({id: event.id})})).text()).replace(/\r\n[ \t]/g, '');
+  const blocks = ics.split('BEGIN:VEVENT').slice(1), exported = blocks.find(b => b.includes('UID:' + second.id + '@'))!;
+  assert.equal(blocks.length, 3);
+  assert.ok(exported.includes('DTSTART;TZID=Europe/Madrid:20310310T200000') && exported.includes('DTEND;TZID=Europe/Madrid:20310310T220000'), exported);
+  assert.ok(Number(/SEQUENCE:(\d+)/.exec(exported)![1]) > 1);
+  assert.ok(!ics.includes('20310311T190000'), 'the original time is gone');
+  assert.equal(blocks.filter(b => b.includes('SEQUENCE:0')).length, 2, 'the other dates are untouched');
+  // Saving the series again with the same dates (and a new length): the moved date stays as the organizer left it,
+  // nothing is created in its original slot, and the other dates take the new length.
+  const times = event.occurrences.map(o => ({startsAt: o.startsAt, endsAt: new Date(o.endsAt!.getTime() + 1800000)}));
+  await db.$transaction(tx => input.syncOccurrences(tx, event.id, times));
+  let rows = await db.eventOccurrence.findMany({where: {eventId: event.id}, orderBy: {startsAt: 'asc'}});
+  assert.deepEqual(rows.map(r => r.id), [first.id, second.id, third.id]);
+  assert.deepEqual(rows.map(r => r.startsAt.toISOString()), [first.startsAt.toISOString(), '2031-03-10T19:00:00.000Z', third.startsAt.toISOString()]);
+  assert.equal(rows[1].endsAt!.toISOString(), '2031-03-10T21:00:00.000Z');
+  assert.equal(rows[1].originalStartsAt!.getTime(), second.startsAt.getTime());
+  assert.deepEqual([rows[0].endsAt!.getTime(), rows[2].endsAt!.getTime()], [times[0].endsAt.getTime(), times[2].endsAt.getTime()]);
+  assert.equal(await db.occurrenceRsvp.count({where: {occurrenceId: second.id}}), 2, 'answers for the moved date survive');
+  // A series that now has a date at the very time the moved one occupies does not get a second row there.
+  const clash = {startsAt: rows[1].startsAt, endsAt: rows[1].endsAt!};
+  await db.$transaction(tx => input.syncOccurrences(tx, event.id, [...times, clash]));
+  rows = await db.eventOccurrence.findMany({where: {eventId: event.id}, orderBy: {startsAt: 'asc'}});
+  assert.deepEqual(rows.map(r => r.id), [first.id, second.id, third.id]);
+  // When the series drops the slot the moved date stood for, the moved date goes with it.
+  await db.$transaction(tx => input.syncOccurrences(tx, event.id, [times[0], times[2]]));
+  rows = await db.eventOccurrence.findMany({where: {eventId: event.id}, orderBy: {startsAt: 'asc'}});
+  assert.deepEqual(rows.map(r => r.id), [first.id, third.id]);
+});
+
+test('the preview image is a PNG that renders Cyrillic and accented Latin from the bundled font', async () => {
+  // The route file is JSX compiled by Next; outside Next, tsx uses the classic transform, which expects a global React.
+  (globalThis as {React?: unknown}).React = await import('react');
+  const {default: Image} = await import('../src/app/[locale]/events/[slug]/opengraph-image');
+  const fonts = await import('../src/lib/events/og-fonts');
+  const loaded = await fonts.ogFonts();
+  assert.deepEqual(loaded.map(f => [f.name, f.weight]), [['PT Sans', 400], ['PT Sans', 700]]);
+  assert.ok(loaded.every(f => f.data.length > 100000));
+  assert.equal(fonts.plainSpaces('7:00'+String.fromCharCode(0x202f)+'PM'+String.fromCharCode(0xa0)+'x'), '7:00 PM x');
+  const png = async (title: string, locale = 'ru') => {
+    const event = await makeEvent({title}, 1);
+    const response = await Image({params: {locale, slug: event.slug}});
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/png');
+    const bytes = Buffer.from(await response.arrayBuffer());
+    assert.deepEqual([...bytes.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    assert.deepEqual([bytes.readUInt32BE(16), bytes.readUInt32BE(20)], [1200, 630]);
+    return bytes;
+  };
+  const cyrillic = await png('Свинг-вечеринка «Ёлка» ' + tag);
+  assert.ok(cyrillic.length > 10000);
+  await png('Fiesta de swing en Córdoba: ¡ñandú, pingüino! ' + tag, 'es');
+  // Glyphs that are missing from a font all come out as the same box. Two titles that differ only in their Cyrillic
+  // letters give different pictures only when the letters are really drawn.
+  const [zhe, sha] = [await png('ЖЖЖЖЖЖЖЖ'), await png('ОООООООО')];
+  assert.notEqual(Buffer.compare(zhe, sha), 0);
+  // A draft gives nothing away: the neutral brand card, identical for any hidden title.
+  const drafts = await Promise.all(['Секрет один', 'Секрет два'].map(async title => {
+    const event = await makeEvent({title, status: 'DRAFT'}, 1);
+    return Buffer.from(await (await Image({params: {locale: 'ru', slug: event.slug}})).arrayBuffer());
+  }));
+  assert.equal(Buffer.compare(drafts[0], drafts[1]), 0);
 });

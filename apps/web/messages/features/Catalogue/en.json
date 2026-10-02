@@ -62,5 +62,6 @@
   "error_INVALID_INPUT": "The request was not understood. Reload the page and try again.",
   "error_TARGET_NOT_FOUND": "This page is no longer available.",
   "error_CANNOT_FOLLOW_SELF": "You cannot follow your own profile.",
-  "error_SERVER_ERROR": "The server could not complete the request. Please try again later."
+  "error_SERVER_ERROR": "The server could not complete the request. Please try again later.",
+  "localCityName": "Local name: {name}"
 }

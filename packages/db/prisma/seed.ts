@@ -2,10 +2,11 @@ import {db} from '../src/index';
 import {cities} from './data/cities';
 import {styleTree} from './data/styles';
 // Idempotent: rows are matched by slug and never overwritten, so edits made in the admin panel survive a re-seed.
+// The one exception is City.names: localized city names are reference data and are refreshed on every run, no other column is touched.
 try {
   for (const city of cities) {
     new Intl.DateTimeFormat('en',{timeZone:city.timezone}).format(new Date());
-    await db.city.upsert({where:{slug:city.slug},create:{id:city.slug,...city},update:{}});
+    await db.city.upsert({where:{slug:city.slug},create:{id:city.slug,...city},update:{names:city.names}});
   }
   // styleTree lists parents before children; the parent is resolved by slug because older rows may have other ids.
   const ids = new Map((await db.danceStyle.findMany({select:{id:true,slug:true}})).map(s => [s.slug,s.id]));

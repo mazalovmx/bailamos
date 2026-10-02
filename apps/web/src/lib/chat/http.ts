@@ -5,7 +5,7 @@ import type {Me} from './service';
 export async function chatActor(request: Request): Promise<Me> {
   const user = await actor(request);
   if (!user.profile) throw new ApiError('PROFILE_REQUIRED', 409);
-  return {userId: user.id, profileId: user.profile.id, role: user.role, name: user.profile.name};
+  return {userId: user.id, profileId: user.profile.id, role: user.role, name: user.profile.name, schoolIds: user.schoolIds};
 }
 /** Reads: a ban cuts chat off completely, including reading and the live stream. */
 export async function chatViewer(request: Request): Promise<Me> {
@@ -14,6 +14,6 @@ export async function chatViewer(request: Request): Promise<Me> {
   if (user.bannedAt) throw new ApiError('BANNED', 403);
   if (!user.emailVerified) throw new ApiError('VERIFY_EMAIL', 403);
   if (!user.profile) throw new ApiError('PROFILE_REQUIRED', 409);
-  return {userId: user.id, profileId: user.profile.id, role: user.role, name: user.profile.name};
+  return {userId: user.id, profileId: user.profile.id, role: user.role, name: user.profile.name, schoolIds: user.schoolIds};
 }
 export const noStore = {'Cache-Control': 'private, no-store'};

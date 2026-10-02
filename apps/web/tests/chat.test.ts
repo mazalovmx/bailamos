@@ -3,20 +3,28 @@
 import test, {after} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac, randomUUID} from 'node:crypto';
-import {readFileSync} from 'node:fs';
+import {mkdtempSync, readFileSync} from 'node:fs';
+import {rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import sharp from 'sharp';
 import {config} from 'dotenv';
 config({path: '../../.env', quiet: true});
+// Attachments are written to a throw-away directory by the local storage driver, whatever the environment configures.
+const mediaDir = mkdtempSync(join(tmpdir(), 'dance-chat-'));
+Object.assign(process.env, {MEDIA_STORAGE: 'local', MEDIA_LOCAL_DIR: mediaDir, MEDIA_SIGNING_SECRET: 'test-only-signing-secret'});
+delete process.env.S3_PUBLIC_URL;
 import {linkify, safeHref, LINK_REL} from '../src/lib/chat/linkify';
 import {directKey, directPeer, requestRemaining} from '../src/lib/chat/policy';
 const tag = randomUUID().slice(0, 8);
-type Me = {userId: string; profileId: string; role: string; name: string};
+type Me = {userId: string; profileId: string; role: string; name: string; schoolIds?: string[]};
 const userIds: string[] = [], eventIds: string[] = [], profileIds: string[] = [];
 const code = (expected: string) => (error: unknown) => (error as {code?: string}).code === expected;
 async function available(t: {skip(message: string): void}) {
   const {db} = await import('@dance/db');
   try {await db.$queryRaw`SELECT 1`; return db;} catch {t.skip('PostgreSQL is not available'); return null;}
 }
-async function member(label: string, role: 'USER' | 'MODERATOR' = 'USER'): Promise<Me> {
+async function member(label: string, role: 'USER' | 'MODERATOR' | 'SCHOOL_ADMIN' = 'USER'): Promise<Me> {
   const {db} = await import('@dance/db');
   const id = 'chat-' + tag + '-' + label + '-' + randomUUID().slice(0, 6);
   await db.user.create({data: {id, name: label, email: id + '@example.test', emailVerified: true, ageConfirmed: true, role}});
@@ -41,10 +49,12 @@ after(async () => {
     await db.conversationMember.deleteMany({where: {profileId: {in: profileIds}}});
     await db.auditLog.deleteMany({where: {actorUserId: {in: userIds}}});
     await db.user.deleteMany({where: {id: {in: userIds}}});
+    await db.profile.deleteMany({where: {id: {in: profileIds}}});
   } catch {/* the database was not available */}
   const {closeChatRealtime} = await import('../src/lib/chat/realtime');
   const {closeRedis} = await import('../src/lib/redis');
   await closeChatRealtime(); await closeRedis(); await db.$disconnect();
+  await rm(mediaDir, {recursive: true, force: true});
 });
 test('linkifier: only http(s) URLs become links and nothing can inject markup or script URLs', () => {
   const parts = linkify('See https://swing.example/party?x=1&y=<b>. Also (http://a.example/b), done');
@@ -264,16 +274,18 @@ test('event room: organizers and GOING/INTERESTED only, organizer moderates, rea
 test('city room and groups: join, invite by handle, requests from strangers, removal and leaving', {timeout: 60000}, async t => {
   const db = await available(t); if (!db) return;
   const chat = await import('../src/lib/chat/service');
-  const [a, b, c, staff] = [await member('ga'), await member('gb'), await member('gc'), await member('gs', 'MODERATOR')];
+  const [a, b, c, staff, local] = [await member('ga'), await member('gb'), await member('gc'), await member('gs', 'MODERATOR'), await member('gl', 'SCHOOL_ADMIN')];
   const city = await db.city.findFirstOrThrow();
   const before = await db.conversation.findUnique({where: {cityId: city.id}, select: {id: true}});
   const room = await chat.joinRoom(a, {cityId: city.id});
   assert.equal((await chat.joinRoom(b, {cityId: city.id})).id, room.id);
   await chat.joinRoom(staff, {cityId: city.id});
+  await chat.joinRoom(local, {cityId: city.id});
   await assert.rejects(chat.joinRoom(a, {cityId: 'missing-' + tag}), code('NOT_FOUND'));
   const spam = await chat.sendMessage(a, room.id, 'city hello');
   assert.equal((await chat.listMessages(b, room.id, {limit: 1})).messages[0].body, 'city hello');
   await assert.rejects(chat.setMessageHidden(b, spam.id, true), code('FORBIDDEN'));
+  await assert.rejects(chat.setMessageHidden(local, spam.id, true), code('FORBIDDEN'));
   await chat.setMessageHidden(staff, spam.id, true);
   await chat.leaveConversation(b, room.id);
   await assert.rejects(chat.listMessages(b, room.id), code('NOT_FOUND'));
@@ -331,7 +343,7 @@ test('unread counters, read marks, backwards pagination and coalesced notificati
   // A burst creates exactly one unread notification, addressed to the recipient only.
   const notes = await db.notification.findMany({where: {userId: {in: [a.userId, b.userId]}, type: 'CHAT_MESSAGE'}});
   assert.equal(notes.length, 1);
-  assert.deepEqual([notes[0].userId, notes[0].url, notes[0].data], [b.userId, '/messages/' + direct.id, {conversationId: direct.id, senderName: a.name, preview: 'm1'}]);
+  assert.deepEqual([notes[0].userId, notes[0].url, notes[0].data], [b.userId, '/messages/' + direct.id, {conversationId: direct.id, messageId: sent[0], senderName: a.name, preview: 'm1'}]);
   // Pages of three, newest first, each page in chronological order.
   const newest = await chat.listMessages(b, direct.id, {limit: 3});
   assert.deepEqual([newest.messages.map(row => row.body), newest.hasMore], [['m5', 'm6', 'm7'], true]);
@@ -350,7 +362,7 @@ test('unread counters, read marks, backwards pagination and coalesced notificati
   await chat.markRead(b, direct.id);
   assert.deepEqual(await chat.unreadCounts(b), {total: 0, conversations: 0, requests: 0});
   assert.equal(await db.notification.count({where: {userId: b.userId, type: 'CHAT_MESSAGE', readAt: null}}), 0, 'reading the conversation reads its notification');
-  await new Promise(resolve => setTimeout(resolve, 5));
+  // No pause here on purpose: a message sent in the very millisecond of the read mark is still newer than it.
   const late = await chat.sendMessage(a, direct.id, 'm8');
   await chat.sendMessage(a, direct.id, 'm9');
   assert.equal((await chat.inbox(b)).conversations[0].unread, 2);
@@ -369,15 +381,24 @@ test('unread counters, read marks, backwards pagination and coalesced notificati
   assert.equal(JSON.stringify(mine).includes('m1'), false);
   assert.deepEqual(await chatExport('missing-' + tag), {messages: [], conversations: [], blocks: []});
 });
-const readUntil = async (reader: ReadableStreamDefaultReader<Uint8Array>, wanted: string, ms: number, seen = {text: ''}) => {
-  const decoder = new TextDecoder(), deadline = Date.now() + ms;
-  while (!seen.text.includes(wanted) && Date.now() < deadline) {
-    const chunk = await Promise.race([reader.read(), new Promise<null>(resolve => setTimeout(() => resolve(null), Math.max(1, deadline - Date.now())))]);
-    if (!chunk || chunk.done) break;
-    seen.text += decoder.decode(chunk.value);
-  }
+// One outstanding read per stream, and whatever it returns is always kept: a wait that times out must not swallow the next frame.
+type Seen = {text: string; done?: boolean; pending?: Promise<void>};
+const pump = (reader: ReadableStreamDefaultReader<Uint8Array>, seen: Seen) => seen.pending ??= reader.read().then(chunk => {
+  seen.pending = undefined;
+  if (chunk.done) seen.done = true; else seen.text += new TextDecoder().decode(chunk.value);
+}, () => {seen.pending = undefined; seen.done = true;});
+const waitFor = async (reader: ReadableStreamDefaultReader<Uint8Array>, seen: Seen, ready: () => boolean, ms: number) => {
+  const deadline = Date.now() + ms;
+  while (!ready() && !seen.done && Date.now() < deadline)
+    await Promise.race([pump(reader, seen), new Promise(resolve => setTimeout(resolve, Math.max(1, deadline - Date.now())))]);
+  return ready();
+};
+const readUntil = async (reader: ReadableStreamDefaultReader<Uint8Array>, wanted: string, ms: number, seen: Seen) => {
+  await waitFor(reader, seen, () => seen.text.includes(wanted), ms);
   return seen.text;
 };
+const countUntil = (reader: ReadableStreamDefaultReader<Uint8Array>, wanted: string, count: number, ms: number, seen: Seen) =>
+  waitFor(reader, seen, () => seen.text.split(wanted).length - 1 >= count, ms);
 test('realtime: the stream carries only the viewer\'s conversations, follows membership and suppresses notifications while connected', {timeout: 60000}, async t => {
   const db = await available(t); if (!db) return;
   const chat = await import('../src/lib/chat/service');
@@ -398,7 +419,7 @@ test('realtime: the stream carries only the viewer\'s conversations, follows mem
   assert.ok(streamO);
   assert.equal(streamB.headers.get('content-type'), 'text/event-stream; charset=utf-8');
   assert.equal(streamB.headers.get('x-accel-buffering'), 'no');
-  const readerB = streamB.body!.getReader(), readerO = streamO.body!.getReader(), seenB = {text: ''}, seenO = {text: ''};
+  const readerB = streamB.body!.getReader(), readerO = streamO.body!.getReader(), seenB: Seen = {text: ''}, seenO: Seen = {text: ''};
   assert.ok((await readUntil(readerB, 'event: ready', 3000, seenB)).includes('event: ready'));
   await readUntil(readerO, 'event: ready', 3000, seenO);
   const message = await chat.sendMessage(a, direct.id, 'live <b>hello</b>');
@@ -409,13 +430,13 @@ test('realtime: the stream carries only the viewer\'s conversations, follows mem
   assert.equal(await db.notification.count({where: {userId: b.userId, type: 'CHAT_MESSAGE'}}), 0, 'no notification for a member who is watching the stream');
   // A conversation joined after the stream opened is picked up through the profile channel.
   const group = await chat.createGroup(a, {title: 'Live', handles: [b.userId]});
-  await readUntil(readerB, 'event: conversation', 5000, seenB);
-  await new Promise(resolve => setTimeout(resolve, 300));
+  // The membership event is forwarded only after the stream has subscribed to the new conversation: no waiting is needed.
+  assert.equal(await countUntil(readerB, 'event: conversation', 1, 5000, seenB), true);
   const inGroup = await chat.sendMessage(a, group.id, 'group live');
   assert.ok((await readUntil(readerB, inGroup.id, 5000, seenB)).includes(inGroup.id));
   // Removal takes the subscription away again.
   await chat.leaveConversation(a, group.id, b.profileId);
-  await new Promise(resolve => setTimeout(resolve, 400));
+  assert.equal(await countUntil(readerB, 'event: conversation', 2, 5000, seenB), true);
   const secret = await chat.sendMessage(a, group.id, 'after removal');
   await readUntil(readerB, secret.id, 600, seenB);
   assert.equal(seenB.text.includes(secret.id), false);
@@ -423,9 +444,26 @@ test('realtime: the stream carries only the viewer\'s conversations, follows mem
   assert.ok((await readUntil(readerO, ': ping', 3000, seenO)).includes(': ping'));
   for (const id of [message.id, inGroup.id, secret.id]) assert.equal(seenO.text.includes(id), false);
   assert.equal(seenO.text.includes('event: message'), false);
+  // Edits and deletions reach open threads as events of their own.
+  const frameData = (text: string, marker: string) => JSON.parse((text.split('\n\n').find(part => part.includes(marker)) ?? '').split('data: ')[1] ?? '{}');
+  const edited = await chat.editMessage(a, message.id, 'live, corrected');
+  assert.deepEqual(frameData(await readUntil(readerB, 'event: edited', 5000, seenB), 'event: edited'), {type: 'edited', conversationId: direct.id, message: edited});
+  await chat.deleteMessage(a, message.id);
+  assert.deepEqual(frameData(await readUntil(readerB, 'event: deleted', 5000, seenB), 'event: deleted'), {type: 'deleted', conversationId: direct.id, messageId: message.id});
+  // A sender the reader blocked: the reader's own stream marks the message, the sender's stream does not.
+  const crew = await chat.createGroup(a, {title: 'Crew', handles: [b.userId, outsider.userId]});
+  await chat.acceptConversation(outsider, crew.id);
+  await chat.blockProfile(b, outsider.profileId);
+  await readUntil(readerB, '"conversationId":""', 5000, seenB);
+  const joined = '{"type":"conversation","conversationId":"' + crew.id + '"}';
+  assert.ok((await readUntil(readerB, joined, 5000, seenB)).includes(joined) && (await readUntil(readerO, joined, 5000, seenO)).includes(joined));
+  const fromBlocked = await chat.sendMessage(outsider, crew.id, 'you cannot ignore me');
+  assert.equal(frameData(await readUntil(readerB, fromBlocked.id, 5000, seenB), fromBlocked.id).message?.blockedSender, true);
+  assert.equal(frameData(await readUntil(readerO, fromBlocked.id, 5000, seenO), fromBlocked.id).message?.blockedSender, false);
+  assert.equal(await db.notification.count({where: {userId: b.userId, type: 'CHAT_MESSAGE', data: {path: ['conversationId'], equals: crew.id}}}), 0);
   abortB.abort(); abortO.abort();
-  const end = await Promise.race([readerB.read(), new Promise<null>(resolve => setTimeout(() => resolve(null), 2000))]);
-  assert.ok(end?.done, 'aborting the request closes the stream');
+  // Frames queued before the abort are still delivered; after them the stream ends.
+  assert.equal(await waitFor(readerB, seenB, () => !!seenB.done, 2000), true, 'aborting the request closes the stream');
 });
 test('HTTP layer: session, same-origin mutations, bans and error codes', {timeout: 60000}, async t => {
   const db = await available(t); if (!db) return;
@@ -499,4 +537,364 @@ test('HTTP layer: session, same-origin mutations, bans and error codes', {timeou
   // A member without a profile is told to create one.
   await db.profile.delete({where: {id: c.profileId}});
   assert.deepEqual(await (await unread.GET(request('/api/chat/unread', cookieC))).json(), {error: 'PROFILE_REQUIRED'});
+});
+// ---------- Gaps closed after the first version: ordering, attachments, edit/delete, invitations, school chats, blocks in groups ----------
+async function upload(who: Me, conversationId: string) {
+  const {startUpload, completeUpload} = await import('../src/lib/media/upload');
+  const {storage} = await import('../src/lib/storage');
+  const user = {id: who.userId, role: who.role, profile: {id: who.profileId}, schoolIds: who.schoolIds};
+  const body = await sharp({create: {width: 900, height: 600, channels: 3, background: '#a33'}}).withExif({IFD0: {Copyright: 'secret-owner'}}).jpeg().toBuffer();
+  const ticket = await startUpload(user, {target: 'chat', targetId: conversationId, mime: 'image/jpeg', size: body.length});
+  await storage().putObject(ticket.key, body, 'image/jpeg');
+  return (await completeUpload(user, {key: ticket.key})).key;
+}
+async function school(label: string) {
+  const {db} = await import('@dance/db');
+  const profile = await db.profile.create({data: {type: 'SCHOOL', handle: 'chat-' + tag + '-' + label, name: 'School ' + label}});
+  profileIds.push(profile.id);
+  return profile;
+}
+async function manager(label: string, schoolId: string): Promise<Me> {
+  const {db} = await import('@dance/db');
+  const {managedSchoolIds} = await import('../src/lib/schools/access');
+  const me = await member(label, 'SCHOOL_ADMIN');
+  await db.schoolAdmin.create({data: {userId: me.userId, schoolProfileId: schoolId}});
+  return {...me, schoolIds: await managedSchoolIds(me.userId)};
+}
+test('ordering does not depend on the wall clock: a new message is always newer than every read mark, join and message', {timeout: 60000}, async t => {
+  const db = await available(t); if (!db) return;
+  const chat = await import('../src/lib/chat/service');
+  const [a, b] = [await member('ca'), await member('cb')];
+  await db.follow.create({data: {userId: b.userId, profileId: a.profileId}});
+  const direct = await chat.openDirect(a, b.profileId);
+  // The clock "steps back": the stored read mark and the newest message are ahead of what new Date() returns from now on.
+  const ahead = new Date(Date.now() + 5000);
+  const first = await chat.sendMessage(a, direct.id, 'first');
+  await db.message.update({where: {id: first.id}, data: {createdAt: ahead}});
+  await db.conversationMember.updateMany({where: {conversationId: direct.id, profileId: b.profileId}, data: {lastReadAt: new Date(ahead.getTime() + 1000)}});
+  const second = await chat.sendMessage(a, direct.id, 'second'), third = await chat.sendMessage(a, direct.id, 'third');
+  assert.ok(Date.parse(second.createdAt) > ahead.getTime() + 1000 && Date.parse(third.createdAt) > Date.parse(second.createdAt));
+  assert.deepEqual((await chat.listMessages(b, direct.id)).messages.map(row => row.body), ['first', 'second', 'third']);
+  assert.equal((await chat.unreadCounts(b)).total, 2, 'both count as unread although the wall clock is behind the read mark');
+  assert.deepEqual((await chat.listMessages(b, direct.id, {after: second.id})).messages.map(row => row.body), ['third']);
+  // Reading covers everything that is there, even messages stamped later than the reader's clock.
+  await chat.markRead(b, direct.id);
+  assert.equal((await chat.unreadCounts(b)).total, 0);
+  await chat.sendMessage(a, direct.id, 'fourth');
+  assert.equal((await chat.unreadCounts(b)).total, 1);
+  // The notification burst guard is tied to the read mark: a claim left behind cannot swallow the next burst.
+  const {claimNotification} = await import('../src/lib/chat/realtime');
+  assert.equal(await claimNotification(direct.id, b.userId, 1), true);
+  assert.equal(await claimNotification(direct.id, b.userId, 2), true, 'a new read mark is a new claim');
+  // Pure thread state used by the client for events and for polled pages.
+  const {applyEvent, mergeMessages} = await import('../src/lib/chat/merge');
+  const list = mergeMessages([third, second], [{...second, body: 'changed'}, {...first, createdAt: ahead.toISOString()}]);
+  assert.deepEqual(list.map(row => row.body), ['first', 'changed', 'third']);
+  const afterDelete = applyEvent(list, {type: 'deleted', conversationId: direct.id, messageId: second.id});
+  assert.deepEqual([afterDelete[1].deleted, afterDelete[1].body, afterDelete[1].attachment], [true, null, null]);
+  assert.deepEqual(applyEvent(list, {type: 'hidden', conversationId: direct.id, messageId: third.id, hidden: true})[2].body, null);
+  assert.equal(applyEvent(list, {type: 'edited', conversationId: direct.id, message: {...third, body: 'x', editedAt: third.createdAt}})[2].body, 'x');
+});
+test('attachments: one image through the media pipeline, served to current members only, removed with the message and the conversation', {timeout: 120000}, async t => {
+  const db = await available(t); if (!db) return;
+  const chat = await import('../src/lib/chat/service');
+  const {storage} = await import('../src/lib/storage');
+  const keys = await import('../src/lib/media/keys');
+  const {deleteProfileChatAttachments} = await import('../src/lib/chat/attachments');
+  const [a, b, c, outsider] = [await member('aa'), await member('ab'), await member('ac'), await member('ao')];
+  await db.follow.create({data: {userId: b.userId, profileId: a.profileId}});
+  const group = await chat.createGroup(a, {title: 'Photos', handles: [b.userId, c.userId]});
+  const exists = (key: string) => storage().exists(keys.variantKey(key, 800, 'webp'));
+  // Who may upload: accepted members who may write. Not outsiders, not invited-but-not-accepted members.
+  await assert.rejects(upload(outsider, group.id), code('NOT_FOUND'));
+  await assert.rejects(upload(c, group.id), code('REQUEST_NOT_ACCEPTED'));
+  const key = await upload(a, group.id);
+  assert.deepEqual(keys.parseChatKey(key), {conversationId: group.id, profileId: a.profileId, uuid: key.split('/')[3]});
+  // The stored files are re-encoded derivatives without metadata.
+  const stored = await storage().getObject(keys.variantKey(key, 800, 'webp'));
+  const bytes = Buffer.from(await new Response(stored!.body).arrayBuffer()), meta = await sharp(bytes).metadata();
+  assert.deepEqual([meta.format, meta.width, meta.exif, bytes.includes('secret-owner')], ['webp', 800, undefined, false]);
+  // The public media route does not know the chat prefix at all.
+  assert.equal(keys.isBaseKey(key), false);
+  assert.equal(keys.parseVariantKey(keys.variantKey(key, 800, 'webp')), null);
+  const publicRoute = await import('../src/app/api/media/file/[...key]/route');
+  for (const path of [key, keys.variantKey(key, 800, 'webp')])
+    assert.equal((await publicRoute.GET(new Request('http://localhost/api/media/file/' + path), {params: Promise.resolve({key: path.split('/')})})).status, 404);
+  // The key works for its uploader, in its conversation, once.
+  const other = await chat.createGroup(a, {title: 'Elsewhere', handles: [b.userId]});
+  await assert.rejects(chat.sendMessage(a, other.id, 'x', key), code('INVALID_INPUT'));
+  await assert.rejects(chat.sendMessage(b, group.id, 'x', key), code('INVALID_INPUT'));
+  await assert.rejects(chat.sendMessage(a, group.id, 'x', key.replace(/.$/, key.endsWith('0') ? '1' : '0')), code('INVALID_INPUT'));
+  await assert.rejects(chat.sendMessage(a, group.id, 'x', 'img/' + a.profileId + '/' + key.split('/')[3]), code('INVALID_INPUT'));
+  const photo = await chat.sendMessage(a, group.id, '', key);
+  assert.deepEqual([photo.body, photo.attachment?.src], ['', '/api/chat/attachments/' + photo.id + '?w=800&f=webp']);
+  assert.equal(JSON.stringify(photo).includes(key), false, 'the storage key never reaches a client');
+  await assert.rejects(chat.sendMessage(a, group.id, 'again', key), code('INVALID_INPUT'));
+  await assert.rejects(chat.sendMessage(a, group.id, '', undefined), {name: 'ZodError'});
+  assert.equal((await chat.inbox(b)).conversations.find(row => row.id === group.id)?.lastMessage?.attachment, true);
+  // Reading: members yes; outsiders, removed members and unknown ids no.
+  assert.equal(await chat.attachmentKeyFor(b, photo.id), key);
+  assert.equal(await chat.attachmentKeyFor(c, photo.id), key, 'an invited member reads the group they were invited to');
+  await assert.rejects(chat.attachmentKeyFor(outsider, photo.id), code('NOT_FOUND'));
+  await assert.rejects(chat.attachmentKeyFor(a, 'missing-' + tag), code('NOT_FOUND'));
+  await chat.leaveConversation(a, group.id, c.profileId);
+  await assert.rejects(chat.attachmentKeyFor(c, photo.id), code('NOT_FOUND'));
+  // A hidden message does not serve its image; restoring brings it back.
+  await chat.setMessageHidden(a, photo.id, true);
+  await assert.rejects(chat.attachmentKeyFor(b, photo.id), code('NOT_FOUND'));
+  assert.equal((await chat.listMessages(b, group.id)).messages[0].attachment, null);
+  await chat.setMessageHidden(a, photo.id, false);
+  assert.equal(await chat.attachmentKeyFor(b, photo.id), key);
+  // Deleting the message erases the files.
+  await chat.deleteMessage(a, photo.id);
+  await assert.rejects(chat.attachmentKeyFor(b, photo.id), code('NOT_FOUND'));
+  assert.equal(await exists(key), false);
+  assert.deepEqual(await db.message.findUniqueOrThrow({where: {id: photo.id}, select: {body: true, attachmentKey: true}}), {body: '', attachmentKey: null});
+  // Strangers cannot push images into requests: neither the upload nor the message is accepted until the request is.
+  const request = await chat.openDirect(a, outsider.profileId);
+  await assert.rejects(upload(a, request.id), code('ATTACHMENT_NOT_ALLOWED'));
+  const second = await upload(a, group.id);
+  await assert.rejects(chat.sendMessage(a, request.id, 'look', second.replace(group.id, request.id)), code('ATTACHMENT_NOT_ALLOWED'));
+  assert.equal((await chat.conversationDetail(a, request.id)).canAttach, false);
+  await chat.sendMessage(a, request.id, 'hello');
+  await chat.acceptConversation(outsider, request.id);
+  assert.equal((await chat.conversationDetail(a, request.id)).canAttach, true);
+  assert.equal((await chat.sendMessage(a, request.id, 'now with a photo', await upload(a, request.id))).attachment !== null, true);
+  // Account deletion hook and conversation removal take the stored files with them.
+  const mine = await chat.sendMessage(a, group.id, 'keep', second), theirs = await chat.sendMessage(b, group.id, 'b', await upload(b, group.id));
+  const theirKey = await chat.attachmentKeyFor(a, theirs.id);
+  assert.deepEqual(await deleteProfileChatAttachments(a.profileId), {attachments: 2});
+  assert.deepEqual([await exists(second), await exists(theirKey)], [false, true]);
+  await assert.rejects(chat.attachmentKeyFor(b, mine.id), code('NOT_FOUND'));
+  await chat.leaveConversation(a, group.id); await chat.leaveConversation(b, group.id);
+  assert.deepEqual([await db.conversation.count({where: {id: group.id}}), await exists(theirKey)], [0, false]);
+  const {limits} = await import('../src/lib/chat/policy');
+  assert.ok(limits.attach.limit / limits.attach.windowSec < limits.send.limit / limits.send.windowSec, 'attachments have a tighter budget than text');
+});
+test('own messages: edit within 15 minutes, delete at any time; polling sees every change to older messages', {timeout: 60000}, async t => {
+  const db = await available(t); if (!db) return;
+  const chat = await import('../src/lib/chat/service');
+  const [a, b, outsider] = [await member('xa'), await member('xb'), await member('xo')];
+  await db.follow.create({data: {userId: b.userId, profileId: a.profileId}});
+  const group = await chat.createGroup(a, {title: 'Edits', handles: [b.userId]});
+  const one = await chat.sendMessage(b, group.id, 'frist'), two = await chat.sendMessage(b, group.id, 'second');
+  await chat.sendMessage(a, group.id, 'third');
+  assert.deepEqual([one.editedAt, one.deleted], [null, false]);
+  const fixed = await chat.editMessage(b, one.id, '  first ');
+  assert.deepEqual([fixed.body, typeof fixed.editedAt, fixed.id], ['first', 'string', one.id]);
+  await assert.rejects(chat.editMessage(a, one.id, 'not mine'), code('FORBIDDEN'));
+  await assert.rejects(chat.editMessage(outsider, one.id, 'x'), code('NOT_FOUND'));
+  await assert.rejects(chat.editMessage(b, one.id, '   '), {name: 'ZodError'});
+  await assert.rejects(chat.editMessage(b, 'missing-' + tag, 'x'), code('NOT_FOUND'));
+  // A hidden message cannot be rewritten; the room admin keeps hide and restore.
+  await chat.setMessageHidden(a, two.id, true);
+  await assert.rejects(chat.editMessage(b, two.id, 'sneaky'), code('EDIT_UNAVAILABLE'));
+  // Polling fallback: re-reading from the oldest shown message returns the current state of all of them.
+  const polled = async () => (await chat.listMessages(a, group.id, {from: one.id, limit: 100})).messages.map(row => [row.body, row.hidden, row.deleted, !!row.editedAt]);
+  assert.deepEqual(await polled(), [['first', false, false, true], [null, true, false, false], ['third', false, false, false]]);
+  await chat.setMessageHidden(a, two.id, false);
+  assert.deepEqual((await polled())[1], ['second', false, false, false], 'a restored older message is seen without the stream');
+  assert.deepEqual(await chat.listMessages(a, group.id, {from: two.id, limit: 1}), {messages: [(await chat.listMessages(a, group.id)).messages[1]], hasMore: true});
+  await assert.rejects(chat.listMessages(a, group.id, {from: one.id, after: two.id}), {name: 'ZodError'});
+  // Delete: own only, idempotent; the text is erased from the row, the counters and the notification preview.
+  await chat.markRead(a, group.id);
+  const late = await chat.sendMessage(b, group.id, 'secret words');
+  assert.equal((await chat.unreadCounts(a)).total, 1);
+  assert.equal(JSON.stringify(await db.notification.findMany({where: {userId: a.userId}})).includes('secret words'), true);
+  await assert.rejects(chat.deleteMessage(a, late.id), code('FORBIDDEN'));
+  await assert.rejects(chat.deleteMessage(outsider, late.id), code('NOT_FOUND'));
+  assert.deepEqual(await chat.deleteMessage(b, late.id), {id: late.id, deleted: true});
+  assert.deepEqual(await chat.deleteMessage(b, late.id), {id: late.id, deleted: true});
+  assert.equal((await chat.unreadCounts(a)).total, 0, 'a deleted message is not unread');
+  assert.equal(JSON.stringify(await db.notification.findMany({where: {userId: a.userId}})).includes('secret words'), false);
+  assert.equal((await db.message.findUniqueOrThrow({where: {id: late.id}})).body, '');
+  const last = (await chat.listMessages(a, group.id)).messages.at(-1)!;
+  assert.deepEqual([last.id, last.deleted, last.hidden, last.body, last.editedAt], [late.id, true, false, null, null]);
+  const preview = (await chat.inbox(a)).conversations.find(row => row.id === group.id)?.lastMessage;
+  assert.deepEqual([preview?.deleted, preview?.body], [true, null]);
+  await assert.rejects(chat.editMessage(b, late.id, 'undelete'), code('EDIT_UNAVAILABLE'));
+  // The edit window is 15 minutes from sending; deleting has no time limit.
+  await db.message.update({where: {id: two.id}, data: {createdAt: new Date(Date.now() - 16 * 60_000)}});
+  await assert.rejects(chat.editMessage(b, two.id, 'too late'), code('EDIT_WINDOW_CLOSED'));
+  await chat.deleteMessage(b, two.id);
+  // The export shows the author what is left of their messages.
+  const {chatExport} = await import('../src/lib/chat/export');
+  assert.deepEqual((await chatExport(b.userId)).messages.map(row => [row.body, !!row.deletedAt, !!row.editedAt]).sort(), [['', true, false], ['', true, false], ['first', false, true]]);
+});
+test('group invitations appear in the notification centre and are read with the conversation', {timeout: 60000}, async t => {
+  const db = await available(t); if (!db) return;
+  const chat = await import('../src/lib/chat/service');
+  const {renderNotification} = await import('../src/lib/notifications/render');
+  const [a, b, c] = [await member('ia'), await member('ib'), await member('ic')];
+  await db.follow.create({data: {userId: b.userId, profileId: a.profileId}});
+  const group = await chat.createGroup(a, {title: 'Friday practice', handles: [b.userId]});
+  await chat.inviteMember(a, group.id, {handle: c.userId});
+  await assert.rejects(chat.inviteMember(a, group.id, {handle: c.userId}), code('ALREADY_MEMBER'));
+  for (const who of [b, c]) {
+    const notes: {data: unknown; url: string | null; readAt: Date | null}[] = await db.notification.findMany({where: {userId: who.userId, type: 'GROUP_INVITE'}});
+    assert.equal(notes.length, 1, 'known member and stranger are both told, once');
+    assert.deepEqual([notes[0].data, notes[0].url, notes[0].readAt], [{conversationId: group.id, title: 'Friday practice', inviterName: a.name}, '/messages/' + group.id, null]);
+    for (const [locale, word] of [['en', 'Invitation'], ['es', 'Invitación'], ['ru', 'Приглашение']]) {
+      const text = renderNotification(locale, 'GROUP_INVITE', notes[0].data);
+      assert.ok(text.title.startsWith(word) && text.body.includes(a.name) && text.body.includes('Friday practice'), locale + ': ' + JSON.stringify(text));
+    }
+  }
+  assert.equal(await db.notification.count({where: {userId: a.userId, type: 'GROUP_INVITE'}}), 0);
+  await chat.markRead(c, group.id);
+  assert.equal(await db.notification.count({where: {userId: c.userId, type: 'GROUP_INVITE', readAt: null}}), 0);
+  // The group admin can rename the group; members cannot.
+  assert.deepEqual(await chat.renameConversation(a, group.id, {title: ' Saturday practice '}), {id: group.id, title: 'Saturday practice'});
+  await assert.rejects(chat.renameConversation(b, group.id, {title: 'Mine now'}), code('FORBIDDEN'));
+  await assert.rejects(chat.renameConversation(a, group.id, {title: ' '}), {name: 'ZodError'});
+  assert.equal((await chat.conversationDetail(b, group.id)).title, 'Saturday practice');
+});
+test('school chats: managers read, moderate and post as the school; other schools and ordinary members get nothing extra', {timeout: 60000}, async t => {
+  const db = await available(t); if (!db) return;
+  const chat = await import('../src/lib/chat/service');
+  const {managedSchoolIds} = await import('../src/lib/schools/access');
+  const [schoolA, schoolB] = [await school('sa'), await school('sb')];
+  const [boss, rival, pupil, guest] = [await manager('sm', schoolA.id), await manager('sr', schoolB.id), await member('sp'), await member('sg')];
+  const create = (schoolId: string, title: string, members: Me[]) => db.conversation.create({data: {kind: 'GROUP', title, schoolProfileId: schoolId,
+    members: {create: [{profileId: schoolId, admin: true}, ...members.map(row => ({profileId: row.profileId}))]}}});
+  // Created the way the admin school cabinet does it: the school profile is the admin member.
+  const [roomA, roomB] = [await create(schoolA.id, 'Beginners A', [pupil]), await create(schoolB.id, 'Beginners B', [pupil])];
+  assert.deepEqual(boss.schoolIds, [schoolA.id]);
+  // Inbox: a separate section for the manager, nothing in their personal list; the pupil sees ordinary groups.
+  const box = await chat.inbox(boss);
+  assert.deepEqual([box.school.map(row => [row.id, row.school]), box.conversations.length, box.requests.length], [[[roomA.id, {id: schoolA.id, name: schoolA.name}]], 0, 0]);
+  const pupilBox = await chat.inbox(pupil);
+  assert.deepEqual([pupilBox.school.length, pupilBox.conversations.map(row => row.school)], [0, [null, null]]);
+  // Posting as the school: the sender is the school, the acting manager is recorded only in the audit log.
+  const hello = await chat.sendMessage(boss, roomA.id, 'Class moved to 19:00');
+  assert.deepEqual([hello.sender.id, hello.sender.name], [schoolA.id, schoolA.name]);
+  const audit = await db.auditLog.findMany({where: {action: 'SCHOOL_CHAT_MESSAGE', targetId: hello.id}});
+  assert.deepEqual(audit.map(row => [row.actorUserId, row.targetType, row.data]), [[boss.userId, 'Message', {conversationId: roomA.id, schoolProfileId: schoolA.id}]]);
+  const seen = JSON.stringify([await chat.listMessages(pupil, roomA.id), await chat.conversationDetail(pupil, roomA.id), await chat.inbox(pupil)]);
+  assert.equal(seen.includes(boss.profileId) || seen.includes(boss.name) || seen.includes(boss.userId), false, 'members see the school, never the manager');
+  assert.equal((await chat.unreadCounts(pupil)).total, 1);
+  const detail = await chat.conversationDetail(boss, roomA.id);
+  assert.deepEqual([detail.actingProfileId, detail.school?.id, detail.admin, detail.canModerate, detail.canAttach], [schoolA.id, schoolA.id, true, true, true]);
+  assert.deepEqual((await chat.conversationDetail(pupil, roomA.id)).school, null);
+  // The school's unread counter and read mark are the manager's too.
+  const question = await chat.sendMessage(pupil, roomA.id, 'Which studio?');
+  assert.deepEqual(await chat.unreadCounts(boss), {total: 1, conversations: 1, requests: 0});
+  assert.equal((await chat.inbox(boss)).school[0].unread, 1);
+  await chat.markRead(boss, roomA.id);
+  assert.equal((await chat.unreadCounts(boss)).total, 0);
+  // Moderation: hide, edit the school's messages, rename, add and remove members by handle.
+  await chat.setMessageHidden(boss, question.id, true);
+  assert.equal((await chat.listMessages(pupil, roomA.id)).messages[1].hidden, true);
+  await chat.setMessageHidden(boss, question.id, false);
+  assert.equal((await chat.editMessage(boss, hello.id, 'Class moved to 19:30')).sender.id, schoolA.id);
+  await assert.rejects(chat.editMessage(boss, question.id, 'words in their mouth'), code('FORBIDDEN'));
+  await chat.renameConversation(boss, roomA.id, {title: 'Beginners A, Monday'});
+  await db.follow.create({data: {userId: guest.userId, profileId: schoolA.id}});
+  assert.deepEqual(await chat.inviteMember(boss, roomA.id, {handle: guest.userId}), {profileId: guest.profileId});
+  const invitation = await db.notification.findFirstOrThrow({where: {userId: guest.userId, type: 'GROUP_INVITE'}});
+  assert.deepEqual(invitation.data, {conversationId: roomA.id, title: 'Beginners A, Monday', inviterName: schoolA.name});
+  assert.equal((await chat.inbox(guest)).conversations[0]?.id, roomA.id, 'a follower of the school joins without a request');
+  await chat.leaveConversation(boss, roomA.id, {handle: guest.userId});
+  await assert.rejects(chat.listMessages(guest, roomA.id), code('NOT_FOUND'));
+  await assert.rejects(chat.leaveConversation(boss, roomA.id), code('FORBIDDEN'));
+  await assert.rejects(chat.leaveConversation(boss, roomA.id, schoolA.id), code('FORBIDDEN'));
+  assert.deepEqual((await db.auditLog.findMany({where: {actorUserId: boss.userId, targetId: roomA.id}, orderBy: {createdAt: 'asc'}})).map(row => row.action),
+    ['SCHOOL_CHAT_RENAME', 'SCHOOL_CHAT_MEMBER_ADD', 'SCHOOL_CHAT_MEMBER_REMOVE']);
+  // Ordinary members get no moderation rights from being in a school chat.
+  await assert.rejects(chat.setMessageHidden(pupil, hello.id, true), code('FORBIDDEN'));
+  await assert.rejects(chat.inviteMember(pupil, roomA.id, {handle: guest.userId}), code('FORBIDDEN'));
+  await assert.rejects(chat.renameConversation(pupil, roomA.id, {title: 'Hijacked'}), code('FORBIDDEN'));
+  await assert.rejects(chat.leaveConversation(pupil, roomA.id, schoolA.id), code('FORBIDDEN'));
+  // School isolation: the manager of A, and anybody claiming a school that is not the conversation's, finds nothing in B.
+  const inB = await chat.sendMessage(rival, roomB.id, 'B only');
+  for (const who of [boss, {...boss, role: 'ADMIN'}, {...guest, schoolIds: [schoolA.id]}])
+    for (const attempt of [() => chat.listMessages(who, roomB.id), () => chat.conversationDetail(who, roomB.id), () => chat.sendMessage(who, roomB.id, 'hi'),
+      () => chat.markRead(who, roomB.id), () => chat.setMessageHidden(who, inB.id, true), () => chat.editMessage(who, inB.id, 'x'), () => chat.deleteMessage(who, inB.id),
+      () => chat.attachmentKeyFor(who, inB.id), () => chat.inviteMember(who, roomB.id, {handle: guest.userId}), () => chat.renameConversation(who, roomB.id, {title: 'Mine'}),
+      () => chat.leaveConversation(who, roomB.id, pupil.profileId), () => upload(who, roomB.id)]) await assert.rejects(attempt(), code('NOT_FOUND'));
+  assert.equal((await chat.inbox(boss)).school.some(row => row.id === roomB.id), false);
+  assert.deepEqual([(await chat.conversationIds(boss)).includes(roomA.id), (await chat.conversationIds(boss)).includes(roomB.id)], [true, false]);
+  assert.equal((await db.message.findUniqueOrThrow({where: {id: inB.id}})).body, 'B only');
+  // The school profile's membership elsewhere (a group it was merely added to) is not opened to its managers.
+  const foreign = await db.conversation.create({data: {kind: 'GROUP', title: 'Teachers', members: {create: [{profileId: schoolA.id}, {profileId: guest.profileId, admin: true}]}}});
+  await assert.rejects(chat.listMessages(boss, foreign.id), code('NOT_FOUND'));
+  // A revoked grant ends everything at once, including the live stream's subscriptions.
+  await db.schoolAdmin.deleteMany({where: {userId: boss.userId}});
+  const revoked = {...boss, schoolIds: await managedSchoolIds(boss.userId)};
+  await assert.rejects(chat.listMessages(revoked, roomA.id), code('NOT_FOUND'));
+  assert.equal((await chat.inbox(revoked)).school.length, 0);
+  assert.equal((await chat.conversationIds(boss)).includes(roomA.id), false);
+});
+test('blocks inside groups: messages of a blocked sender are flagged for the blocker only', {timeout: 60000}, async t => {
+  const db = await available(t); if (!db) return;
+  const chat = await import('../src/lib/chat/service');
+  const [a, b, c] = [await member('za'), await member('zb'), await member('zc')];
+  for (const who of [b, c]) await db.follow.create({data: {userId: who.userId, profileId: a.profileId}});
+  const group = await chat.createGroup(a, {title: 'Mixed', handles: [b.userId, c.userId]});
+  await chat.sendMessage(a, group.id, 'welcome');
+  await chat.blockProfile(b, c.profileId);
+  const rude = await chat.sendMessage(c, group.id, 'hello again');
+  assert.equal(rude.blockedSender, false, 'the sender is told nothing');
+  assert.deepEqual((await chat.listMessages(b, group.id)).messages.map(row => [row.sender.id, row.blockedSender]), [[a.profileId, false], [c.profileId, true]]);
+  for (const who of [a, c]) assert.deepEqual((await chat.listMessages(who, group.id)).messages.map(row => row.blockedSender), [false, false]);
+  const preview = (await chat.inbox(b)).conversations[0].lastMessage;
+  assert.deepEqual([preview?.blockedSender, preview?.body], [true, null]);
+  assert.equal((await chat.inbox(a)).conversations[0].lastMessage?.body, 'hello again');
+  assert.equal(await db.notification.count({where: {userId: b.userId, type: 'CHAT_MESSAGE'}}), 1, 'only the welcome message notified the blocker');
+  const view = JSON.stringify([await chat.conversationDetail(c, group.id), await chat.listMessages(c, group.id), await chat.inbox(c)]);
+  assert.equal(/"blockedSender":true|"blockedByMe":true/.test(view), false);
+  await chat.unblockProfile(b, c.profileId);
+  assert.deepEqual((await chat.listMessages(b, group.id)).messages.map(row => row.blockedSender), [false, false]);
+});
+test('HTTP layer: editing, deleting, renaming and the member-only attachment route', {timeout: 120000}, async t => {
+  const db = await available(t); if (!db) return;
+  const secret = process.env.BETTER_AUTH_SECRET;
+  if (!secret) {t.skip('BETTER_AUTH_SECRET is not set'); return;}
+  const chat = await import('../src/lib/chat/service');
+  const origin = new URL(process.env.BETTER_AUTH_URL || 'http://localhost:3000').origin;
+  const [a, b, c] = [await member('pa'), await member('pb'), await member('pc')];
+  const cookieFor = async (who: Me) => {
+    const token = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
+    await db.session.create({data: {id: randomUUID(), token, userId: who.userId, expiresAt: new Date(Date.now() + 3600_000)}});
+    return (origin.startsWith('https') ? '__Secure-' : '') + 'better-auth.session_token=' + encodeURIComponent(token + '.' + createHmac('sha256', secret).update(token).digest('base64'));
+  };
+  const [cookieA, cookieB, cookieC] = [await cookieFor(a), await cookieFor(b), await cookieFor(c)];
+  const request = (path: string, cookie?: string, method = 'GET', body?: unknown) => new Request(origin + path, {method,
+    headers: {...(cookie ? {cookie} : {}), ...(method !== 'GET' ? {origin} : {}), 'content-type': 'application/json'}, ...(body === undefined ? {} : {body: JSON.stringify(body)})});
+  const unread = await import('../src/app/api/chat/unread/route');
+  if ((await unread.GET(request('/api/chat/unread', cookieA))).status === 401) {t.skip('this Better Auth version does not accept the hand-signed test cookie'); return;}
+  const messages = await import('../src/app/api/chat/conversations/[id]/messages/route');
+  const conversation = await import('../src/app/api/chat/conversations/[id]/route');
+  const members = await import('../src/app/api/chat/conversations/[id]/members/route');
+  const one = await import('../src/app/api/chat/messages/[id]/route');
+  const attachments = await import('../src/app/api/chat/attachments/[messageId]/route');
+  await db.follow.create({data: {userId: b.userId, profileId: a.profileId}});
+  const group = await chat.createGroup(a, {title: 'HTTP', handles: [b.userId]}), params = {params: Promise.resolve({id: group.id})};
+  const posted = await messages.POST(request('/api/chat/conversations/' + group.id + '/messages', cookieA, 'POST', {body: 'with photo', attachmentKey: await upload(a, group.id)}), params);
+  assert.equal(posted.status, 201);
+  const {message} = await posted.json() as {message: {id: string; attachment: {src: string}}};
+  const file = (cookie: string | undefined, query = '') => attachments.GET(request('/api/chat/attachments/' + message.id + query, cookie), {params: Promise.resolve({messageId: message.id})});
+  const served = await file(cookieB, '?w=320&f=avif');
+  assert.deepEqual([served.status, served.headers.get('content-type'), served.headers.get('cache-control'), served.headers.get('x-content-type-options')],
+    [200, 'image/avif', 'private, max-age=3600', 'nosniff']);
+  assert.equal((await sharp(Buffer.from(await served.arrayBuffer())).metadata()).width, 320);
+  assert.equal((await file(cookieA)).headers.get('content-type'), 'image/webp');
+  assert.deepEqual([(await file(undefined)).status, (await file(cookieC)).status, (await file(cookieB, '?w=999')).status, (await file(cookieB, '?f=svg')).status], [401, 404, 400, 400]);
+  // Edit and delete through the message route; both need the session and the site's own Origin.
+  const target = {params: Promise.resolve({id: message.id})};
+  const patched = await one.PATCH(request('/api/chat/messages/' + message.id, cookieA, 'PATCH', {body: 'caption fixed'}), target);
+  assert.equal(((await patched.json()) as {message: {body: string}}).message.body, 'caption fixed');
+  assert.equal((await one.PATCH(request('/api/chat/messages/' + message.id, cookieB, 'PATCH', {body: 'not mine'}), target)).status, 403);
+  assert.equal((await one.PATCH(request('/api/chat/messages/' + message.id, cookieA, 'PATCH', {body: 'x', hidden: true}), target)).status, 400);
+  assert.equal((await one.DELETE(request('/api/chat/messages/' + message.id, cookieC, 'DELETE', {}), target)).status, 404);
+  assert.equal((await one.DELETE(request('/api/chat/messages/' + message.id, cookieB, 'DELETE', {}), target)).status, 403);
+  assert.equal((await one.DELETE(new Request(origin + '/api/chat/messages/' + message.id, {method: 'DELETE', headers: {cookie: cookieA, origin: 'https://evil.example'}}), target)).status, 403);
+  assert.deepEqual(await (await one.DELETE(request('/api/chat/messages/' + message.id, cookieA, 'DELETE', {}), target)).json(), {id: message.id, deleted: true});
+  assert.equal((await file(cookieB)).status, 404, 'a deleted message serves no image');
+  // Rename, the polling page and removal by handle.
+  assert.equal((await conversation.PATCH(request('/api/chat/conversations/' + group.id, cookieA, 'PATCH', {action: 'rename', title: 'HTTP renamed'}), params)).status, 200);
+  assert.equal((await conversation.PATCH(request('/api/chat/conversations/' + group.id, cookieB, 'PATCH', {action: 'rename', title: 'No'}), params)).status, 403);
+  const page = await (await messages.GET(request('/api/chat/conversations/' + group.id + '/messages?from=' + message.id, cookieB), params)).json() as {messages: {deleted: boolean}[]};
+  assert.deepEqual(page.messages.map(row => row.deleted), [true]);
+  assert.equal((await members.DELETE(request('/api/chat/conversations/' + group.id + '/members', cookieA, 'DELETE', {handle: b.userId}), params)).status, 200);
+  assert.equal((await messages.GET(request('/api/chat/conversations/' + group.id + '/messages', cookieB), params)).status, 404);
 });

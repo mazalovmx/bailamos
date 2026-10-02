@@ -1,9 +1,9 @@
 import {createHmac, randomBytes, randomUUID, timingSafeEqual} from 'node:crypto';
 import {createReadStream, existsSync} from 'node:fs';
-import {mkdir, rename, rm, stat, writeFile} from 'node:fs/promises';
+import {copyFile, mkdir, readdir, rename, rm, stat, writeFile} from 'node:fs/promises';
 import {dirname, join, resolve, sep} from 'node:path';
 import {Readable} from 'node:stream';
-import {assertKey, UPLOAD_TTL_SEC, type PresignOptions, type Storage} from './types';
+import {assertKey, UPLOAD_TTL_SEC, type ListedObject, type PresignOptions, type Storage} from './types';
 // Development driver: objects are files under MEDIA_LOCAL_DIR and the "presigned URL" is a same-origin,
 // HMAC-signed PUT /api/media/local/<key> link. It also works in production on a single node with a persistent volume.
 const types: Record<string, string> = {avif: 'image/avif', webp: 'image/webp', jpg: 'image/jpeg', png: 'image/png'};
@@ -48,6 +48,7 @@ export function verifyLocalUpload(key: string, query: URLSearchParams, now = Dat
   if (exp * 1000 < now) return null;
   return {size, mime};
 }
+const LIST_SCAN_MAX = 200_000;
 export const diskStorage: Storage = {
   driver: 'local',
   async presignUpload(key, options) {
@@ -79,5 +80,30 @@ export const diskStorage: Storage = {
   },
   async exists(key) {
     return !!(await stat(file(key)).catch(() => null))?.isFile();
+  },
+  async list(prefix, {limit = 1000, after} = {}) {
+    if (!prefix.endsWith('/')) throw new Error('INVALID_STORAGE_KEY');
+    const found: ListedObject[] = [];
+    // The whole prefix is walked (bounded) and sorted, so `after` means the same as on S3.
+    async function walk(directory: string, key: string) {
+      for (const item of await readdir(directory, {withFileTypes: true}).catch(() => [])) {
+        if (found.length >= LIST_SCAN_MAX) return;
+        const path = join(directory, item.name), name = key + item.name;
+        if (item.isDirectory()) await walk(path, name + '/');
+        // Half-written files of putObject / putFile are not objects yet.
+        else if (item.isFile() && !item.name.endsWith('.tmp')) {
+          const info = await stat(path).catch(() => null);
+          if (info) found.push({key: name, modified: info.mtime, size: info.size});
+        }
+      }
+    }
+    await walk(file(prefix), prefix);
+    return found.filter(item => !after || item.key > after).sort((a, b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0).slice(0, Math.max(limit, 0));
+  },
+  async putFile(key, source) {
+    const path = file(key), temporary = path + '.' + randomUUID() + '.tmp';
+    await mkdir(dirname(path), {recursive: true});
+    await copyFile(source, temporary);
+    await rename(temporary, path);
   }
 };

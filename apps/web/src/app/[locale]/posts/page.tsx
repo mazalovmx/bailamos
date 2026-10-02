@@ -2,7 +2,7 @@ import {getTranslations} from 'next-intl/server';
 import {redirect} from 'next/navigation';
 import Link from 'next/link';
 import {postPath} from '../../../lib/blog/links';
-import {ownPosts} from '../../../lib/blog/posts';
+import {editableProfileIds, ownPosts} from '../../../lib/blog/posts';
 import {currentUser} from '../../../lib/session';
 import '../../styles/blog.css';
 export const metadata = {robots: {index: false, follow: false}};
@@ -10,7 +10,8 @@ export default async function MyPosts({params}: {params: Promise<{locale: string
   const {locale} = await params, user = await currentUser();
   if (!user) redirect('/' + locale + '/login');
   const t = await getTranslations('Blog');
-  const posts = user.profile ? await ownPosts(user.profile.id) : [];
+  // The author's own posts and the posts of the schools the author manages.
+  const profileIds = editableProfileIds(user), posts = profileIds.length ? await ownPosts(profileIds) : [];
   const drafts = posts.filter(post => !post.publishedAt), published = posts.filter(post => post.publishedAt);
   const date = new Intl.DateTimeFormat(locale, {dateStyle: 'medium', timeZone: 'UTC'});
   const row = (post: typeof posts[number]) => <li key={post.id} className="post-row">
@@ -18,13 +19,14 @@ export default async function MyPosts({params}: {params: Promise<{locale: string
       <strong>{post.title || t('untitled')}</strong>
       <span className="post-meta">
         {post.publishedAt ? t('publishedOn', {date: date.format(post.publishedAt)}) : t('editedOn', {date: date.format(post.updatedAt)})}
+        {post.profileId !== user.profile?.id ? ' · ' + t('publishedByName', {name: post.profile.name}) : ''}
         {post.hiddenAt ? ' · ' + t('hiddenByModeration') : ''}
       </span>
     </div>
     <div className="post-row-actions">
       <Link href={'/' + locale + '/posts/' + post.id + '/edit'}>{t('edit')}<span className="sr-only"> {post.title || t('untitled')}</span></Link>
-      {post.publishedAt && post.slug && !post.hiddenAt && user.profile &&
-        <Link href={postPath(locale, user.profile.handle, post.slug)}>{t('view')}<span className="sr-only"> {post.title}</span></Link>}
+      {post.publishedAt && post.slug && !post.hiddenAt &&
+        <Link href={postPath(locale, post.profile.handle, post.slug)}>{t('view')}<span className="sr-only"> {post.title}</span></Link>}
     </div>
   </li>;
   return <main className="detail-page blog-page">

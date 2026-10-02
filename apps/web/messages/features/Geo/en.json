@@ -78,5 +78,13 @@
   "error_VENUE_TOO_FAR": "This place is too far from the selected city. Check the city and the marker.",
   "error_CITY_NOT_FOUND": "Choose a city from the list.",
   "error_GEOLOCATION_DENIED": "Location access was denied. Choose a city instead, or allow location access in your browser.",
-  "error_GEOLOCATION_UNAVAILABLE": "Your location could not be determined. Choose a city instead."
+  "error_GEOLOCATION_UNAVAILABLE": "Your location could not be determined. Choose a city instead.",
+  "eventLocation": "Where it happens",
+  "pinToggle": "Set an exact point instead of a venue",
+  "pinHint": "For places that are not a venue, such as a park or a square. The point must be in or near the chosen city.",
+  "pinMapHelp": "Click the map to place the pin. Drag it to fine-tune the location; you can also use the coordinate fields below.",
+  "pinKeyboard": "Event location pin. Use arrow keys to move it; hold Shift for larger steps.",
+  "eventMap": "Map for this event location",
+  "pinMapUnavailable": "The map could not load. Enter the coordinates below instead.",
+  "pinRequired": "Choose a point on the map or enter both coordinates."
 }

@@ -1,0 +1,52 @@
+{
+  "replay": "Show tips for this page",
+  "next": "Next",
+  "previous": "Back",
+  "done": "Done",
+  "progress": "{{current}} of {{total}}",
+  "account": {
+    "homeTitle": "Your dance home",
+    "homeText": "Start with your profile, then use these shortcuts for events, messages, partner search and stories. Each section has its own short guide the first time you visit.",
+    "eventsTitle": "Organise a dance event",
+    "eventsText": "Create a social, regular class, workshop or masterclass. You can add its location, schedule and dance styles.",
+    "schoolsTitle": "Run a school profile",
+    "schoolsText": "Set your profile type to School, then publish classes and events under its name. School managers can also publish stories and manage school spaces in the admin panel.",
+    "shareTitle": "Make a post to share",
+    "shareText": "Open Announcement Studio to create a portrait, story or square PNG for Instagram and WhatsApp. On a phone, use Share image to open the system share sheet.",
+    "profileTitle": "Set up your dance profile",
+    "profileText": "Add your city and dance styles. You control separately whether each style appears in partner search.",
+    "communityTitle": "Find your community",
+    "communityText": "Browse events, classes and schools without filling everything in at once. Open a section to get tips for that task."
+  },
+  "event": {
+    "introTitle": "Create from a post or start manually",
+    "introText": "If the announcement parser is enabled, paste the WhatsApp or Instagram text and review its suggestions. Otherwise, fill the form below.",
+    "detailsTitle": "Add the event details",
+    "detailsText": "Choose a clear title, city and dance style. Add tags for the format, level and intensity so dancers can filter the listing.",
+    "placeTitle": "Pin the exact place",
+    "placeText": "Choose a venue or switch to a custom map point for parks and outdoor socials. Check the location before publishing.",
+    "scheduleTitle": "Set the time and repeat pattern",
+    "scheduleText": "Enter the local date and time for the selected city, then choose a one-off or recurring schedule.",
+    "publishTitle": "Review, then save",
+    "publishText": "You can save as a draft or publish. Parser suggestions require your explicit review and confirmation."
+  },
+  "schools": {
+    "createTitle": "Create your school profile",
+    "createText": "There is no separate school form. Set your profile type to School in your profile, add its public details, and then publish classes or events in its name.",
+    "createAction": "Set up a profile",
+    "listTitle": "Find a school",
+    "listText": "Filter schools by city, open a profile and check its weekly timetable, special events and venues.",
+    "claimTitle": "Take ownership of an existing profile",
+    "claimText": "Open an unclaimed school profile and use its claim request. A moderator reviews ownership before management access is granted.",
+    "adminTitle": "Manage your school",
+    "adminText": "A school profile owner can publish classes, events and posts in the school's name. School resource and staff administration lives in the separate admin panel; a platform owner or global admin must grant the School Admin role first. The admin link appears in the site header after access is granted."
+  },
+  "share": {
+    "fieldsTitle": "Write the announcement",
+    "fieldsText": "Enter the title, date, place and short description. Add a photo and adjust its crop if you like.",
+    "sizeTitle": "Choose a social format",
+    "sizeText": "Use post, story or square dimensions depending on where you will publish it.",
+    "exportTitle": "Share or save the image",
+    "exportText": "On supported phones, Share image opens the system sheet so you can choose Instagram or WhatsApp. Otherwise download the PNG and copy the caption."
+  }
+}

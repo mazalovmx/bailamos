@@ -15,7 +15,7 @@ export default async function Messages({params}: {params: Promise<{locale: strin
   const t = await getTranslations('Chat');
   if (!user.profile) return <main className="form-page chat-page"><h1>{t('title')}</h1><p className="intro">{t('error_PROFILE_REQUIRED')}</p>
     <Link className="button" href={'/' + locale + '/profile'}>{t('createProfile')}</Link></main>;
-  const me = {userId: user.id, profileId: user.profile.id, role: user.role, name: user.profile.name};
+  const me = {userId: user.id, profileId: user.profile.id, role: user.role, name: user.profile.name, schoolIds: user.schoolIds};
   const [initial, blocks] = await Promise.all([inbox(me), listBlocks(me)]);
   return <main className="form-page chat-page"><h1>{t('title')}</h1><p className="intro">{t('inboxIntro')}</p>
     <Inbox initial={initial} initialBlocks={blocks}/>

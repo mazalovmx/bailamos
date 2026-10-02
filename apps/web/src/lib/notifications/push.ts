@@ -33,7 +33,7 @@ export async function removeSubscription(userId: string, endpoint: string) {
   return (await db.pushSubscription.deleteMany({where: {userId, endpoint}})).count;
 }
 export type PushPreferences = {pushReminders: boolean; pushRsvp: boolean; pushChat: boolean};
-const gates: Record<string, keyof PushPreferences> = {EVENT_REMINDER: 'pushReminders', NEW_ATTENDEE: 'pushRsvp', CHAT_MESSAGE: 'pushChat'};
+const gates: Record<string, keyof PushPreferences> = {EVENT_REMINDER: 'pushReminders', NEW_ATTENDEE: 'pushRsvp', CHAT_MESSAGE: 'pushChat', GROUP_INVITE: 'pushChat', EVENT_MOVED: 'pushReminders'};
 // Three types have a switch; everything else is pushed whenever the device is subscribed. No row means defaults (all on).
 export function pushAllowed(type: string, preferences?: Partial<PushPreferences> | null) {
   const gate = gates[type];

@@ -1,1 +1,40 @@
 .home-cta{display:flex;gap:12px;flex-wrap:wrap}.home-cta .button{margin-top:8px;gap:12px;align-items:center}.home-reassurance{font-size:14px;line-height:1.6;color:#4b554a;max-width:510px}.home-capabilities{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:20px 0 35px}.home-capabilities>a{padding:24px;background:#e9edde;border:1px solid #d5dbc9;border-radius:16px;text-decoration:none}.home-capabilities h3{margin:0 0 12px;font-size:22px}.home-capabilities p{font-size:16px;line-height:1.6;margin:0}.home-capabilities>a:hover{border-color:#496149}@media(max-width:700px){.home-capabilities{grid-template-columns:1fr}.home-hero h1{font-size:40px}.home-hero{padding-top:20px}.home-cta{flex-direction:column}.home-cta .button{justify-content:center;text-align:center;padding:14px 16px;min-height:48px}.home-hero .intro{font-size:16px}}
+
+/* Homepage photographs: fixed frames, cropped images. */
+.community-photo img{object-position:center 28%}
+.home-hero{padding:36px 0;gap:40px}
+.home-hero .community-photo{aspect-ratio:5/4;max-height:460px;border-radius:90px 90px 20px 20px}
+.discovery-card .community-photo{aspect-ratio:3/2}
+.discovery-card:nth-child(n+4) .community-photo{aspect-ratio:5/2}
+.discovery-copy{padding:20px 22px}
+.discovery-copy h3{margin:10px 0}
+.home-section{padding:24px 0 36px}
+.home-bottom{padding:30px 0 45px}
+@media(max-width:800px){.discovery-card:nth-child(n+4) .community-photo{aspect-ratio:2/1}}
+@media(max-width:600px){
+  .home-hero{padding:18px 0 24px}
+  .home-hero .community-photo{aspect-ratio:16/9;max-height:none;border-radius:50px 50px 18px 18px}
+  .discovery-card .community-photo,.discovery-card:nth-child(n+4) .community-photo{aspect-ratio:2/1}
+  .discovery-copy{padding:16px 18px}
+}
+/* Homepage: what the site is for, school how-to, Instagram strip. Kept compact. */
+.home-section{padding:20px 0 26px}
+.home-section>p{margin:6px 0 12px;max-width:720px;line-height:1.6}
+.home-section h2,.tempo-banner h2{font-size:clamp(24px,2.6vw,32px);margin:0 0 6px}
+.home-kinds{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0 0 12px;padding:0}
+.home-kinds a{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;background:#e9edde;border:1px solid #d5dbc9;border-radius:24px;text-decoration:none;font-weight:600}
+.home-kinds a:hover{border-color:#496149}
+.home-create{display:flex;flex-wrap:wrap;gap:16px;align-items:center}.home-create .button{margin:0}
+.home-steps{display:grid;grid-template-columns:1fr 1fr;gap:16px;list-style:none;margin:0 0 10px;padding:0}
+.home-steps figure{margin:0}
+.home-steps img{display:block;width:100%;height:auto;border:1px solid #d5dbc9;border-radius:12px}
+.home-steps figcaption{font-size:15px;line-height:1.5;margin-top:8px}
+.home-instagram{display:flex;gap:12px;overflow-x:auto;padding:12px;background:#fffefa;border:1px solid #d5dbc9;border-radius:18px;scroll-snap-type:x proximity}
+.home-instagram:focus-visible{outline:3px solid #245ddd;outline-offset:3px}
+.ig-frame{flex:0 0 260px;scroll-snap-align:start;display:flex;flex-direction:column;gap:6px}
+.ig-frame iframe{width:260px;height:340px;border:1px solid #d5dbc9;border-radius:10px;background:#f6f4ee}
+.ig-frame a{font-size:13px;min-height:32px;display:inline-flex;align-items:center}
+.tempo-banner{padding:26px 30px;margin-bottom:30px}.tempo-links{margin-top:14px}
+@media(max-width:700px){.home-steps{grid-template-columns:1fr}.ig-frame{flex-basis:230px}.ig-frame iframe{width:230px;height:320px}}
+.home-share{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between;margin-top:16px;padding:16px 20px;background:#253b2f;color:#f6f4ee;border-radius:16px}
+.home-share h3{margin:0 0 4px;font-size:20px}.home-share p{margin:0;max-width:620px;line-height:1.5;font-size:15px}.home-share .button{margin:0}

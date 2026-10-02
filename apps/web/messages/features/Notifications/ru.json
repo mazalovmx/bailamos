@@ -62,6 +62,8 @@
   "body_NEW_ATTENDEE": "{name} идёт на «{title}».",
   "type_CHAT_MESSAGE": "Новое сообщение от {name}",
   "body_CHAT_MESSAGE": "Откройте чат, чтобы прочитать.",
+  "type_GROUP_INVITE": "Приглашение в группу",
+  "body_GROUP_INVITE": "{name} приглашает вас в группу «{title}».",
   "type_EVENT_CANCELLED": "Отменено: {title}",
   "body_EVENT_CANCELLED": "Это событие отменено.",
   "body_EVENT_CANCELLED_DATE": "Дата {date} отменена.",
@@ -77,6 +79,7 @@
   "body_CLAIM_DECIDED_REJECTED": "Ваша заявка на профиль «{profile}» отклонена.",
   "type_MODERATION": "Сообщение от модераторов",
   "body_MODERATION": "Модератор принял меры в отношении вашего контента.",
+  "type_NEW_POST": "Новый пост: {name}",
   "mailOpen": "Открыть в Dance Community",
   "mailFooter": "Вы получили это письмо из-за вашей активности в Dance Community. Отключить письма о событиях можно в настройках: {url}",
   "telegramTitle": "Telegram",
@@ -84,5 +87,7 @@
   "telegramConnect": "Подключить Telegram",
   "telegramConnected": "Telegram подключён.",
   "telegramDisconnect": "Отключить Telegram",
-  "telegramFailed": "Не удалось связаться с Telegram. Попробуйте ещё раз."
+  "telegramFailed": "Не удалось связаться с Telegram. Попробуйте ещё раз.",
+  "type_EVENT_MOVED": "Дата изменена: {title}",
+  "body_EVENT_MOVED": "Новое время: {date}"
 }

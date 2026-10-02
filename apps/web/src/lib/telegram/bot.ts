@@ -1,3 +1,4 @@
+import {cityName} from '../catalogue/city-name';
 import {DateTime} from 'luxon';
 import {z} from 'zod';
 import {db, type Prisma, type TelegramChat} from '@dance/db';
@@ -78,7 +79,7 @@ export async function eventList(chat: Chat, mode: Mode, arg: string, page: numbe
     where: {...upcomingOccurrences(filter, from), startsAt: {gte: from, ...(to ? {lte: to} : {})}},
     orderBy: [{startsAt: 'asc'}, {id: 'asc'}], skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE + 1,
     select: {startsAt: true, event: {select: {slug: true, title: true, timezone: true, city: {select: {name: true}}, venue: {select: {name: true}}}}}});
-  const heading = t(locale, titles[mode][city ? 0 : 1], {city: city?.name ?? '', query: arg, style: label}) + (page > 1 ? ' · ' + t(locale, 'page', {page}) : '');
+  const heading = t(locale, titles[mode][city ? 0 : 1], {city: city ? cityName(city, locale) : '', query: arg, style: label}) + (page > 1 ? ' · ' + t(locale, 'page', {page}) : '');
   const lines = rows.slice(0, PAGE_SIZE).map(({startsAt, event}) => {
     const place = [event.venue?.name, city ? null : event.city.name].filter(Boolean).join(', ');
     return '<b>' + esc(event.title) + '</b>\n' + esc(when(startsAt, event.timezone, locale) + (place ? ' · ' + place : '')) + '\n'
@@ -109,12 +110,12 @@ async function command(chat: Chat, name: string, arg: string, isPrivate: boolean
       const cities = await allCities();
       if (!arg) {
         const current = cities.find(city => city.id === chat.cityId);
-        return current ? say('cityCurrent', {city: current.name}) : say('cityUsage');
+        return current ? say('cityCurrent', {city: cityName(current, locale)}) : say('cityUsage');
       }
       const city: CityOption | null = fuzzyPick(cities, arg);
       if (!city) return say('cityNotFound', {query: arg.slice(0, 80)});
       await update({cityId: city.id});
-      return say('citySet', {city: city.name});
+      return say('citySet', {city: cityName(city, locale)});
     }
     case 'events': case 'today': case 'weekend': return eventList(chat, name, '', paged(arg, false).page, now);
     case 'search': case 'style': {

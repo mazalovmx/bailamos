@@ -40,9 +40,10 @@ export function Inbox({initial, initialBlocks}: {initial: ChatInbox; initialBloc
       <Avatar name={title} url={conversation.other?.avatarUrl ?? null}/>
       <div className="chat-row-main">
         <Link className="chat-row-title" href={'/' + locale + '/messages/' + conversation.id}>{title}</Link>
-        {conversation.kind !== 'DIRECT' && <span className="chat-kind">{t('kind_' + conversation.kind)}</span>}
-        <p className="chat-row-preview">{last ? <>{last.mine ? t('you') : last.senderName}: {last.hidden ? <em>{t('hiddenMessage')}</em> : last.body}</>
-          : t('noMessagesYet')}</p>
+        {conversation.kind !== 'DIRECT' && <span className="chat-kind">{conversation.school ? conversation.school.name : t('kind_' + conversation.kind)}</span>}
+        <p className="chat-row-preview">{!last ? t('noMessagesYet') : last.blockedSender ? <em>{t('blockedSenderMessage')}</em>
+          : <>{last.mine ? conversation.school?.name ?? t('you') : last.senderName}: {last.deleted ? <em>{t('deletedMessage')}</em>
+            : last.hidden ? <em>{t('hiddenMessage')}</em> : last.body || (last.attachment ? t('photo') : '')}</>}</p>
         {request && <div className="chat-actions">
           <button type="button" className="button" disabled={!!busy} onClick={() => act(conversation.id, () => chatCall('/api/chat/conversations/' + conversation.id, 'PATCH', {action: 'accept'}))}>{t('accept')}</button>
           <button type="button" className="button secondary" disabled={!!busy} onClick={() => act(conversation.id, () => chatCall('/api/chat/conversations/' + conversation.id, 'DELETE', {}))}>{t('decline')}</button>
@@ -70,6 +71,11 @@ export function Inbox({initial, initialBlocks}: {initial: ChatInbox; initialBloc
       <h2 id="chat-conversations-title">{t('conversations')}</h2>
       {data.conversations.length ? <ul className="chat-list">{data.conversations.map(conversation => row(conversation, false))}</ul> : <p>{t('noConversations')}</p>}
     </section>
+    {data.school.length > 0 && <section aria-labelledby="chat-school-title" className="chat-section">
+      <h2 id="chat-school-title">{t('schoolConversations')}</h2>
+      <p className="chat-hint">{t('schoolConversationsHint')}</p>
+      <ul className="chat-list">{data.school.map(conversation => row(conversation, false))}</ul>
+    </section>}
     <details className="chat-panel">
       <summary>{t('newGroup')}</summary>
       <form className="chat-form" onSubmit={event => {event.preventDefault(); void createGroup(event.currentTarget);}}>

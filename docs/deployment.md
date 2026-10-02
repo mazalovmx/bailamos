@@ -37,7 +37,21 @@ The root railway.json defines build/start settings but does not connect GitHub o
 | SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD, SMTP_FROM | Real verification, recovery and notification email delivery. Mailpit is development-only. |
 | RAILPACK_PRUNE_DEPS=false | Retain prisma, tsx and dotenv-cli for release commands. |
 | NEXT_TELEMETRY_DISABLED=1 | Optional telemetry setting. |
+| DEEPSEEK_API_KEY | Optional. Enables event parsing from pasted announcements; leave unset to keep manual event creation. The default model is `deepseek-chat`; optionally set `DEEPSEEK_MODEL` or `DEEPSEEK_API_URL`. |
 
 Railway supplies PORT. .env is local and ignored. The root config deploys web only, not admin or the background worker. Create a separate worker service with railway.worker.json following the [worker runbook](worker.md). Expanded modules require Redis, worker scheduling, persistent media storage and integration-specific configuration. Do not assume they are operational until exercised in the target environment.
+
+## Admin service
+
+The admin panel is a third service from the same repository and `deploy` branch, root `/`, config path `/railway.admin.json`. It builds the admin app only and starts it on Railway's `PORT`; migrations stay with the web service. Give it its own domain (for example `admin.<domain>`) and set:
+
+| Variable | Purpose |
+| --- | --- |
+| DATABASE_URL, BETTER_AUTH_SECRET | Same values as the web service: same users, same sessions table. |
+| ADMIN_URL | Public HTTPS URL of the admin service. Sign-in and the Origin check use it. |
+| WEB_URL | Public URL of the web service, for links and media previews. |
+| RAILPACK_PRUNE_DEPS=false | Keeps Prisma available at runtime. |
+
+Set `ADMIN_URL` on the **web** service as well: the account menu shows staff a link to the panel and falls back to `http://localhost:3001` without it. The first owner is created with `grant-role.ts` (see docs/status.md); nobody can sign up through the panel. No Railway service is created just by committing the config file.
 
 Sources: [Railway configuration](https://docs.railway.com/config-as-code/reference), [GitHub autodeploys/Wait for CI](https://docs.railway.com/deployments/github-autodeploys), [Railpack Node.js settings](https://railpack.com/languages/node/).

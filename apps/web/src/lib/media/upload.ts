@@ -6,7 +6,7 @@ import {authorizeTarget, profileOf, type MediaUser} from './access';
 import {allowedMimes, maxBytes, maxItemsPerParent} from './config';
 import {toMediaDto, type MediaDto} from './dto';
 import {MediaError} from './errors';
-import {TARGETS, baseKey, isBaseKey, parseRawKey, rawKey, variantKey, variantKeys} from './keys';
+import {TARGETS, baseKey, chatBaseKey, isBaseKey, parseRawKey, rawKey, variantKey, variantKeys} from './keys';
 import {processImage} from './process';
 import {mediaUrl} from './url';
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
@@ -27,7 +27,7 @@ export async function startUpload(user: MediaUser, input: unknown) {
   if (!allowedMimes().includes(mime.toLowerCase())) throw new MediaError('MEDIA_TYPE', 415);
   if (size > maxBytes()) throw new MediaError('MEDIA_TOO_LARGE', 413);
   await assertRoom(await authorizeTarget(user, target, targetId));
-  const key = rawKey(profileId, target, target === 'event' || target === 'post' ? targetId : undefined, randomUUID());
+  const key = rawKey(profileId, target, target === 'avatar' || target === 'cover' ? undefined : targetId, randomUUID());
   const presigned = await storage().presignUpload(key, {mime: mime.toLowerCase(), size});
   return {key, uploadUrl: presigned.url, method: presigned.method, headers: presigned.headers, expiresAt: presigned.expiresAt};
 }
@@ -52,9 +52,11 @@ export async function completeUpload(user: MediaUser, input: unknown): Promise<U
   }
   // Whatever happens next, the unverified original must not stay in storage.
   const processed = await processImage(body).finally(() => store.deleteObjects([key]).catch(() => {}));
-  const base = baseKey(profileId, raw.uuid);
+  const base = raw.target === 'chat' && raw.targetId ? chatBaseKey(raw.targetId, profileId, raw.uuid) : baseKey(profileId, raw.uuid);
   try {
     for (const file of processed.files) await store.putObject(variantKey(base, file.width, file.format), file.body, file.contentType);
+    // A chat attachment has no MediaItem and no public URL: the key is handed to the message that is sent next.
+    if (raw.target === 'chat') return {key: base, url: ''};
     if (raw.target === 'avatar' || raw.target === 'cover') {
       const field = raw.target === 'avatar' ? 'avatarKey' : 'coverKey';
       const previous = (await db.profile.findUnique({where: {id: profileId}, select: {avatarKey: true, coverKey: true}}))?.[field];

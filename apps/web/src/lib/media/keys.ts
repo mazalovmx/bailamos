@@ -3,11 +3,11 @@ export const WIDTHS = [320, 800, 1600] as const;
 export const FORMATS = ['avif', 'webp'] as const;
 export type Width = typeof WIDTHS[number];
 export type Format = typeof FORMATS[number];
-export const TARGETS = ['event', 'post', 'avatar', 'cover'] as const;
+export const TARGETS = ['event', 'post', 'avatar', 'cover', 'chat'] as const;
 export type UploadTarget = typeof TARGETS[number];
 const ID = '[A-Za-z0-9_-]{1,64}';
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const RAW = new RegExp('^raw/(' + ID + ')/(event|post|avatar|cover)/(' + ID + ')/(' + UUID + ')$');
+const RAW = new RegExp('^raw/(' + ID + ')/(event|post|avatar|cover|chat)/(' + ID + ')/(' + UUID + ')$');
 const BASE = new RegExp('^img/(' + ID + ')/(' + UUID + ')$');
 const VARIANT = new RegExp('^(img/' + ID + '/' + UUID + ')/(320|800|1600)\\.(avif|webp)$');
 /**
@@ -30,4 +30,14 @@ export function parseVariantKey(key: string) {
   const match = VARIANT.exec(key);
   return match ? {base: match[1], width: Number(match[2]) as Width, format: match[3] as Format} : null;
 }
+// Chat attachments live under their own prefix, which BASE and VARIANT above do not match: the public file route can never
+// serve them. They are read only through /api/chat/attachments/<messageId>, which checks conversation membership.
+// The key names the conversation (one prefix to remove with it) and the uploader (only they may attach it to a message).
+const CHAT_BASE = new RegExp('^chat/(' + ID + ')/(' + ID + ')/(' + UUID + ')$');
+export const chatBaseKey = (conversationId: string, profileId: string, uuid: string) => ['chat', conversationId, profileId, uuid].join('/');
+export function parseChatKey(key: string) {
+  const match = CHAT_BASE.exec(key);
+  return match ? {conversationId: match[1], profileId: match[2], uuid: match[3]} : null;
+}
+export const chatPrefix = (conversationId: string) => 'chat/' + conversationId + '/';
 export const contentTypes: Record<Format, string> = {avif: 'image/avif', webp: 'image/webp'};

@@ -11,6 +11,7 @@ import {Queue, Worker, UnrecoverableError, type Job} from 'bullmq';
 import Redis from 'ioredis';
 import {db} from '@dance/db';
 import {closeRedis} from '../lib/redis';
+import {recordError} from '../lib/ops/alerts';
 import {DEAD_LETTER_KEY, DEAD_LETTER_MAX, HEARTBEAT_EVERY_MS, HEARTBEAT_KEY, HEARTBEAT_TTL_SEC} from './keys';
 import {jobs, registryProblems} from './registry';
 import type {JobDef} from './types';
@@ -95,6 +96,8 @@ async function serve(exitAfterSec: number | null) {
   worker.on('failed', (job, error) => {
     const attempts = job?.opts.attempts ?? 1, final = !job || job.attemptsMade >= attempts || error instanceof UnrecoverableError;
     log(final ? 'error' : 'warn', final ? 'job_dead' : 'job_failed', {job: job?.name ?? null, id: job?.id ?? null, attempt: job?.attemptsMade ?? null, attempts, message: message(error)});
+    // Counted for the failed-jobs alert (ops.watchdog).
+    if (final) void recordError('job').catch(() => {});
     // Dead-letter log: the last failures stay readable after BullMQ trims its own failed set.
     if (final) void redis.multi().lpush(DEAD_LETTER_KEY, JSON.stringify({at: new Date().toISOString(), queue: queueName, job: job?.name ?? null, id: job?.id ?? null,
       attempts: job?.attemptsMade ?? null, message: message(error).slice(0, 500)})).ltrim(DEAD_LETTER_KEY, 0, DEAD_LETTER_MAX - 1).exec().catch(() => {});

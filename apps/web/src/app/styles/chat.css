@@ -66,3 +66,5 @@
   .chat-actions .button{flex:1 1 auto}
 }
 @media(prefers-reduced-motion:no-preference){.chat-scroll{scroll-behavior:auto}}
+.chat-message .media-picture img{max-height:360px;width:auto;max-width:100%;border-radius:10px;margin-top:6px}
+.chat-message-meta span{font-size:12px;color:#414b3f}

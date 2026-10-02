@@ -10,6 +10,10 @@ a { color: var(--accent); }
 h1 { font-size: 1.6rem; margin: 0 0 12px; }
 h2 { font-size: 1.15rem; margin: 0 0 8px; }
 :focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
+.admin-guide-replay { position: fixed; right: 16px; bottom: max(16px,env(safe-area-inset-bottom)); z-index: 1200; border: 1px solid var(--accent); border-radius: 999px; background: var(--surface); color: var(--accent); padding: 10px 15px; font: inherit; font-weight: 700; box-shadow: 0 3px 16px #18251e26; cursor: pointer; }
+.admin-guide-replay:hover { background: #e6f0e8; }
+.dance-guide-popover { max-width: min(340px,calc(100vw - 28px)); }
+.dance-guide-popover .driver-popover-description { line-height: 1.5; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .skip { position: absolute; left: -999px; top: 8px; background: var(--surface); padding: 8px 12px; z-index: 10; }
 .skip:focus { left: 8px; }

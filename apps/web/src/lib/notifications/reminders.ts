@@ -2,10 +2,13 @@ import {db} from '@dance/db';
 import {notify} from '../notify';
 import {sendEventReminderEmail} from './email';
 import {pushEnabled} from './push';
+import {attendeeProfileIds} from '../events/attendees';
 import './register';
 export const REMINDER_LEAD_MINUTES = 120;
 /**
- * Reminds everyone who answered "going" about occurrences that start within the next two hours.
+ * Reminds everyone who is "going" to an occurrence that starts within the next two hours. For a series the answer
+ * that counts is the effective one for that date: an answer given for the date itself, else the answer for the whole
+ * series. So "not this date" silences the reminder and "going" to this date only earns one.
  * Call it every `intervalMinutes` (5 by default): the window is widened by one interval, so a reminder goes out
  * between 2 h 05 min and 1 h 55 min before the start. An occurrence that enters the window late (created or
  * published shortly before it starts, or the scheduler was down) is still reminded once, as long as it has not started.
@@ -24,13 +27,12 @@ export async function sendEventReminders(now = new Date(), intervalMinutes = 5) 
   const result = {occurrences: claimed.length, notified: 0, mailed: 0};
   if (!claimed.length) return result;
   const occurrences = await db.eventOccurrence.findMany({where: {id: {in: claimed.map(row => row.id)}}, select: {id: true, startsAt: true,
-    event: {select: {id: true, slug: true, title: true, timezone: true, venue: {select: {name: true}},
-      rsvps: {where: {status: 'GOING'}, select: {profile: {select: {user: {select: {id: true, bannedAt: true,
-        notificationPreference: {select: {emailEvents: true}}, _count: {select: {pushSubscriptions: true}}}}}}}}}}}});
+    event: {select: {id: true, slug: true, title: true, timezone: true, venue: {select: {name: true}}}}}});
   for (const occurrence of occurrences) {
     const {event} = occurrence;
-    const users = [...new Map(event.rsvps.flatMap(rsvp => rsvp.profile.user && !rsvp.profile.user.bannedAt ? [rsvp.profile.user] : [])
-      .map(user => [user.id, user] as const)).values()];
+    const going = await attendeeProfileIds(event.id, occurrence.id, ['GOING']);
+    const users = going.length ? await db.user.findMany({where: {profile: {id: {in: going}}, bannedAt: null}, select: {id: true,
+      notificationPreference: {select: {emailEvents: true}}, _count: {select: {pushSubscriptions: true}}}}) : [];
     if (!users.length) continue;
     const data = {eventId: event.id, slug: event.slug, title: event.title, occurrenceId: occurrence.id,
       startsAt: occurrence.startsAt.toISOString(), timezone: event.timezone, ...(event.venue ? {place: event.venue.name} : {})};

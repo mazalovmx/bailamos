@@ -4,6 +4,7 @@ import {getTranslations} from 'next-intl/server';
 import {db} from '@dance/db';
 import {allStyles, upcomingOccurrences} from '../../../../lib/catalogue/data';
 import {ancestors, descendantIds} from '../../../../lib/catalogue/tree';
+import {cityName} from '../../../../lib/catalogue/city-name';
 import {currentCity} from '../../../../lib/catalogue/current-city';
 import {isFollowing} from '../../../../lib/catalogue/follows';
 import {currentUser} from '../../../../lib/session';
@@ -37,10 +38,10 @@ export default async function Style({params, searchParams}: Props) {
       <Link className="button secondary" href={'/' + locale + '/calendar?style=' + encodeURIComponent(style.slug)}>{t('openCalendar')}</Link></div>
     {children.length > 0 && <section aria-labelledby="sub-styles"><h2 id="sub-styles">{t('subStyles')}</h2>
       <div className="tags">{children.map(child => <Link key={child.id} href={base + child.slug}>{child.name}</Link>)}</div></section>}
-    <section aria-labelledby="style-events"><h2 id="style-events">{local ? t('upcomingInCity', {city: local.name}) : t('upcomingEvents')}</h2>
+    <section aria-labelledby="style-events"><h2 id="style-events">{local ? t('upcomingInCity', {city: cityName(local, locale)}) : t('upcomingEvents')}</h2>
       {ids.length > 1 && <p className="catalogue-meta">{t('includesSubStyles', {count: ids.length - 1})}</p>}
       {local ? <p><Link href={base + style.slug + '?everywhere=1'}>{t('showEverywhere')}</Link></p>
-        : city && <p><Link href={base + style.slug}>{t('showOnlyCity', {city: city.name})}</Link></p>}
+        : city && <p><Link href={base + style.slug}>{t('showOnlyCity', {city: cityName(city, locale)})}</Link></p>}
       {occurrences.length ? <div className="event-grid">{occurrences.map(occurrence => <EventCard key={occurrence.id} event={occurrence.event} displayDate={occurrence.startsAt} locale={locale}/>)}</div>
         : <p className="notice" role="status">{t('noEventsInStyle')}</p>}
       {total > occurrences.length && <p className="catalogue-meta">{t('moreEvents', {count: total - occurrences.length})}</p>}

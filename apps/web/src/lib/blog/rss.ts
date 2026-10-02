@@ -1,5 +1,6 @@
 import {createHash} from 'node:crypto';
-export type RssItem = {title: string; link: string; description?: string | null; publishedAt: Date; author?: string; image?: string};
+/** `content` is the full body as HTML that is already safe to show (lib/blog/html.ts); it goes out as content:encoded. */
+export type RssItem = {title: string; link: string; description?: string | null; content?: string | null; publishedAt: Date; author?: string; image?: string};
 export type RssChannel = {title: string; link: string; self: string; description: string; language?: string; items: RssItem[]};
 // Characters XML 1.0 cannot carry at all (most C0 controls, lone surrogates, U+FFFE/U+FFFF) are dropped before escaping.
 const c = String.fromCharCode;
@@ -14,9 +15,10 @@ export function buildRss(channel: RssChannel) {
   const items = channel.items.map(item => '<item>' + tag('title', item.title) + tag('link', item.link) +
     '<guid isPermaLink="true">' + xmlEscape(item.link) + '</guid>' + tag('pubDate', item.publishedAt.toUTCString()) +
     (item.author ? tag('dc:creator', item.author) : '') + (item.description ? tag('description', item.description) : '') +
+    (item.content ? tag('content:encoded', item.content) : '') +
     (item.image ? '<enclosure url="' + xmlEscape(item.image) + '" type="image/webp" length="0"/>' : '') + '</item>');
   return '<?xml version="1.0" encoding="UTF-8"?>\n' +
-    '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel>' +
+    '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel>' +
     tag('title', channel.title) + tag('link', channel.link) + tag('description', channel.description) +
     (channel.language ? tag('language', channel.language) : '') +
     '<atom:link href="' + xmlEscape(channel.self) + '" rel="self" type="application/rss+xml"/>' +

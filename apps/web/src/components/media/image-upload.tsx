@@ -5,7 +5,7 @@ import {useTranslations} from 'next-intl';
 import type {MediaDto} from '../../lib/media/dto';
 export type UploadedImage = {id?: string; key: string; url: string; item?: MediaDto};
 type Props = {
-  target: 'event' | 'post' | 'avatar' | 'cover';
+  target: 'event' | 'post' | 'avatar' | 'cover' | 'chat';
   targetId?: string;
   onUploaded?: (item: UploadedImage) => void;
   /** Mirrors the server limit (MEDIA_MAX_BYTES) for an early, friendly check; the server enforces the real one. */
@@ -35,6 +35,14 @@ function put(url: string, headers: Record<string, string>, file: File, onProgres
     xhr.send(file);
   });
 }
+/** The three upload steps (ticket, PUT, verification) for callers with their own form, such as the chat composer. */
+export async function uploadImage(file: File, target: Props['target'], targetId?: string, alt?: string, onProgress: (percent: number) => void = () => {}, onStored: () => void = () => {}) {
+  const ticket = await post('/api/media/uploads', {target, targetId, mime: file.type, size: file.size});
+  await put(ticket.uploadUrl, ticket.headers || {}, file, onProgress);
+  onStored();
+  return await post('/api/media/uploads/complete', {key: ticket.key, alt: alt || undefined}) as UploadedImage;
+}
+export const IMAGE_TYPES = TYPES;
 export function ImageUpload({target, targetId, onUploaded, maxBytes = 10 * 1024 * 1024}: Props) {
   const t = useTranslations('Media'), uid = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -54,10 +62,7 @@ export function ImageUpload({target, targetId, onUploaded, maxBytes = 10 * 1024 
     if (!file || busy) return;
     setError(''); setPercent(0); setPhase('uploading');
     try {
-      const ticket = await post('/api/media/uploads', {target, targetId, mime: file.type, size: file.size});
-      await put(ticket.uploadUrl, ticket.headers || {}, file, setPercent);
-      setPhase('processing');
-      const done = await post('/api/media/uploads/complete', {key: ticket.key, alt: alt.trim() || undefined}) as UploadedImage;
+      const done = await uploadImage(file, target, targetId, alt.trim(), setPercent, () => setPhase('processing'));
       setPhase('done'); setFile(null); setAlt('');
       if (input.current) input.current.value = '';
       onUploaded?.(done);
