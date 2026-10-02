@@ -86,19 +86,19 @@ export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools
   }}>
     <label>{t('title')}<input name="title" required minLength={3} maxLength={120} defaultValue={initial.title}/></label>
     <label>{t('description')}<textarea name="description" required minLength={10} maxLength={5000} rows={6} defaultValue={initial.description}/></label>
-    <div className="form-grid"><label>{t('city')}<select name="cityId" required value={cityId} onChange={e=>setCityId(e.target.value)}><option value="">{t('choose')}</option>{cities.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+    <div className="form-grid" data-guide="event-details"><label>{t('city')}<select name="cityId" required value={cityId} onChange={e=>setCityId(e.target.value)}><option value="">{t('choose')}</option>{cities.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
     <Select name="styleId" label={t('style')} options={styles} value={initial.styleId}/></div>
     {/* The picker submits "venueId"; saving copies the venue's coordinates to the event, or the city's when there is none. */}
     {!id&&schools.length>0&&<label>{x('onBehalfOf')}<select name="schoolProfileId" defaultValue=""><option value="">{x('onBehalfOfMe')}</option>{schools.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select><small>{x('onBehalfOfHint')}</small></label>}
-    <EventLocation key={cityId} city={cities.find(c=>c.id===cityId)} initial={cityId===initial.cityId?initial:{}}/>
+    <div data-guide="event-place"><EventLocation key={cityId} city={cities.find(c=>c.id===cityId)} initial={cityId===initial.cityId?initial:{}}/></div>
     <label>{x('price')}<input name="priceText" maxLength={120} defaultValue={initial.priceText} placeholder={x('pricePlaceholder')}/><small>{x('priceHint')}</small></label>
     <SwingFields initial={initial} tags={tags} selectedTags={selectedTags}/>
-    <ScheduleFields initial={initial} zone={cities.find(c=>c.id===cityId)?.timezone}/>
+    <div data-guide="event-schedule"><ScheduleFields initial={initial} zone={cities.find(c=>c.id===cityId)?.timezone}/></div>
     <div className="form-grid"><label>{x('attendeeVisibility')}<select name="attendeeVisibility" defaultValue={initial.attendeeVisibility||'PUBLIC'}>{['PUBLIC','ATTENDEES','ORGANIZERS'].map(value=><option key={value} value={value}>{x('visibility_'+value)}</option>)}</select><small>{x('attendeeVisibilityHint')}</small></label>
     <Select name="status" label={t('status')} value={initial.status||'DRAFT'} options={(id?['DRAFT','PUBLISHED','CANCELLED']:['DRAFT','PUBLISHED']).map(id=>({id,name:t(id)}))}/></div>
     {/* Values suggested by the announcement parser are never saved without the organizer saying they were checked. */}
     {parseId&&<><input type="hidden" name="parseId" value={parseId}/><label className="checkbox"><input type="checkbox" name="parsedConfirmed" required/>{x('parseConfirm')}</label></>}
-    {s.feedback}<button className="button" disabled={s.busy}>{t(s.busy?'working':'saveEvent')}</button>
+    {s.feedback}<button data-guide="event-publish" className="button" disabled={s.busy}>{t(s.busy?'working':'saveEvent')}</button>
   </form>;
 }
 export function RsvpButtons({eventId,initial}:{eventId:string;initial:string}) {

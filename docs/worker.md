@@ -29,6 +29,7 @@ Registry: `apps/web/src/worker/registry.ts`. Jobs cover weekly digests, event re
 | `embeds.refresh` | every 30 min | Instagram oEmbed copies older than ~20 h |
 | `ops.watchdog` | every minute | error rates, heartbeat, database, Redis, backup freshness → alerts |
 | `backup.database` | daily 02:40 | `pg_dump` to the object store; only with `BACKUP_ENABLED=true` |
+| `blog.notifications` | every minute | drains the transactional outbox for first-publication follower notifications |
 
 Alerts, backups, restore and log fields are described in [operations](operations.md).
 

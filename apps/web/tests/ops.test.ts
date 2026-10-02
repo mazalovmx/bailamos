@@ -57,7 +57,8 @@ after(async () => {
 test('registry: the operations jobs are registered with sound schedules', () => {
   assert.deepEqual(registryProblems(), []);
   const byName = new Map(jobs.map(job => [job.name, job]));
-  assert.deepEqual(['embeds.refresh', 'media.purge', 'media.orphans', 'ops.watchdog', 'backup.database'].map(name => !!byName.get(name)), [true, true, true, true, true]);
+  assert.deepEqual(['embeds.refresh', 'media.purge', 'media.orphans', 'ops.watchdog', 'backup.database', 'blog.notifications'].map(name => !!byName.get(name)), [true, true, true, true, true, true]);
+  assert.equal(byName.get('blog.notifications')?.everyMs, 60_000);
   assert.equal(byName.get('ops.watchdog')?.everyMs, 60_000);
   assert.equal(byName.get('backup.database')?.cron, '40 2 * * *');
 });

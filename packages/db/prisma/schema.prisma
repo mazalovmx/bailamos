@@ -398,8 +398,19 @@ model Post {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
   media MediaItem[]
+  notificationOutbox PostNotificationOutbox?
   @@index([profileId, publishedAt])
   @@index([eventId])
+}
+model PostNotificationOutbox {
+  postId String @id
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  excludeUserId String?
+  lastFollowId String?
+  notified Int @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
+  @@index([completedAt, createdAt])
 }
 model MediaItem {
   id String @id @default(cuid())
@@ -505,6 +516,7 @@ model Notification {
   type String
   data Json
   url String?
+  dedupeKey String? @unique
   readAt DateTime? @db.Timestamptz(3)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@index([userId, readAt, createdAt])

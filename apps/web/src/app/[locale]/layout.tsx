@@ -11,6 +11,7 @@ import {getTranslations} from 'next-intl/server';
 // Registers push delivery so that notify() reaches subscribed devices.
 import '../../lib/notifications/register';
 import '../globals.css';
+import '../guide.css';
 import '../application.css';
 import '../swing.css';
 import '../community.css';

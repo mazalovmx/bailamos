@@ -10,5 +10,10 @@ export async function notify(userIds: string[], type: NotificationType, data: Pr
   const unique = [...new Set(userIds)];
   if (!unique.length) return;
   await db.notification.createMany({data: unique.map(userId => ({userId, type, data, url}))});
+  await dispatchNotification(unique, type, data, url);
+}
+/** Sends registered external channels for notifications already committed to the database. */
+export async function dispatchNotification(userIds: string[], type: NotificationType, data: Prisma.InputJsonObject, url?: string) {
+  const unique = [...new Set(userIds)];
   await Promise.all(unique.flatMap(userId => deliveries.map(deliver => deliver(userId, type, data, url).catch(() => undefined))));
 }

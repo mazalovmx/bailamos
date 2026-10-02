@@ -48,7 +48,7 @@ export async function publisherFor(user: Viewer, wanted?: string) {
 export const createDraft = (profileId: string, title = '', schoolProfileId: string | null = null) =>
   db.post.create({data: {profileId, schoolProfileId, title, content: emptyDoc()}, select: {id: true}});
 type Stored = {id: string; slug: string | null; title: string; content: unknown; publishedAt: Date | null};
-export type SaveOptions = {/** Who saves: recorded as the uploader of new embed rows. */ actorProfileId?: string | null; embedDeps?: EmbedDeps};
+export type SaveOptions = {/** Who saves: recorded as the uploader of new embed rows. */ actorProfileId?: string | null; excludeNotificationUserId?: string | null; embedDeps?: EmbedDeps};
 /**
  * Applies an edit: title, body, the "I was here" event, and/or the published state. The body is validated against the
  * uploads of this post; uploads the new body no longer shows are deleted together with their files, so a removed photo
@@ -100,11 +100,16 @@ export async function savePost(post: Stored, input: PatchInput, options: SaveOpt
   // and only one of two racing first publications gets to set the address.
   const write = async (values: Prisma.PostUncheckedUpdateManyInput, claim: boolean) => {
     const where = {id: post.id, ...(expected ? {updatedAt: expected} : {}), ...(claim ? {slug: null} : {})};
-    try {return (await db.post.updateMany({where, data: values})).count;}
+    const update = async (client: Prisma.TransactionClient, nextValues: Prisma.PostUncheckedUpdateManyInput) => {
+      const count = (await client.post.updateMany({where, data: nextValues})).count;
+      if (count && claim) await client.postNotificationOutbox.create({data: {postId: post.id, excludeUserId: options.excludeNotificationUserId ?? null}});
+      return count;
+    };
+    try {return await db.$transaction(client => update(client, values));}
     catch (error) {
       // Two posts raced for the same slug: the loser gets a random suffix.
       if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002' && values.slug)) throw error;
-      return (await db.post.updateMany({where, data: {...values, slug: slugBase(title) + '-' + randomSuffix()}})).count;
+      return db.$transaction(client => update(client, {...values, slug: slugBase(title) + '-' + randomSuffix()}));
     }
   };
   let firstPublished = first;

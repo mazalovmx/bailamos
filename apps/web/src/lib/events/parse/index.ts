@@ -37,7 +37,9 @@ export type ParseContext = {city: City; styles: readonly Style[]; venues: readon
 export async function parseAnnouncement(text: string, context: ParseContext): Promise<ParseResult | null> {
   const input = cleanInput(text), now = context.now ?? new Date(), local = DateTime.fromJSDate(now, {zone: context.city.timezone});
   if (input.length < 10) return null;
-  const hash = cacheHash(input, context.city.timezone, local.toISODate() || ''), cacheKey = 'evparse:answer:' + hash;
+  // Extraction sees the city name and the style codes, so answers from a different city/catalogue must not collide.
+  const scope = JSON.stringify({cityId: context.city.id, cityName: context.city.name, styleCodes: context.styles.map(style => style.slug).sort()});
+  const hash = cacheHash(input, context.city.timezone, local.toISODate() || '', scope), cacheKey = 'evparse:answer:' + hash;
   let parsed = decode((await take(cacheKey)) || ''), cached = !!parsed;
   if (!parsed) {
     const messages = buildMessages(input, {today: local.toISODate() || '', weekday: local.setLocale('en').toFormat('cccc'), zone: context.city.timezone,

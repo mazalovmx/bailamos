@@ -8,6 +8,7 @@ English working edition of the specification by Aleksandr Mazalov, dated Septemb
 - The primary audience dances swing, Lindy Hop and solo jazz. Model substyles, regular classes, masterclasses, workshops, solo/partner formats, levels, intensity, tempo and tags separately.
 - Discovery selectors support multiple selections, including cities and styles.
 - Prioritize a usable mobile experience, photographic sections and image export for Instagram and WhatsApp.
+- Show short, contextual first-visit guides for the account, event creation, school setup/administration and social-image sharing. Do not show every guide at sign-in; trigger each when its section is first opened, and let users replay it.
 - Git promotion is experiments → stable → deploy. Railway deploys from deploy, replacing the original Coolify/Hetzner hosting proposal.
 
 ## Scope and principles
@@ -73,7 +74,7 @@ Use a modular monolith with separate worker processes sharing the same domain/da
 | Chat, original proposal | Matrix Synapse / Element | Direct/group rooms and moderation |
 | Admin | Refine | Resource CRUD, moderation and catalogue management |
 
-The original host proposal was a single Docker Compose/Coolify server. Railway is the subsequent owner decision. The current chat implementation uses the application database and Redis rather than Matrix; this is an explicit unresolved architecture difference.
+The original host proposal was a single Docker Compose/Coolify server. Railway is the subsequent owner decision. The owner accepted the custom database/Redis chat as the implementation, replacing Matrix/Element; track this as an intentional architecture deviation.
 
 ### Domain components
 
@@ -171,7 +172,7 @@ Create web/admin/database workspaces, local PostgreSQL/PostGIS/Redis/storage, CI
 
 ### E2 — Accounts and profiles
 
-Implement password, magic-link and Google sign-in; email verification/reset and rate limits; profile types, unique handles, avatar/cover; onboarding city/styles/roles/levels; multiple skills and explicit matching opt-in; API permissions; public /@handle pages with Person metadata; export/deletion. Acceptance: users can register and publish skills while private fields and unauthorized mutations remain protected.
+Implement password, magic-link and Google sign-in; email verification/reset and rate limits; profile types, unique handles, avatar/cover; onboarding city/styles/roles/levels; multiple skills and explicit matching opt-in; API permissions; public /@handle pages with Person metadata; export/deletion. Show a short, replayable guide on first entry to relevant sections rather than one long tour at sign-in. Acceptance: users can register and publish skills while private fields and unauthorized mutations remain protected; first-time visitors can find task guidance in English, Spanish and Russian.
 
 ### E3 — Catalogue
 
@@ -179,7 +180,7 @@ Seed at least 170 hierarchical styles and cities with coordinates/time zones. Ad
 
 ### E4 — Events
 
-Implement draft/edit/publish/cancel/delete, RRULE with preview of the next ten dates and materialized occurrences, co-organizer invitations by handle/email, artist links/stubs, RSVP and privacy-aware attendance, event details/map/local time/media, ICS/Google export, OG previews/short links and cancellation notifications. Acceptance: a weekly event with a co-organizer, artist and RSVP displays correctly to a visitor in another time zone.
+Implement draft/edit/publish/cancel/delete, RRULE with preview of the next ten dates and materialized occurrences, co-organizer invitations by handle/email, artist links/stubs, RSVP and privacy-aware attendance, event details/map/local time/media, ICS/Google export, OG previews/short links and cancellation notifications. Organizers choose a saved venue or place an event pin by clicking or dragging on the map; keyboard movement and coordinate fields remain available, and edits preserve the selected location. Acceptance: a weekly event with a co-organizer, artist and RSVP displays correctly to a visitor in another time zone.
 
 ### E5 — Geography
 
@@ -195,7 +196,7 @@ Provide signed uploads, MIME/size validation, WebP/AVIF conversion and lazy load
 
 ### E8 — Blog
 
-Provide TipTap text/headings/lists/images/Instagram blocks, draft/public CRUD, author/follow feeds, event reports, BlogPosting/OG/sitemap metadata, author RSS and reporting. Acceptance: a festival report with images and embeds appears in the author's feed/RSS and has indexable public content.
+Provide TipTap text/headings/lists/images/Instagram blocks, draft/public CRUD, author/follow feeds, event reports, BlogPosting/OG/sitemap metadata, author RSS and reporting. Notify eligible followers once on first publication through a durable, idempotent background outbox. Acceptance: a festival report with images and embeds appears in the author's feed/RSS and has indexable public content; retries do not duplicate follower notifications.
 
 ### E9 — Administration
 
@@ -211,7 +212,7 @@ Filter opt-in candidates by compatible role, style, level within one step and ra
 
 ### E12 — Chat
 
-The original requirement is Matrix deployment and Better Auth SSO, event/city rooms, direct messaging, moderation and stranger-message limits through an SDK or Element. A custom chat implementation must be recorded as a deviation until the architecture requirement is explicitly resolved.
+The original requirement proposed Matrix deployment and Better Auth SSO, event/city rooms, direct messaging, moderation and stranger-message limits through an SDK or Element. The product owner accepted the custom database/Redis implementation as a deviation. The shipped feature includes direct/group/event/city/school conversations, image attachments, message edits/deletes, per-conversation mute, moderation and stranger-message limits. Acceptance still requires organizer and device testing.
 
 ### E13 — Courses and digest
 
@@ -221,17 +222,21 @@ Provide weekly classes with level/price/venue, school schedules, city/style/prof
 
 Import RSS, iCal and Schema.org events through retryable jobs. Deduplicate by title/time/location and send ambiguous matches to moderation. Add Telegram search and notifications. Acceptance requires real approved sources and bot delivery, not only parser fixtures.
 
+### E15 — Event parser
+
+The event creation page optionally accepts pasted WhatsApp/Instagram announcement text and uses DeepSeek JSON mode to suggest fields for the organizer to review. Validation, city-timezone date checks, style matching and address geocoding run on the server; the organizer must explicitly confirm before saving. The provider key is optional and secrets belong in environment variables. Acceptance still needs the specified labelled sample of 50 real announcements and measured field accuracy/edit rates.
+
 ## Risks and open decisions
 
 - Provider changes: retain cached/fallback links and direct uploads.
 - Public geocoder limits: cache requests and support a configurable/self-hosted service.
-- Matrix operations: the source proposed reconsidering the chat transport if usage remained below 5% after a month; that proposal is not prior approval to mark a different implementation complete.
+- Chat transport: Matrix/Element was replaced by the owner-approved in-app chat; revisit only if operating experience calls for it.
 - Empty content: launch with a curated programme in one city.
 - Matching abuse: require opt-in, blocking/reporting and contact rate limits.
 - Geographic performance: retain GiST coverage and a representative 50,000-event benchmark.
 - Schedule uncertainty: revise estimates after foundational work.
 
-Select the launch city, decide the initial open/invite-only registration policy and accept the chat architecture. The default-language question is already resolved: English.
+Select the initial launch city and open/invite-only registration policy. The default language is English, and the chat architecture deviation has been accepted.
 
 ## Reference trail
 

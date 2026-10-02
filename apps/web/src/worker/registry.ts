@@ -6,6 +6,7 @@ import {maintenanceJobs} from '../lib/jobs/maintenance';
 import {importJobs} from '../lib/import/jobs';
 import {embedJobs} from '../lib/embeds/refresh';
 import {opsJobs} from '../lib/jobs/ops';
+import {blogJobs} from '../lib/jobs/blog';
 // Every background job of the platform. A feature exports JobDef[] and is added here; the worker entrypoint
 // (src/worker/index.ts) registers each definition as a repeatable job and removes schedules that left this list.
 export const jobs: JobDef[] = [
@@ -16,6 +17,7 @@ export const jobs: JobDef[] = [
   ...importJobs,       // import.sources     — every 30 minutes; import.news.prune — daily
   ...embedJobs,        // embeds.refresh     — every 30 minutes
   ...opsJobs,          // ops.watchdog       — every minute; backup.database — daily 02:40 UTC (BACKUP_ENABLED=true)
+  ...blogJobs,         // blog.notifications — every minute; transactional outbox delivery
 ];
 const PART = /^(?:\*|(\d+)(?:-(\d+))?)(?:\/(\d+))?$/;
 /** Five-field cron ("m h dom mon dow"), numbers only — the subset the registry allows. */

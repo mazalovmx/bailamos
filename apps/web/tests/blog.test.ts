@@ -393,6 +393,32 @@ test('a new post is announced in the reader language', () => {
   assert.equal(renderNotification('en', 'NEW_POST', {}).body, '');
   assert.equal(localizeUrl('/people/anna/posts/festival', 'ru'), '/ru/people/anna/posts/festival');
 });
+test('first publication writes a durable outbox and retries create one follower notification', async t => {
+  const {db} = await import('@dance/db');
+  try {await db.$queryRaw`SELECT 1`;} catch {t.skip('PostgreSQL is not available'); return;}
+  const {createDraft, savePost} = await import('../src/lib/blog/posts');
+  const {drainPostNotificationOutbox} = await import('../src/lib/blog/outbox');
+  const tag = randomUUID().slice(0, 8), authorId = 'blog-outbox-author-' + tag, readerId = 'blog-outbox-reader-' + tag;
+  try {
+    const author = await db.user.create({data: {id: authorId, name: 'Outbox author', email: authorId + '@example.test', emailVerified: true}});
+    const reader = await db.user.create({data: {id: readerId, name: 'Outbox reader', email: readerId + '@example.test', emailVerified: true}});
+    const profile = await db.profile.create({data: {userId: author.id, type: 'DANCER', handle: 'outbox-' + tag, name: author.name}});
+    await db.follow.create({data: {userId: reader.id, profileId: profile.id}});
+    const draft = await createDraft(profile.id, 'Reliable post ' + tag);
+    const first = await savePost(await db.post.findUniqueOrThrow({where: {id: draft.id}}), {content: doc(p(text('An announcement to followers.'))), published: true},
+      {excludeNotificationUserId: author.id});
+    assert.equal(first.firstPublished, true);
+    assert.ok(await db.postNotificationOutbox.findUnique({where: {postId: draft.id}}), 'outbox is stored with the first-publication write');
+    await drainPostNotificationOutbox();
+    await drainPostNotificationOutbox();
+    const notes = await db.notification.findMany({where: {userId: reader.id, type: 'NEW_POST'}});
+    assert.equal(notes.length, 1);
+    assert.equal(notes[0].dedupeKey, 'post:' + draft.id + ':' + reader.id);
+    assert.ok((await db.postNotificationOutbox.findUniqueOrThrow({where: {postId: draft.id}})).completedAt);
+  } finally {
+    await db.user.deleteMany({where: {id: {in: [authorId, readerId]}}});
+  }
+});
 test('school managers edit the posts of their schools and nobody else does', () => {
   const manager = {role: 'USER', profile: {id: 'p1'}, schoolIds: ['s1']}, other = {role: 'USER', profile: {id: 'p2'}, schoolIds: ['s2']};
   const draft = {profileId: 's1', publishedAt: null, hiddenAt: null}, live = {...draft, publishedAt: new Date()};

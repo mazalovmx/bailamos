@@ -3,10 +3,14 @@ import assert from 'node:assert/strict';
 import {readFile, readdir} from 'node:fs/promises';
 import {URL} from 'node:url';
 function assertSame(catalogues) {
-  const keys = Object.keys(catalogues[0]).sort();
+  const flatten = (value, prefix = '') => Object.entries(value).flatMap(([key, item]) =>
+    item && typeof item === 'object' && !Array.isArray(item) ? flatten(item, prefix + key + '.') : [[prefix + key, item]]);
+  const first = flatten(catalogues[0]);
+  const keys = first.map(([key]) => key).sort();
   for (const catalogue of catalogues) {
-    assert.deepEqual(Object.keys(catalogue).sort(), keys);
-    for (const value of Object.values(catalogue)) assert.ok(typeof value === 'string' && value.trim().length > 0);
+    const entries = flatten(catalogue);
+    assert.deepEqual(entries.map(([key]) => key).sort(), keys);
+    for (const [, value] of entries) assert.ok(typeof value === 'string' && value.trim().length > 0);
   }
 }
 test('all launch languages contain the same non-empty messages', async () => {

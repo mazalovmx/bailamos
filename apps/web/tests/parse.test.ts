@@ -20,6 +20,7 @@ test('contract: missing and malformed values become null, lists become empty, in
   assert.equal(cleanInput('a'.repeat(MAX_INPUT + 50)).length, MAX_INPUT);
   assert.equal(cleanInput('line\r\nnext\u0000'), 'line\nnext');
   assert.notEqual(cacheHash('text', 'Europe/Madrid', '2026-10-01'), cacheHash('text', 'Europe/Madrid', '2026-10-02'));
+  assert.notEqual(cacheHash('text', 'Europe/Madrid', '2026-10-01', 'madrid'), cacheHash('text', 'Europe/Madrid', '2026-10-01', 'mexico-city'));
 });
 test('prompt carries today, the zone and the style codes, and nothing about the user', () => {
   const [system, user] = buildMessages('Party on Saturday', {today: '2026-10-01', weekday: 'Thursday', zone: 'Europe/Madrid', cityName: 'Madrid', styleCodes: ['lindy-hop', 'balboa']});

@@ -25,7 +25,7 @@ export type ParsedAnnouncement = z.infer<typeof parsedAnnouncement>;
 export const cleanInput = (value: string) => value.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim().slice(0, MAX_INPUT);
 // The same announcement pasted by several organizers costs one model call: the key covers the text and everything
 // else the answer depends on (the city's zone and today's date decide what "this Saturday" means).
-export const cacheHash = (input: string, zone: string, today: string) => createHash('sha256').update([input, zone, today].join('\n\u0000')).digest('hex');
+export const cacheHash = (input: string, zone: string, today: string, context = '') => createHash('sha256').update([input, zone, today, context].join('\n\u0000')).digest('hex');
 export type ChatMessage = {role: 'system' | 'user'; content: string};
 export function buildMessages(input: string, context: {today: string; weekday: string; zone: string; cityName: string; styleCodes: readonly string[]}): ChatMessage[] {
   const system = [

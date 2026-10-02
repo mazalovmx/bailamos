@@ -81,5 +81,10 @@
   "error_GEOLOCATION_UNAVAILABLE": "Your location could not be determined. Choose a city instead.",
   "eventLocation": "Where it happens",
   "pinToggle": "Set an exact point instead of a venue",
-  "pinHint": "For places that are not a venue, such as a park or a square. The point must be in or near the chosen city."
+  "pinHint": "For places that are not a venue, such as a park or a square. The point must be in or near the chosen city.",
+  "pinMapHelp": "Click the map to place the pin. Drag it to fine-tune the location; you can also use the coordinate fields below.",
+  "pinKeyboard": "Event location pin. Use arrow keys to move it; hold Shift for larger steps.",
+  "eventMap": "Map for this event location",
+  "pinMapUnavailable": "The map could not load. Enter the coordinates below instead.",
+  "pinRequired": "Choose a point on the map or enter both coordinates."
 }
