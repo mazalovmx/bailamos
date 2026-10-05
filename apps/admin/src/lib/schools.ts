@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {db, Prisma} from '@dance/db';
+import {db, Prisma, changeEventStatus, lockEvent} from '@dance/db';
 import {z} from 'zod';
 import {HttpError} from './errors';
 type Tx=Prisma.TransactionClient;
@@ -44,7 +44,7 @@ export async function schoolResources(userId:string,schoolId:string){
   await schoolAccess(userId,schoolId);
   const where={schoolProfileId:schoolId};
   const [events,posts,venues,conversations,messages]=await Promise.all([
-    db.event.findMany({where,select:{id:true,title:true,status:true,description:true},orderBy:{createdAt:'desc'},take:100}),
+    db.event.findMany({where,select:{id:true,slug:true,title:true,status:true,description:true},orderBy:{createdAt:'desc'},take:100}),
     db.post.findMany({where,select:{id:true,title:true,publishedAt:true,hiddenAt:true},orderBy:{createdAt:'desc'},take:100}),
     db.venue.findMany({where,select:{id:true,name:true,address:true,hiddenAt:true},take:100}),
     db.conversation.findMany({where,select:{id:true,title:true},take:100}),
@@ -62,11 +62,7 @@ export async function createSchoolResource(userId:string,schoolId:string,input:u
   return db.$transaction(async tx=>{
     await schoolAccess(userId,schoolId,tx);let id:string;
     if(data.kind==='event'){
-      const startsAt=new Date(data.startsAt),endsAt=new Date(data.endsAt);
-      if(endsAt<=startsAt)throw new HttpError('INVALID_INPUT',400);
-      const city=await tx.city.findUnique({where:{id:data.cityId}});
-      if(!city||!await tx.danceStyle.count({where:{id:data.styleId}}))throw new HttpError('INVALID_REFERENCE',400);
-      const row=await tx.event.create({data:{title:data.title,description:data.description,slug:'school-'+randomUUID(),schoolProfileId:schoolId,cityId:city.id,timezone:city.timezone,lat:city.lat,lng:city.lng,startsAt,endsAt,kind:'CLASS',status:'DRAFT',styles:{create:{styleId:data.styleId}},members:{create:{profileId:schoolId,role:'OWNER'}},occurrences:{create:{startsAt,endsAt}}}});id=row.id;
+      throw new HttpError('USE_EVENT_EDITOR',400);
     }else if(data.kind==='post'){
       const row=await tx.post.create({data:{schoolProfileId:schoolId,profileId:schoolId,title:data.title,slug:'school-'+randomUUID(),excerpt:data.body.slice(0,300),content:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text:data.body}]}]}}});id=row.id;
     }else if(data.kind==='venue'){
@@ -95,8 +91,8 @@ export async function changeSchoolResource(userId:string,schoolId:string,input:u
         else await tx.conversationMember.deleteMany({where:memberKey});
       }else throw new HttpError('INVALID_INPUT',400);
     }else if(data.kind==='event'){
-      if(data.action==='rename'&&data.title)await tx.event.update({where:{id:data.id},data:{title:data.title}});
-      else if(['publish','cancel'].includes(data.action)){await tx.event.update({where:{id:data.id},data:{status:data.action==='publish'?'PUBLISHED':'CANCELLED'}});await tx.eventOccurrence.updateMany({where:{eventId:data.id},data:{cancelled:data.action==='cancel'}});}
+      if(data.action==='rename'&&data.title){await lockEvent(tx,data.id);await tx.event.update({where:{id:data.id},data:{title:data.title,version:{increment:1}}});}
+      else if(['publish','cancel'].includes(data.action))await changeEventStatus(tx,data.id,data.action==='publish'?'PUBLISHED':'CANCELLED',userId);
       else if(['hide','restore'].includes(data.action))await tx.event.update({where:{id:data.id},data:{hiddenAt:data.action==='hide'?new Date():null}});
       else throw new HttpError('INVALID_INPUT',400);
     }else if(data.kind==='post'){

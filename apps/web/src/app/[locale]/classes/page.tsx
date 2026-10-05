@@ -1,4 +1,11 @@
 import Link from 'next/link';
+import {db} from '@dance/db';
+import {DateTime} from 'luxon';
+import {discoveryQuery} from '../../../lib/discovery';
+import {eventSearchAll} from '../../../lib/event-search';
+import {DiscoveryNav} from '../../../components/discovery-nav';
+import {queryParams,values} from '../../../lib/search-query';
+import {MultiFilter} from '../../../components/multi-filter';
 import type {Metadata} from 'next';
 import {getTranslations} from 'next-intl/server';
 import {cityName} from '../../../lib/catalogue/city-name';
@@ -6,7 +13,7 @@ import {allCities, allStyles} from '../../../lib/catalogue/data';
 import {currentCitySlug} from '../../../lib/catalogue/current-city';
 import {classLevels} from '../../../lib/swing';
 import {siteUrl} from '../../../lib/mail';
-import {DAY_PARTS, parseDayPart, parseLevels, parseWeekdays, styleFilter, weekOf, weekTimetable} from '../../../lib/courses/timetable';
+import {DAY_PARTS, parseDayPart, parseLevels, parseWeekdays, weekOf, weekTimetable} from '../../../lib/courses/timetable';
 import {WeekTimetable} from '../../../components/courses/timetable';
 import {WeekNav} from '../../../components/courses/week-nav';
 import '../../styles/courses.css';
@@ -21,25 +28,28 @@ export default async function Classes({params, searchParams}: Props) {
   const value = (key: string) => {const item = raw[key]; return (Array.isArray(item) ? item[0] : item || '').slice(0, 80).trim();};
   const [t, app, cities, styles, cookieCity] = await Promise.all([getTranslations('Courses'), getTranslations('App'), allCities(), allStyles(), currentCitySlug()]);
   // No ?city= means the visitor's chosen city; "all" asks for every city explicitly.
-  const citySlug = value('city') || cookieCity || 'all', city = citySlug === 'all' ? null : cities.find(item => item.slug === citySlug || item.id === citySlug) || null;
+  const cityValues=values(raw.city).filter(c=>c!=='all');
+  const citySlug = cityValues[0] || (raw.city===undefined?cookieCity:null) || 'all', city = citySlug === 'all'||cityValues.length>1 ? null : cities.find(item => item.slug === citySlug || item.id === citySlug) || null;
   const style = styles.find(item => item.slug === value('style') || item.id === value('style')) || null;
   const level = parseLevels(value('level'))[0] || '', weekday = parseWeekdays(value('weekday'))[0] || 0, dayPart = parseDayPart(value('time'));
-  const zone = city?.timezone || 'UTC', week = weekOf(value('week'), zone), current = weekOf(null, zone);
-  const timetable = await weekTimetable(week, {cityId: city?.id, styleIds: styleFilter(styles, value('style')) ?? (value('style') ? [] : undefined),
-    levels: level ? [level] : [], weekdays: weekday ? [weekday] : [], dayPart});
-  const query = Object.fromEntries(Object.entries({city: city ? city.slug : 'all', style: style?.slug || '', level, weekday: weekday ? String(weekday) : '', time: dayPart || ''}).filter(([, item]) => item));
+  const {query:discovery}=await discoveryQuery(raw);
+  const zone = city?.timezone || 'UTC', week = weekOf(value('week')||value('from'), zone), current = weekOf(null, zone);
+  const timetable = await weekTimetable(week, {query:discovery,weekdays: weekday ? [weekday] : [], dayPart});
+  const query = {...discovery,weekday:weekday?String(weekday):'',time:dayPart||''};
   const weekdayName = new Intl.DateTimeFormat(locale, {weekday: 'long', timeZone: 'UTC'}), path = '/' + locale + '/classes';
   const filtered = !!(style || level || weekday || dayPart), schoolsHref = '/' + locale + '/schools' + (city ? '?city=' + encodeURIComponent(city.slug) : '');
+  const firstClass=timetable.total?null:await db.eventOccurrence.findFirst({where:{cancelled:false,startsAt:{gte:new Date()},event:{AND:[await eventSearchAll(discovery)],rrule:{not:null},kind:{in:['CLASS','PRACTICE']}}},orderBy:{startsAt:'asc'},select:{startsAt:true,event:{select:{timezone:true}}}});
+  const firstWeek=firstClass?weekOf(DateTime.fromJSDate(firstClass.startsAt,{zone:firstClass.event.timezone}).toISODate(),zone).start:null;
   return <main className="courses-page">
     <p className="eyebrow">{t('eyebrow')}</p><h1>{city ? t('classesIn', {city: cityName(city, locale)}) : t('classesTitle')}</h1>
     <p className="intro">{t('classesIntro')}</p>
+    <DiscoveryNav locale={locale} query={discovery}/>
     <form className="courses-filters" action={path} role="search" aria-label={t('filters')}>
-      <label>{t('city')}<select name="city" defaultValue={city ? city.slug : 'all'}><option value="all">{t('allCities')}</option>
-        {cities.map(item => <option key={item.id} value={item.slug}>{item.name}</option>)}</select></label>
-      <label>{t('style')}<select name="style" defaultValue={style?.slug || ''}><option value="">{t('allStyles')}</option>
-        {styles.map(item => <option key={item.id} value={item.slug}>{item.name}</option>)}</select></label>
-      <label>{t('level')}<select name="level" defaultValue={level}><option value="">{t('allLevels')}</option>
-        {classLevels.filter(item => item !== 'UNSPECIFIED').map(item => <option key={item} value={item}>{app('level_' + item)}</option>)}</select></label>
+      <input type="hidden" name="city" value="all"/>
+      <MultiFilter name="city" label={t('city')} all={t('allCities')} items={cities} initial={values(discovery.city).filter(c=>c!=='all')}/>
+      <MultiFilter name="style" label={t('style')} all={t('allStyles')} items={styles} initial={values(discovery.style)}/>
+      <MultiFilter name="level" label={t('level')} all={t('allLevels')} items={classLevels.filter(item=>item!=='UNSPECIFIED').map(id=>({id,name:app('level_'+id)}))} initial={values(discovery.level)}/>
+      {[...queryParams(discovery)].filter(([key])=>!['city','style','level','week','weekday','time'].includes(key)).map(([key,value],i)=><input key={i} type="hidden" name={key} value={value}/>)}
       <label>{t('weekday')}<select name="weekday" defaultValue={weekday ? String(weekday) : ''}><option value="">{t('allWeekdays')}</option>
         {week.dates.map((date, index) => <option key={date} value={index + 1}>{weekdayName.format(new Date(date + 'T12:00:00Z'))}</option>)}</select></label>
       <label>{t('timeOfDay')}<select name="time" defaultValue={dayPart || ''}><option value="">{t('anyTime')}</option>
@@ -54,6 +64,7 @@ export default async function Classes({params, searchParams}: Props) {
     {timetable.truncated && <p className="notice">{t('truncated')}</p>}
     {timetable.total ? <WeekTimetable timetable={timetable} locale={locale} showCity={!city}/> :
       <p className="notice" role="status">{filtered ? t('noClassesFiltered') : t('noClasses')}</p>}
+    {!timetable.total&&firstWeek&&firstWeek!==week.start&&<p><Link href={path+'?'+queryParams({...discovery,week:firstWeek})}>{t('classesStart',{date:new Intl.DateTimeFormat(locale,{dateStyle:'long',timeZone:'UTC'}).format(new Date(firstWeek+'T00:00:00Z'))})}</Link></p>}
     <p className="courses-links"><Link href={schoolsHref}>{t('browseSchools')}</Link><Link href={'/' + locale + '/events/new'}>{t('addClass')}</Link></p>
   </main>;
 }

@@ -1,11 +1,12 @@
 import {createHash, randomUUID} from 'node:crypto';
 import {DateTime} from 'luxon';
 import {z} from 'zod';
-import {db, Prisma, type ImportedItem, type ImportStatus} from '@dance/db';
+import {db, Prisma, lockEvent, queueEventNotice, type ImportedItem, type ImportStatus} from '@dance/db';
+import {syncOccurrences} from '../event-input';
 import {allStyles} from '../catalogue/data';
 import {normalize} from '../catalogue/search';
 import {ensureShortCode} from '../events/short-code';
-import {announceCancellation} from '../events/cancel';
+import {tryEventDelivery} from '../events/outbox';
 import {dedupeKey, distanceM, titleSimilarity} from './dedupe';
 // What the pipeline stores in ImportedItem.payload: the item after timezone, city and coordinates were resolved.
 // Dates are ISO strings. Rejected items may lack a date or a city; anything that becomes an Event passes `ready`.
@@ -57,7 +58,7 @@ async function eventShape(tx: Prisma.TransactionClient, input: ReadyPayload, sou
   const description = [input.description, where].filter(Boolean).join('\n\n').slice(0, 5000) || null;
   return {dates, fields: {
     title: input.title, description, startsAt: dates[0].startsAt, endsAt: dates[0].endsAt,
-    timezone: input.timezone, rrule: input.rrule, cityId: city.id, venueId: await venueId(tx, input),
+    timezone: input.timezone, rrule: input.rrule, cityId: city.id, venueId: await venueId(tx, input),placeConfirmed:input.precise,address:input.address,
     lat: input.precise && input.lat !== null ? input.lat : city.lat, lng: input.precise && input.lng !== null ? input.lng : city.lng,
     kind: guessKind(input.title), sourceUrl: (input.url || sourceUrl).slice(0, 2000), dedupeKey: payloadKey(input, dates[0].startsAt)}};
 }
@@ -78,18 +79,11 @@ export async function createEvent(tx: Prisma.TransactionClient, input: ReadyPayl
 export async function updateEvent(tx: Prisma.TransactionClient, eventId: string, input: ReadyPayload, sourceUrl: string, now = new Date()) {
   const shape = await eventShape(tx, input, sourceUrl, now);
   if (!shape) return null;
-  const existing = await tx.eventOccurrence.findMany({where: {eventId, startsAt: {gte: now}}, select: {id: true, startsAt: true, endsAt: true}});
-  const wanted = new Map(shape.dates.filter(date => date.startsAt >= now).map(date => [date.startsAt.getTime(), date])), kept = new Set<number>();
-  for (const row of existing) {
-    const match = wanted.get(row.startsAt.getTime());
-    if (!match) continue;
-    kept.add(row.startsAt.getTime());
-    if ((row.endsAt?.getTime() ?? null) !== (match.endsAt?.getTime() ?? null)) await tx.eventOccurrence.update({where: {id: row.id}, data: {endsAt: match.endsAt}});
-  }
-  await tx.eventOccurrence.deleteMany({where: {id: {in: existing.filter(row => !kept.has(row.startsAt.getTime())).map(row => row.id)}}});
-  const added = [...wanted.values()].filter(date => !kept.has(date.startsAt.getTime()));
-  if (added.length) await tx.eventOccurrence.createMany({data: added.map(date => ({eventId, ...date})), skipDuplicates: true});
-  return tx.event.update({where: {id: eventId}, data: shape.fields});
+  const before=await lockEvent(tx,eventId);
+  await syncOccurrences(tx,eventId,shape.dates,now,before.startsAt.getTime()!==shape.fields.startsAt.getTime());
+  const event=await tx.event.update({where:{id:eventId},data:{...shape.fields,version:{increment:1}}});
+  if(before.status==='PUBLISHED')await queueEventNotice(tx,event,{type:'EVENT_MOVED',key:`event:${eventId}:${event.version}:import`,previous:before.startsAt});
+  return event;
 }
 // ---------- following the source ----------
 // ImportedItem.payload.sync: what the importer needs to tell "the feed changed" from "a person changed the event".
@@ -134,11 +128,13 @@ export async function stampItem(itemId: string, eventId: string, payload: Payloa
 // Cancels the event of an item the source cancelled or dropped, and tells the people who planned to come — once:
 // only the change from published to cancelled announces anything.
 export async function cancelImported(eventId: string, now = new Date()) {
-  const changed = await db.event.updateMany({where: {id: eventId, status: 'PUBLISHED'}, data: {status: 'CANCELLED'}});
-  if (!changed.count) return false;
-  if (await db.eventOccurrence.count({where: {eventId, cancelled: false, startsAt: {gte: now}}})) await announceCancellation(eventId).catch(error =>
-    console.warn(JSON.stringify({level: 'warn', event: 'import_cancel_notice_failed', eventId, message: error instanceof Error ? error.message.slice(0, 200) : 'unknown'})));
-  return true;
+  const changed=await db.$transaction(async tx=>{
+    const before=await lockEvent(tx,eventId);if(before.status!=='PUBLISHED')return false;
+    const event=await tx.event.update({where:{id:eventId},data:{status:'CANCELLED',version:{increment:1}}});
+    if(await tx.eventOccurrence.count({where:{eventId,cancelled:false,startsAt:{gte:now}}}))await queueEventNotice(tx,event,{type:'EVENT_CANCELLED',key:`event:${eventId}:${event.version}:import-cancel`});
+    return true;
+  });
+  if(changed)await tryEventDelivery();return changed;
 }
 export type Outcome = {status: ImportStatus; eventId: string | null; note: string | null};
 // An item confirmed by staff becomes an event without another de-duplication pass. `from` is the state it must still be in,

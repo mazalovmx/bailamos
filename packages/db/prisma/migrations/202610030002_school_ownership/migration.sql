@@ -1,0 +1,1 @@
+ALTER TABLE "SchoolAdmin" ADD COLUMN "canManageAdmins" BOOLEAN NOT NULL DEFAULT false;

@@ -13,6 +13,8 @@ const slug = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,59}$/);
 const styles = z.array(z.string()).max(20).transform(list => [...new Set(list.flatMap(item => item.split(',')).filter(Boolean))])
   .pipe(z.array(slug).max(20));
 const integer = (min: number, max: number) => z.string().regex(/^\d{1,4}$/).transform(Number).pipe(z.number().int().min(min).max(max));
+const discoveryFields={city:z.array(z.string().max(80)).max(30).default([]),level:z.array(z.string().max(40)).max(20).default([]),kind:z.array(z.string().max(40)).max(20).default([]),
+  format:z.array(z.string().max(40)).max(20).default([]),intensity:z.array(z.string().max(40)).max(20).default([]),tempo:z.array(z.string().max(40)).max(20).default([]),tag:z.array(z.string().max(80)).max(20).default([]),q:z.string().max(100).optional(),noPartner:z.string().optional(),recurring:z.string().optional()};
 type Range = {from?: string; to?: string};
 // Upcoming window: never starts in the past, defaults to the next 7 days, spans at most a year. A date-only `to` includes that day.
 export function eventWindow({from, to}: Range, now = new Date()): {from: Date; to: Date} | null {
@@ -26,6 +28,7 @@ function withWindow<T extends Range>(value: T, ctx: z.RefinementCtx) {
   return {...value, ...range};
 }
 export const nearbySchema = z.object({
+  ...discoveryFields,
   lat: latitude, lng: longitude,
   radiusKm: decimal.pipe(z.number().min(0.1).max(200)).optional().transform(value => value ?? 25),
   style: styles, from: instant.optional(), to: instant.optional(),
@@ -33,6 +36,7 @@ export const nearbySchema = z.object({
 }).transform(withWindow);
 export type NearbyParams = z.infer<typeof nearbySchema>;
 export const bboxSchema = z.object({
+  ...discoveryFields,
   bbox: z.string().max(120).transform(value => value.split(',')).pipe(z.tuple([longitude, latitude, longitude, latitude]))
     .refine(([, south, , north]) => south < north),
   style: styles, from: instant.optional(), to: instant.optional(),
@@ -56,5 +60,5 @@ export const venueSchema = z.object({
 // Missing parameters must be undefined, not null; `style` may repeat.
 export function queryObject(request: Request): Record<string, string | string[]> {
   const params = new URL(request.url).searchParams;
-  return {...Object.fromEntries(params), style: params.getAll('style')};
+  return {...Object.fromEntries(params),...Object.fromEntries(['style','city','level','kind','format','intensity','tempo','tag'].map(key=>[key,params.getAll(key)]))};
 }

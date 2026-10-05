@@ -7,21 +7,31 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import '../../app/styles/geo.css';
 import {brand, circle, loadMapLibre, mapLocale, mapStyleUrl, tint, type MapLibreModule} from './maplibre';
 import {nearMe} from './near-me';
-type City = {id: string; slug: string; name: string; lat: number; lng: number};
+import {DateTime} from 'luxon';
+import {queryParams,values,type SearchQuery} from '../../lib/search-query';
+import {DiscoveryNav} from '../discovery-nav';
+import {classLevels} from '../../lib/swing';
+import {MultiFilter} from '../multi-filter';
+type City = {id: string; slug: string; name: string; lat: number; lng: number;timezone:string};
 type Option = {id: string; name: string};
 type MapEvent = {id: string; slug: string; title: string; kind: string; timezone: string; lat: number; lng: number; startsAt: string; city: string; venue: string | null; styles: string[]; distanceM: number | null};
 type Origin = {lat: number; lng: number; kind: 'city' | 'me' | 'map'; name?: string};
-type Filters = {city: string; style: string; from: string; to: string; radius: number};
+type Filters = {city: string; style: string; from: string; to: string; radius: number;level?:string};
 const radii = [5, 10, 25, 50, 100];
 const VIEW_LIMIT = 1000, RADIUS_LIMIT = 500, PAGE = 30, MAX_CLUSTER_ZOOM = 16;
 const empty = {type: 'FeatureCollection' as const, features: []};
 // Events on a map with client-side clustering, plus the same events as a list for people who cannot or do not want to use the map.
-export function MapExplorer({locale, cities, styles, initial, defaults, centre}: {
+export function MapExplorer({locale, cities, styles, initial, defaults, centre,discovery={}}: {
+  discovery?:SearchQuery;
   locale: string; cities: City[]; styles: Option[]; initial: Filters; defaults: {from: string; to: string}; centre: {lat: number; lng: number; zoom: number};
 }) {
   const t = useTranslations('Geo'), app = useTranslations('App');
   const startCity = cities.find(city => city.slug === initial.city);
-  const [filters, setFilters] = useState(initial);
+  const [filters, setFilters] = useState({...initial,level:values(discovery.level)[0]||''});
+  const [multi,setMulti]=useState({city:values(discovery.city).filter(c=>c!=='all').map(c=>cities.find(item=>item.id===c||item.slug===c)?.slug||c),style:values(discovery.style),level:values(discovery.level)});
+  const activeQuery=useMemo(()=>({...discovery,
+    city:multi.city.length?multi.city:['all'],style:multi.style,level:multi.level,
+    from:filters.from,to:filters.to}),[discovery,filters,multi]);
   const [origin, setOrigin] = useState<Origin | null>(startCity ? {lat: startCity.lat, lng: startCity.lng, kind: 'city', name: startCity.name} : initial.radius ? {...centre, kind: 'map'} : null);
   const [bounds, setBounds] = useState<string | null>(null), [events, setEvents] = useState<MapEvent[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading'), [mapFailed, setMapFailed] = useState(false), [ready, setReady] = useState(false);
@@ -151,13 +161,15 @@ export function MapExplorer({locale, cities, styles, initial, defaults, centre}:
   // Without a working map (no WebGL, blocked tiles) the list still works: it falls back to a radius around the chosen place.
   const fallback = (mapFailed || stalled) && !ready && !radiusMode ? origin || centre : null;
   const request = useMemo(() => {
-    const start = new Date(filters.from + 'T00:00:00'), end = new Date(filters.to + 'T23:59:59.999');
+    const zone=multi.city.length===1?cities.find(c=>c.slug===multi.city[0])?.timezone||'UTC':'UTC';
+    const start = DateTime.fromISO(filters.from,{zone}).startOf('day').toJSDate(), end = DateTime.fromISO(filters.to,{zone}).plus({days:1}).startOf('day').toJSDate();
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return null;
-    const range = '&from=' + encodeURIComponent(start.toISOString()) + '&to=' + encodeURIComponent(end.toISOString()) + (filters.style ? '&style=' + encodeURIComponent(filters.style) : '');
+    const params=queryParams({...activeQuery,from:start.toISOString(),to:end.toISOString()});params.delete('radius');params.delete('page');
+    const range = '&'+params;
     if (radiusMode && origin) return '/api/events/nearby?lat=' + origin.lat + '&lng=' + origin.lng + '&radiusKm=' + filters.radius + '&limit=' + RADIUS_LIMIT + range;
     if (fallback) return '/api/events/nearby?lat=' + fallback.lat + '&lng=' + fallback.lng + '&radiusKm=50&limit=' + RADIUS_LIMIT + range;
     return bounds ? '/api/geo/events?bbox=' + bounds + '&limit=' + VIEW_LIMIT + range : null;
-  }, [filters, origin, radiusMode, fallback, bounds]);
+  }, [filters, origin, radiusMode, fallback, bounds,activeQuery,cities,multi.city]);
   useEffect(() => {
     if (!request) { if (filters.to < filters.from) { setEvents([]); setStatus('error'); } return; }
     const controller = new AbortController();
@@ -169,14 +181,12 @@ export function MapExplorer({locale, cities, styles, initial, defaults, centre}:
   }, [request, filters.from, filters.to]);
   // Filters live in the address bar, so a view can be shared or bookmarked.
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (filters.city) params.set('city', filters.city);
-    if (filters.style) params.set('style', filters.style);
+    const params = queryParams(activeQuery);
     if (filters.from !== defaults.from || filters.to !== defaults.to) { params.set('from', filters.from); params.set('to', filters.to); }
     if (filters.radius) params.set('radius', String(filters.radius));
     window.history.replaceState(null, '', window.location.pathname + (params.size ? '?' + params : ''));
-  }, [filters, defaults.from, defaults.to]);
-  const update = (patch: Partial<Filters>) => { setFilters(current => ({...current, ...patch})); setShown(PAGE); popup.current?.remove(); };
+  }, [filters, defaults.from, defaults.to,activeQuery]);
+  const update = (patch: Partial<Filters>) => {if(patch.city!==undefined)setMulti(current=>({...current,city:patch.city?[patch.city]:[]})); setFilters(current => ({...current, ...patch})); setShown(PAGE); popup.current?.remove(); };
   const chooseCity = (slug: string) => {
     const city = cities.find(item => item.slug === slug);
     update({city: slug});
@@ -208,12 +218,12 @@ export function MapExplorer({locale, cities, styles, initial, defaults, centre}:
   const limit = radiusMode || fallback ? RADIUS_LIMIT : VIEW_LIMIT;
   const area = radiusMode && origin ? t(origin.kind === 'me' ? 'areaMe' : origin.kind === 'city' ? 'areaCity' : 'areaMap', {radius: filters.radius, city: origin.name || ''}) : fallback ? t('areaFallback') : t('areaView');
   return <>
+    <DiscoveryNav locale={locale} query={activeQuery}/>
     <form className="geo-filters" onSubmit={event => event.preventDefault()} aria-label={t('filters')}>
-      <label>{app('city')}<select value={filters.city} onChange={event => chooseCity(event.target.value)}>
-        <option value="">{app('allCities')}</option>{cities.map(city => <option key={city.id} value={city.slug}>{city.name}</option>)}</select></label>
-      <label>{app('style')}<select value={filters.style} onChange={event => update({style: event.target.value})}>
-        <option value="">{app('allStyles')}</option>{styles.map(style => <option key={style.id} value={style.id}>{style.name}</option>)}</select></label>
+      <MultiFilter name="city" label={app('city')} all={app('allCities')} items={cities.map(c=>({id:c.slug,name:c.name}))} initial={multi.city} selection={multi.city} onChange={city=>{chooseCity(city[0]||'');setMulti(current=>({...current,city}));}}/>
+      <MultiFilter name="style" label={app('style')} all={app('allStyles')} items={styles} initial={multi.style} selection={multi.style} onChange={style=>{setMulti(current=>({...current,style}));setShown(PAGE);}}/>
       <label>{t('from')}<input type="date" required value={filters.from} max={filters.to} onChange={event => event.target.value && update({from: event.target.value})}/></label>
+      <MultiFilter name="level" label={app('classLevel')} all={app('allLevels')} items={classLevels.map(id=>({id,name:app('level_'+id)}))} initial={multi.level} selection={multi.level} onChange={level=>{setMulti(current=>({...current,level}));setShown(PAGE);}}/>
       <label>{t('to')}<input type="date" required value={filters.to} min={filters.from} onChange={event => event.target.value && update({to: event.target.value})}/></label>
       <label>{t('radius')}<select value={filters.radius} onChange={event => chooseRadius(Number(event.target.value))}>
         <option value={0}>{t('radiusView')}</option>{radii.map(km => <option key={km} value={km}>{t('radiusKm', {radius: km})}</option>)}</select></label>

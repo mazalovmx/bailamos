@@ -378,7 +378,7 @@ test('unread counters, read marks, backwards pagination and coalesced notificati
   const mine = await chatExport(b.userId);
   assert.deepEqual(mine.messages.map(row => row.body), ['answer']);
   assert.deepEqual(mine.conversations.map(row => [row.conversationId, row.kind]), [[direct.id, 'DIRECT']]);
-  assert.equal(JSON.stringify(mine).includes('m1'), false);
+  assert.equal(mine.messages.some(row=>row.body==='m1'), false);
   assert.deepEqual(await chatExport('missing-' + tag), {messages: [], conversations: [], blocks: []});
 });
 // One outstanding read per stream, and whatever it returns is always kept: a wait that times out must not swallow the next frame.

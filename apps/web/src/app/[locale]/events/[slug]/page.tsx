@@ -1,3 +1,5 @@
+import {db} from '@dance/db';
+import {Bookmark} from '../../../../components/events/bookmark';
 import type {Metadata} from 'next';
 import {getTranslations} from 'next-intl/server';
 import {notFound} from 'next/navigation';
@@ -18,6 +20,7 @@ import {DateRsvp} from '../../../../components/events/date-rsvp';
 import {ShareButtons} from '../../../../components/events/share-buttons';
 import {LocationMap} from '../../../../components/geo/location-map';
 import {AddToCalendar} from '../../../../components/calendar/add-to-calendar';
+import {eventLocation} from '../../../../lib/calendar/ics';
 import {EventMedia} from '../../../../components/media/event-media';
 import {EventPosts} from '../../../../components/blog/event-posts';
 import {RoomLink} from '../../../../components/chat/room-link';
@@ -53,13 +56,14 @@ export default async function EventPage({params,searchParams}:Props) {
   // A series is answered twice: for all its dates and, optionally, for the selected one. Counters and names
   // follow the selected date; a one-off event has just the one answer.
   const isSeries=event.occurrences.length>1;
-  const {going,interested,visible,series,override,attendees}=await listAttendees(event,user?.profile?.id,isSeries?selected?.id:null);
+  const {going,interested,visible,series,override,attendees}=await listAttendees(event,user?.profile?.id,isSeries?selected?.id:null,managesSchool(user,event.schoolProfileId));
   const startsAt=selected?.startsAt||event.startsAt,endsAt=selected?.endsAt||event.endsAt;
   const isPast=(endsAt||startsAt)<now,dateCancelled=!!selected?.cancelled&&event.status!=='CANCELLED';
   const venue=event.venue&&!event.venue.hiddenAt?event.venue:null;
   const people=(roles:string[])=>event.members.filter(m=>roles.includes(m.role)&&!m.profile.hiddenAt).map(m=>m.profile)
     .filter((profile,index,all)=>all.findIndex(other=>other.id===profile.id)===index);
   const organizers=people(['OWNER','CO_ORGANIZER']),artists=people(['ARTIST']);
+  const saved=user?!!await db.eventBookmark.findUnique({where:{userId_eventId:{userId:user.id,eventId:event.id}}}):false;
   const links=eventLinks(slug,locale,event.shortCode);
   const jsonLd=eventJsonLd(event,{startsAt,endsAt,cancelled:!!selected?.cancelled},{organizers,artists},{origin:links.origin,url:links.canonical});
   return <main className="detail-page event-page"><Link href={'/'+locale+'/events'}>← {t('back')}</Link>
@@ -75,13 +79,27 @@ export default async function EventPage({params,searchParams}:Props) {
       <small>{x('eventZone',{zone:event.timezone,name:zoneName(startsAt,locale,event.timezone)})}</small>
       <ViewerTime startsAt={startsAt.toISOString()} endsAt={endsAt?.toISOString()} eventZone={event.timezone}/>
       {isPublic(event)&&<AddToCalendar eventId={event.id} title={event.title} startsAt={startsAt.toISOString()} endsAt={endsAt?.toISOString()} timezone={event.timezone}
-        location={[venue?.name,venue?.address,cityLabel].filter(Boolean).join(', ')} details={(event.description||'').slice(0,500)} url={links.canonical}/>}
+        location={eventLocation({...event,city:{name:cityLabel}})} details={(event.description||'').slice(0,500)} url={links.canonical}/>}
     </div>
     <div><h2>{t('location')}</h2>
       {venue?<><p><strong>{venue.name}</strong></p><p>{venue.address}</p><p>{cityLabel}</p></>:<>{event.address&&<p>{event.address}</p>}<p>{cityLabel}</p></>}
       {event.priceText&&<><h2>{x('price')}</h2><p>{event.priceText}</p></>}
     </div></div>
-    {/* A venue is shown exactly; an event without one sits at the city's coordinates. */}
+    <section className="rsvp-panel" aria-labelledby="rsvp-title"><h2 id="rsvp-title">{t('rsvpTitle')}</h2>{user&&isPublic(event)&&<Bookmark eventId={event.id} initial={saved}/>}
+      {isSeries&&<p className="field-note">{x('countsForDate',{date:date(startsAt)})}</p>}
+      <p className="rsvp-count">{t('goingCount',{count:going})} · {t('interestedCount',{count:interested})}</p>
+      {event.status==='PUBLISHED'&&!event.hiddenAt&&nextDates.length>0&&(user?.profile?<>
+        {isSeries&&<><h3>{x('rsvpSeries')}</h3><p className="field-note">{x('rsvpSeriesHint')}</p></>}
+        <RsvpButtons eventId={event.id} initial={series||''}/>
+        {isSeries&&selected&&!selected.cancelled&&selected.startsAt>=now&&<DateRsvp key={selected.id} eventId={event.id} occurrenceId={selected.id} date={date(startsAt)} series={series||''} override={override||''}/>}
+      </>:<Link className="button" href={'/'+locale+(user?'/onboarding':'/login')+'?next='+encodeURIComponent('/'+locale+'/events/'+slug)}>{t(user?'profileRequired':'signInRsvp')}</Link>)}
+      <h3>{isSeries?x('attendeesOnDate',{date:date(startsAt)}):x('attendees')}</h3>
+      {!visible?<p className="field-note">{x('attendeesHidden_'+event.attendeeVisibility)}</p>:attendees.length===0?<p className="field-note">{x('noAttendees')}</p>:
+        <ul className="attendee-list">{attendees.map(a=><li key={a.handle}><Link href={'/'+locale+'/@'+a.handle}>{a.name}</Link><span className="badge">{t(a.status==='GOING'?'going':'interested')}</span></li>)}</ul>}
+      {visible&&event.attendeeVisibility!=='PUBLIC'&&<p className="field-note">{x('attendeesNote_'+event.attendeeVisibility)}</p>}
+      {isPublic(event)&&event.status==='PUBLISHED'&&(canManage||!!series||!!override)&&<RoomLink eventId={event.id} signedIn={!!user}/>}
+    </section>
+    {/* The confirmed event location is used for the arrival map. */}
     {event.lat!==null&&event.lng!==null&&<LocationMap lat={event.lat} lng={event.lng} label={venue?venue.name+', '+venue.address:[event.address,cityLabel].filter(Boolean).join(', ')}/>}
     {/* What the organizer wants people to see on arrival: the entrance, the sign, the corner of the square. */}
     {(event.mapImageKey||event.mapNote)&&<figure className="event-map-card">{event.mapImageKey&&<img src={'/api/media/file/'+event.mapImageKey} alt={x('mapImageAlt')} loading="lazy" width={640} height={400}/>}{event.mapNote&&<figcaption>{event.mapNote}</figcaption>}</figure>}
@@ -96,7 +114,7 @@ export default async function EventPage({params,searchParams}:Props) {
     <div className="tags">{event.tags.map(({tag})=><Link key={tag.id} href={'/'+locale+'/events?tag='+encodeURIComponent(tag.id)}>{t.has('tag_'+tag.id)?t('tag_'+tag.id):tag.name}</Link>)}</div>
     <h2>{t('description')}</h2><p className="prose">{event.description}</p>
     {event.prerequisites&&<><h2>{t('prerequisites')}</h2><p className="prose">{event.prerequisites}</p></>}
-    {event.rrule&&<details className="session-list" open><summary>{t('nextSessions')} · {t('sessionCount',{count:event.occurrences.length})}</summary><ol>{event.occurrences.map(o=><li key={o.id}>
+    {event.rrule&&<details className="session-list"><summary>{t('nextSessions')} · {t('sessionCount',{count:event.occurrences.length})}</summary><ol>{event.occurrences.map(o=><li key={o.id}>
       <Link aria-current={o.id===selected?.id?'date':undefined} href={'?date='+encodeURIComponent(o.startsAt.toISOString())}>{o.cancelled?<s>{date(o.startsAt)}</s>:date(o.startsAt)}</Link>
       {o.cancelled&&<span className="badge">{t('CANCELLED')}</span>}{o.originalStartsAt&&!o.cancelled&&<span className="badge">{x('movedBadge')}</span>}</li>)}</ol></details>}
     <h2>{x('organizers')}</h2>
@@ -106,20 +124,6 @@ export default async function EventPage({params,searchParams}:Props) {
     <EventMedia eventId={event.id} canManage={canManage}/>
     {isPublic(event)&&<EventPosts eventId={event.id}/>}
     {canManage&&<Link className="button secondary" href={'/'+locale+'/events/'+slug+'/edit'}>{x('manageEvent')}</Link>}
-    <section className="rsvp-panel" aria-labelledby="rsvp-title"><h2 id="rsvp-title">{t('rsvpTitle')}</h2>
-      {isSeries&&<p className="field-note">{x('countsForDate',{date:date(startsAt)})}</p>}
-      <p className="rsvp-count">{t('goingCount',{count:going})} · {t('interestedCount',{count:interested})}</p>
-      {event.status==='PUBLISHED'&&!event.hiddenAt&&nextDates.length>0&&(user?.profile?<>
-        {isSeries&&<><h3>{x('rsvpSeries')}</h3><p className="field-note">{x('rsvpSeriesHint')}</p></>}
-        <RsvpButtons eventId={event.id} initial={series||''}/>
-        {isSeries&&selected&&!selected.cancelled&&selected.startsAt>=now&&<DateRsvp key={selected.id} eventId={event.id} occurrenceId={selected.id} date={date(startsAt)} series={series||''} override={override||''}/>}
-      </>:<Link className="button" href={'/'+locale+(user?'/onboarding':'/login')+'?next='+encodeURIComponent('/'+locale+'/events/'+slug)}>{t(user?'profileRequired':'signInRsvp')}</Link>)}
-      <h3>{isSeries?x('attendeesOnDate',{date:date(startsAt)}):x('attendees')}</h3>
-      {!visible?<p className="field-note">{x('attendeesHidden_'+event.attendeeVisibility)}</p>:attendees.length===0?<p className="field-note">{x('noAttendees')}</p>:
-        <ul className="attendee-list">{attendees.map(a=><li key={a.handle}><Link href={'/'+locale+'/@'+a.handle}>{a.name}</Link><span className="badge">{t(a.status==='GOING'?'going':'interested')}</span></li>)}</ul>}
-      {visible&&event.attendeeVisibility!=='PUBLIC'&&<p className="field-note">{x('attendeesNote_'+event.attendeeVisibility)}</p>}
-      {isPublic(event)&&event.status==='PUBLISHED'&&(canManage||!!series||!!override)&&<RoomLink eventId={event.id} signedIn={!!user}/>}
-    </section>
     {isPublic(event)&&<section className="share-panel" aria-labelledby="share-title"><h2 id="share-title">{x('shareTitle')}</h2>
       <ShareButtons url={links.short} title={event.title} text={date(startsAt)+' · '+(venue?venue.name+', ':'')+cityLabel}/>
       {event.status==='PUBLISHED'&&<details className="event-share"><summary>{t('shareEvent')} ↗</summary><p>{t('selectedDate')}</p><AnnouncementStudio key={startsAt.toISOString()} initial={{title:event.title,date:date(startsAt)+' · '+event.timezone,place:(venue?venue.name+', ':'')+cityLabel,text:event.styles.map(s=>s.style.name).join(' · ')+' · '+t('kind_'+event.kind)}} urlPath={'/'+locale+'/events/'+slug+'?date='+encodeURIComponent(startsAt.toISOString())}/></details>}

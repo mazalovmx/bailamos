@@ -1,4 +1,7 @@
 import Link from 'next/link';
+import {redirect} from 'next/navigation';
+import {currentCitySlug} from '../../../lib/catalogue/current-city';
+import {queryParams} from '../../../lib/search-query';
 import {headers} from 'next/headers';
 import {getTranslations} from 'next-intl/server';
 import {ZodError} from 'zod';
@@ -19,6 +22,8 @@ export async function generateMetadata({params}: Props) {
 }
 export default async function SearchPage({params, searchParams}: Props) {
   const {locale} = await params, raw = await searchParams, t = await getTranslations('Search');
+  if(raw.city===undefined)raw.city=await currentCitySlug()||undefined;
+  if(['style','level','from','to','kind','format','tag','recurring'].some(key=>raw[key]))redirect('/'+locale+'/events?'+queryParams(raw));
   const one = (key: string) => {const value = raw[key]; return (Array.isArray(value) ? value[0] : value) || '';};
   const q = cleanQuery(one('q')), query = new URLSearchParams({q, locale});
   for (const key of ['type', 'city', 'cursor']) if (one(key)) query.set(key, one(key));

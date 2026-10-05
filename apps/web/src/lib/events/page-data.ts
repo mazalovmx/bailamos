@@ -12,6 +12,7 @@ export type LoadedEvent=NonNullable<Awaited<ReturnType<typeof loadEvent>>>;
 export function pickOccurrence(event:Pick<LoadedEvent,'occurrences'>,requested?:string,now=new Date()) {
   return event.occurrences.find(o=>o.startsAt.toISOString()===requested)
     ||event.occurrences.find(o=>!!requested&&o.originalStartsAt?.toISOString()===requested)
+    ||event.occurrences.find(o=>!!requested&&o.previousStarts?.includes(requested))
     ||event.occurrences.find(o=>!o.cancelled&&o.startsAt>=now)||event.occurrences.at(-1)||null;
 }
 export function eventLinks(slug:string,locale:string,shortCode?:string|null) {

@@ -181,6 +181,7 @@ model Profile {
 model SchoolAdmin {
   userId String
   schoolProfileId String
+  canManageAdmins Boolean @default(false)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   school Profile @relation(fields: [schoolProfileId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
@@ -250,6 +251,9 @@ model Venue {
 }
 model Event {
   id String @id @default(cuid())
+  version Int @default(1)
+  creationKey String? @unique
+  placeConfirmed Boolean @default(false)
   schoolProfileId String?
   school Profile? @relation("SchoolEvents", fields: [schoolProfileId], references: [id], onDelete: SetNull)
   @@index([schoolProfileId])
@@ -294,6 +298,7 @@ model Event {
   media MediaItem[]
   posts Post[]
   occurrences EventOccurrence[]
+  bookmarks EventBookmark[]
   conversation Conversation?
   importedItems ImportedItem[]
   createdAt DateTime @default(now()) @db.Timestamptz(3)
@@ -333,10 +338,40 @@ model EventOccurrence {
   cancelled Boolean @default(false)
   // Set when a single date was moved: the start the series had originally scheduled for it.
   originalStartsAt DateTime? @db.Timestamptz(3)
+  // Stable series slot; distinct from a individually moved occurrence's actual start.
+  slotStartsAt DateTime? @db.Timestamptz(3)
+  previousStarts String[] @default([])
   reminderSentAt DateTime? @db.Timestamptz(3)
   rsvps OccurrenceRsvp[]
   @@unique([eventId, startsAt])
   @@index([startsAt])
+}
+model EventBookmark {
+  userId String
+  eventId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@id([userId, eventId])
+}
+// An independent snapshot survives deletion of the event. In-app notifications commit with the change;
+// external delivery retries without replaying the user's mutation.
+model EventDelivery {
+  id String @id @default(cuid())
+  dedupeKey String @unique
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type String
+  data Json
+  url String?
+  attempts Int @default(0)
+  retryAt DateTime @default(now()) @db.Timestamptz(3)
+  emailSentAt DateTime? @db.Timestamptz(3)
+  channelsSentAt DateTime? @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
+  lastError String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([completedAt, retryAt])
 }
 model EventMembership {
   eventId String
@@ -677,6 +712,8 @@ model TelegramChat {
 }
 
 model User {
+  eventBookmarks EventBookmark[]
+  eventDeliveries EventDelivery[]
   schoolAdminships SchoolAdmin[]
   id String @id
   name String

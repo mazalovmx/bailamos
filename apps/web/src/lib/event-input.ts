@@ -1,10 +1,10 @@
-import {db, type Prisma} from '@dance/db';
+import {db, EventConflict, type Prisma} from '@dance/db';
 import {ApiError} from './api';
 import {eventInput} from './events/schema';
 import {schedule} from './schedule';
 import {eventDedupeKey} from './import/dedupe';
 import {haversine} from './geo/coarsen';
-type Times={startsAt:Date;endsAt:Date};
+type Times={startsAt:Date;endsAt:Date|null};
 export async function prepareEvent(body:unknown) {
   const input=eventInput.parse(body);
   const [city,style,tags,venue]=await Promise.all([
@@ -21,45 +21,49 @@ export async function prepareEvent(body:unknown) {
   let times:ReturnType<typeof schedule>;
   try{
     times=schedule(input.startsLocal,input.endsLocal,city.timezone,
-      {count:input.recurrenceWeeks,interval:input.recurrenceInterval,byDay:input.recurrenceDays,until:input.recurrenceUntil});
+      {count:input.recurrenceCount??input.recurrenceWeeks,interval:input.recurrenceInterval,byDay:input.recurrenceDays,until:input.recurrenceUntil});
   }catch(error){
     if(error instanceof Error&&error.message==='TOO_MANY_DATES') throw new ApiError('TOO_MANY_DATES',400);
     throw error;
   }
   const {occurrences,...when}=times;
   const fields={title:input.title,description:input.description,cityId:city.id,timezone:city.timezone,...when,
-    venueId:venue?.id??null,lat:position.lat,lng:position.lng,
+    venueId:venue?.id??null,lat:position.lat,lng:position.lng,placeConfirmed:!!venue||!!input.pin,
     priceText:input.priceText,address:input.address,mapImageKey:input.mapImageKey,mapNote:input.mapNote,attendeeVisibility:input.attendeeVisibility,
     status:input.status,kind:input.kind,format:input.format,level:input.level,intensity:input.intensity,
     tempo:input.tempo,prerequisites:input.prerequisites,partnerRequired:input.partnerRequired,
     // The same key the importer computes, so an imported copy of this event is recognised as a duplicate.
     dedupeKey:eventDedupeKey({title:input.title,startsAt:when.startsAt,timezone:city.timezone,cityId:city.id,lat:position.lat,lng:position.lng,precise:!!venue||!!input.pin})};
   // Whether the organizer gave an exact place: a venue of the directory or a marker on the map.
-  return {fields,occurrences,styleId:style.id,tagIds:tags.map(t=>t.id),schoolProfileId:input.schoolProfileId,exactPlace:!!venue||!!input.pin};
+  return {fields,occurrences:occurrences.map(row=>({...row,slotStartsAt:row.startsAt})),styleId:style.id,tagIds:tags.map(t=>t.id),schoolProfileId:input.schoolProfileId,exactPlace:!!venue||!!input.pin};
 }
-// Replaces the dates of a series while keeping rows whose start did not move: a cancelled date stays cancelled
-// and a reminder that was already sent is not sent again.
-// A date that was moved on its own (originalStartsAt) stands for the slot the series had scheduled for it: while the
-// series still contains that slot the row stays exactly as the organizer left it and no second row is created for
-// the slot; when the series no longer contains the slot, the moved date goes with it.
-export async function syncOccurrences(tx:Prisma.TransactionClient,eventId:string,occurrences:Times[]) {
-  const existing=await tx.eventOccurrence.findMany({where:{eventId},select:{id:true,startsAt:true,endsAt:true,originalStartsAt:true}});
-  const wanted=new Map(occurrences.map(o=>[o.startsAt.getTime(),o]));
-  // `kept` holds the series slots that already have a row; `taken` the starts that rows occupy after the save.
-  const kept=new Set<number>(),taken=new Set<number>(),stay=new Set<string>();
-  for(const row of existing.filter(row=>row.originalStartsAt)){
-    const slot=row.originalStartsAt!.getTime();
-    if(!wanted.has(slot)||kept.has(slot)) continue;
-    kept.add(slot);taken.add(row.startsAt.getTime());stay.add(row.id);
+// Keep matching slots first, then pair unmatched future slots in order. Never delete a date or its answers.
+// Individual moves and cancellations are exceptions: they survive a whole-series edit. Past dates are immutable.
+export async function syncOccurrences(tx:Prisma.TransactionClient,eventId:string,occurrences:Times[],now=new Date(),shiftSeries=false) {
+  const existing=await tx.eventOccurrence.findMany({where:{eventId},orderBy:{slotStartsAt:'asc'}});
+  const slot=(row:typeof existing[number])=>(row.slotStartsAt??row.originalStartsAt??row.startsAt).getTime();
+  const remaining=new Map(occurrences.map(row=>[row.startsAt.getTime(),row]));
+  const assignments=new Map<string,Times>();
+  for(const [index,row] of existing.entries()){
+    const match=shiftSeries?occurrences[index]:remaining.get(slot(row));
+    if(match){assignments.set(row.id,match);remaining.delete(match.startsAt.getTime());}
   }
-  for(const row of existing.filter(row=>!row.originalStartsAt)){
-    const start=row.startsAt.getTime(),match=wanted.get(start);
-    if(!match||kept.has(start)) continue;
-    kept.add(start);taken.add(start);stay.add(row.id);
-    if(row.endsAt?.getTime()!==match.endsAt.getTime()) await tx.eventOccurrence.update({where:{id:row.id},data:{endsAt:match.endsAt}});
+  const unmatched=existing.filter(row=>!assignments.has(row.id)&&row.startsAt>now).sort((a,b)=>slot(a)-slot(b));
+  for(const next of [...remaining.values()].filter(row=>row.startsAt>now).sort((a,b)=>a.startsAt.getTime()-b.startsAt.getTime())){
+    const row=unmatched.shift();if(!row)break;assignments.set(row.id,next);remaining.delete(next.startsAt.getTime());
   }
-  await tx.eventOccurrence.deleteMany({where:{eventId,id:{in:existing.filter(row=>!stay.has(row.id)).map(row=>row.id)}}});
-  // A new slot is not materialized on top of a moved date that already occupies that very time.
-  const added=occurrences.filter(o=>!kept.has(o.startsAt.getTime())&&!taken.has(o.startsAt.getTime()));
-  if(added.length) await tx.eventOccurrence.createMany({data:added.map(o=>({eventId,...o}))});
+  const occupied=new Set<number>();
+  for(const row of existing){const next=assignments.get(row.id);const start=row.startsAt<=now||row.originalStartsAt||!next?row.startsAt:next.startsAt;
+    if(occupied.has(start.getTime()))throw new EventConflict('DATE_TAKEN');occupied.add(start.getTime());}
+  for(const row of existing){
+    if(row.startsAt<=now)continue;
+    const next=assignments.get(row.id);
+    if(!next){await tx.eventOccurrence.update({where:{id:row.id},data:{cancelled:true}});continue;}
+    if(row.originalStartsAt){await tx.eventOccurrence.update({where:{id:row.id},data:{slotStartsAt:next.startsAt}});continue;}
+    const moved=row.startsAt.getTime()!==next.startsAt.getTime();
+    await tx.eventOccurrence.update({where:{id:row.id},data:{...next,slotStartsAt:next.startsAt,
+      ...(moved?{previousStarts:{push:row.startsAt.toISOString()},reminderSentAt:null}:{})}});
+  }
+  const added=[...remaining.values()].filter(row=>row.startsAt>now&&!occupied.has(row.startsAt.getTime()));
+  if(added.length)await tx.eventOccurrence.createMany({data:added.map(row=>({...row,eventId,slotStartsAt:row.startsAt}))});
 }

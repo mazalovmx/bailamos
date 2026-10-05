@@ -13,6 +13,9 @@ const tag=randomUUID().slice(0,8),password='Test-only-Strong-'+randomUUID();
 const clients:Client[]=[{cookie:'',email:'owner-'+tag+'@example.test'},{cookie:'',email:'guest-'+tag+'@example.test'},{cookie:'',email:'co-'+tag+'@example.test'}];
 const eventIds:string[]=[],stubProfileIds:string[]=[];
 async function request(client:Client,path:string,body:unknown,method='POST'){
+  if(method==='PATCH'&&/^\/api\/events\/[^/]+$/.test(path)&&body&&typeof body==='object'&&'title' in body){
+    const event=await db.event.findUniqueOrThrow({where:{id:path.split('/').at(-1)}});body={...body,version:event.version};
+  }
   const response=await fetch(base+path,{method,headers:{'Content-Type':'application/json',Origin:base,Cookie:client.cookie},body:JSON.stringify(body),redirect:'manual'});
   const cookies=response.headers.getSetCookie().map(c=>c.split(';')[0]);
   if(cookies.length)client.cookie=cookies.join('; ');

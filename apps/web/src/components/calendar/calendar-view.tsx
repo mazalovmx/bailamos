@@ -11,6 +11,7 @@ import esLocale from '@fullcalendar/core/locales/es';
 import ruLocale from '@fullcalendar/core/locales/ru';
 import {wallClock, zoneLabel} from '../../lib/calendar/time';
 import type {CalendarFilters, CalendarOccurrence} from '../../lib/calendar/query';
+import {queryParams} from '../../lib/search-query';
 import '../../app/styles/calendar.css';
 const packs = {en: enLocale, es: esLocale, ru: ruLocale};
 const DAY = 86400000, time = {hour: '2-digit', minute: '2-digit', hour12: false} as const;
@@ -25,17 +26,18 @@ type Loaded = {occurrences: CalendarOccurrence[]; truncated: boolean};
  * Consequences handled here: the fetched range is widened by a day on each side (a grid day is not a UTC day),
  * `now` is supplied as the visitor's wall clock, and links carry the real UTC instant.
  */
-export function CalendarView({locale, filters}: {locale: string; filters: CalendarFilters}) {
+export function CalendarView({locale, filters,initialDate}: {locale: string; filters: CalendarFilters;initialDate?:string}) {
   const t = useTranslations('Calendar');
   const [view, setView] = useState<string | null>(null), [mine, setMine] = useState(false), [zone, setZone] = useState('UTC');
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle'), [truncated, setTruncated] = useState(false);
   const cache = useRef(new Map<string, Loaded>()), calendar = useRef<FullCalendar>(null);
+  const initialRange=useRef(true);
   // Rendered after mount only: the initial view depends on the viewport (list on narrow screens) and the zone on the browser.
   useEffect(() => {
     setZone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
     setView(window.matchMedia('(max-width: 700px)').matches ? 'listMonth' : 'dayGridMonth');
   }, []);
-  const query = (['city', 'style', 'level', 'kind'] as const).flatMap(key => filters[key].map(v => key + '=' + encodeURIComponent(v))).join('&');
+  const query = (['city', 'style', 'level', 'kind'] as const).flatMap(key => filters[key].map(v => key + '=' + encodeURIComponent(v))).join('&')+'&'+queryParams(filters.extra||{});
   const events = useCallback(async (info: EventSourceFuncArg): Promise<EventInput[]> => {
     const from = new Date(info.start.getTime() - DAY).toISOString(), to = new Date(info.end.getTime() + DAY).toISOString();
     const key = from + '|' + to + '|' + query;
@@ -80,6 +82,12 @@ export function CalendarView({locale, filters}: {locale: string; filters: Calend
     {view ? <div className="calendar-scroll"><FullCalendar ref={calendar} plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
       locales={[enLocale, esLocale, ruLocale]} locale={packs[locale as keyof typeof packs] || enLocale}
       timeZone="UTC" now={() => wallClock(new Date(), zone)} nowIndicator
+      initialDate={initialDate}
+      datesSet={({view})=>{if(initialRange.current){initialRange.current=false;return;}
+        const params=new URLSearchParams(window.location.search);
+        params.set('from',view.currentStart.toISOString().slice(0,10));params.set('to',new Date(view.currentEnd.getTime()-DAY).toISOString().slice(0,10));
+        window.history.replaceState(null,'',window.location.pathname+'?'+params);
+      }}
       initialView={view} headerToolbar={{left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listMonth'}}
       height="auto" dayMaxEvents={4} nextDayThreshold="06:00:00" scrollTime="16:00:00" allDaySlot={false} navLinks={false}
       eventDisplay="block" displayEventEnd={false} eventTimeFormat={time} slotLabelFormat={time}

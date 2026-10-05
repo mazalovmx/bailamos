@@ -7,7 +7,7 @@ export function eventSearch(query:SearchQuery,styleIds?:string[]):Prisma.EventWh
     level=classLevels.filter(v=>values(query.level).includes(v)),intensity=intensities.filter(v=>values(query.intensity).includes(v)),
     tempo=tempos.filter(v=>values(query.tempo).includes(v));
   return {status:'PUBLISHED',hiddenAt:null,
-    ...(values(query.city).length?{cityId:{in:values(query.city)}}:{}),
+    ...(values(query.city).filter(c=>c!=='all').length?{cityId:{in:values(query.city).filter(c=>c!=='all')}}:{}),
     ...(values(query.style).length?{styles:{some:{styleId:{in:styleIds??[...new Set(values(query.style).flatMap(styleFamily))]}}}}:{}),
     ...(first(query.q)?{title:{contains:first(query.q).slice(0,100),mode:'insensitive' as const}}:{}),
     ...(kind.length?{kind:{in:kind}}:{}),...(format.length?{format:{in:format}}:{}),...(level.length?{level:{in:level}}:{}),...(intensity.length?{intensity:{in:intensity}}:{}),...(tempo.length?{tempo:{in:tempo}}:{}),

@@ -6,7 +6,7 @@ import {registerTelegramDelivery} from '../telegram/delivery';
 const state = globalThis as {__dancePushDelivery?: boolean};
 if (!state.__dancePushDelivery) {
   state.__dancePushDelivery = true;
-  registerDelivery(async (userId, type, data, url) => {await sendPush(userId, type, data, url);});
+  registerDelivery(async (userId, type, data, url) => {const result=await sendPush(userId, type, data, url);if(result.failed)throw new Error('PUSH_DELIVERY_FAILED');});
 }
 registerTelegramDelivery();
 export const notificationDeliveriesRegistered = true;

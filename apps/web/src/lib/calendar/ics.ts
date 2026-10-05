@@ -5,9 +5,13 @@ export type IcsOccurrence = {id: string; startsAt: Date; endsAt: Date | null; ca
 // SEQUENCE of a moved date counts seconds from here, which keeps it far inside the 32-bit range.
 const SEQUENCE_EPOCH = Date.UTC(2020, 0, 1) / 1000;
 export type IcsEvent = {id: string; slug: string; title: string; description: string | null; timezone: string; status: string; updatedAt: Date;
-  startsAt: Date; endsAt: Date | null; city: {name: string}; venue?: {name: string; address: string; hiddenAt: Date | null} | null; occurrences: IcsOccurrence[]};
-export function eventLocation(event: Pick<IcsEvent, 'city' | 'venue'>) {
-  return event.venue && !event.venue.hiddenAt ? [event.venue.name, event.venue.address].filter(Boolean).join(', ') : event.city.name;
+  version?:number;
+  startsAt: Date; endsAt: Date | null; city: {name: string}; address?:string|null; lat?:number|null; lng?:number|null; venue?: {name: string; address: string; hiddenAt: Date | null} | null; occurrences: IcsOccurrence[]};
+export function eventLocation(event: Pick<IcsEvent, 'city' | 'venue' | 'address' | 'lat' | 'lng'>) {
+  const venue=event.venue&&!event.venue.hiddenAt?event.venue:null;
+  const address=venue?.address||event.address;
+  const place=[venue?.name,address,address?.toLocaleLowerCase().includes(event.city.name.toLocaleLowerCase())?null:event.city.name].filter(Boolean).join(', ');
+  return place+(!venue&&event.lat!=null&&event.lng!=null?' · https://www.openstreetmap.org/?mlat='+event.lat+'&mlon='+event.lng:'');
 }
 // One VEVENT per materialized occurrence: a recurring series is exported as its real dates, so a single cancelled
 // date is exact and no client has to re-expand an RRULE across DST changes.
@@ -26,7 +30,7 @@ export function buildCalendar(input: {name: string; origin: string; locale?: str
       const cancelled = event.status === 'CANCELLED' || occurrence.cancelled;
       // A moved date keeps its UID and is exported at its new time. Its SEQUENCE follows the event's timestamp, which
       // every move advances, so each revision outranks the copy a client already holds (RFC 5545 §3.8.7.4).
-      const revision = occurrence.originalStartsAt ? Math.max(1, Math.floor(event.updatedAt.getTime() / 1000) - SEQUENCE_EPOCH) : 0;
+      const revision = event.version?event.version*2:Math.max(1, Math.floor(event.updatedAt.getTime() / 1000) - SEQUENCE_EPOCH);
       calendar.createEvent({id: occurrence.id + '@' + host,
         // Luxon DateTime in the event zone + `timezone` makes ical-generator write DTSTART;TZID=<zone>:<wall clock>.
         start: inZone(occurrence.startsAt, event.timezone), ...(occurrence.endsAt ? {end: inZone(occurrence.endsAt, event.timezone)} : {}),

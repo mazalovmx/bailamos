@@ -8,6 +8,8 @@ export const eventStatuses=['DRAFT','PUBLISHED','CANCELLED'] as const;
 const local=z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
 // Full event payload of POST /api/events and PATCH /api/events/[id]. Unknown keys (ownership, coordinates) are dropped.
 export const eventInput=z.object({
+  version:z.coerce.number().int().positive().optional(),
+  operationId:z.string().uuid().optional(),
   title:z.string().trim().min(3).max(120),description:z.string().trim().min(10).max(5000),
   cityId:z.string().min(1).max(64),styleId:z.string().min(1).max(64),
   venueId:z.string().max(64).nullish().transform(value=>value||null),
@@ -30,6 +32,7 @@ export const eventInput=z.object({
   tagIds:z.array(z.string().min(1).max(64)).max(8).default([]),
   // Recurrence: a number of dates (1 = single event) or, alternatively, a last local day.
   recurrenceWeeks:z.coerce.number().int().min(1).max(MAX_DATES).default(1),
+  recurrenceCount:z.coerce.number().int().min(1).max(MAX_DATES).optional(),
   recurrenceInterval:z.coerce.number().int().min(1).max(MAX_INTERVAL).default(1),
   recurrenceDays:z.array(z.enum(weekdays)).max(7).default([]),
   recurrenceUntil:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish().or(z.literal('')).transform(value=>value||null)
@@ -37,7 +40,7 @@ export const eventInput=z.object({
   .refine(value=>value.format!=='SOLO'||!value.partnerRequired,{path:['partnerRequired'],message:'Solo classes cannot require a partner'});
 export type EventInput=z.infer<typeof eventInput>;
 // A body with nothing but a status is a quick publish / cancel / back-to-draft.
-export const statusInput=z.object({status:z.enum(eventStatuses)}).strict();
+export const statusInput=z.object({status:z.enum(eventStatuses),version:z.coerce.number().int().positive().optional()}).strict();
 // One date of a series: {cancelled} cancels or restores it, {startsLocal,endsLocal} moves it (wall clock in the event's zone).
 export const occurrenceInput=z.union([z.object({cancelled:z.boolean()}).strict(),z.object({startsLocal:local,endsLocal:local}).strict()]);
 const handle=z.string().trim().toLowerCase().transform(value=>value.replace(/^@/,'')).pipe(z.string().regex(/^[a-z0-9][a-z0-9_-]{2,29}$/));

@@ -1,5 +1,5 @@
 // Generic Prisma-backed CRUD for the whitelisted resources. Every write and its AuditLog row share one transaction.
-import {db, Prisma} from '@dance/db';
+import {db, Prisma, changeEventStatus, lockEvent, type EventStatus} from '@dance/db';
 import {HttpError} from './errors';
 import type {Staff} from './guard';
 import {audit, deleteTarget} from './moderation';
@@ -69,10 +69,14 @@ export async function update(item: Resource, id: string, input: unknown, user: S
   const keys = Object.keys(data).filter(key => data[key] !== undefined);
   if (!keys.length) throw new HttpError('INVALID_INPUT', 400);
   return db.$transaction(async tx => {
+    if(item.model==='event')await lockEvent(tx,id);
     const before = await delegate(tx, item).findUnique({where: {id}, select: {id: true, ...Object.fromEntries(keys.map(key => [key, true]))}});
     if (!before) throw new HttpError('NOT_FOUND', 404);
     await check(tx, item, data, id);
-    const row = await delegate(tx, item).update({where: {id}, data, select: selectOf(item)});
+    if(item.model==='event'&&typeof data.status==='string')await changeEventStatus(tx,id,data.status as EventStatus,user.id);
+    const {status,...other}=data;
+    const updateData=item.model==='event'?{...other,version:{increment:1}}:{...other,...(status!==undefined?{status}:{})};
+    const row = await delegate(tx, item).update({where: {id}, data:updateData, select: selectOf(item)});
     const was = plain(before), now = plain(row), changed = keys.filter(key => JSON.stringify(was[key]) !== JSON.stringify(now[key]));
     if (changed.length) await audit(tx, user.id, 'RECORD_UPDATE', item.modelName, id,
       {before: Object.fromEntries(changed.map(key => [key, was[key] ?? null])), after: Object.fromEntries(changed.map(key => [key, now[key] ?? null]))});
