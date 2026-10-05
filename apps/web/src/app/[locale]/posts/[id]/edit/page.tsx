@@ -1,3 +1,4 @@
+import {loginPath} from '../../../../../lib/login-path';
 import {db} from '@dance/db';
 import {getTranslations} from 'next-intl/server';
 import {notFound, redirect} from 'next/navigation';
@@ -7,10 +8,10 @@ import {canPost} from '../../../../../lib/blog/permissions';
 import {publicEventWhere} from '../../../../../lib/blog/posts';
 import {currentUser} from '../../../../../lib/session';
 import '../../../../styles/blog.css';
-export const metadata = {robots: {index: false, follow: false}};
+export async function generateMetadata() {const t = await getTranslations('Blog'); return {title: t('editPostTitle'), robots: {index: false, follow: false}};}
 export default async function EditPost({params}: {params: Promise<{locale: string; id: string}>}) {
   const {locale, id} = await params, user = await currentUser();
-  if (!user) redirect('/' + locale + '/login');
+  if (!user) redirect(loginPath(locale, '/posts/' + id + '/edit'));
   const post = /^[A-Za-z0-9_-]{1,64}$/.test(id) ? await db.post.findUnique({where: {id}, include: {profile: {select: {handle: true, name: true}}}}) : null;
   // Somebody else's post does not exist here, published or not.
   if (!post || !canPost(user, 'update', post)) notFound();

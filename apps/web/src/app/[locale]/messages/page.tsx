@@ -1,3 +1,4 @@
+import {loginPath} from '../../../lib/login-path';
 import {getTranslations} from 'next-intl/server';
 import {redirect} from 'next/navigation';
 import Link from 'next/link';
@@ -11,7 +12,7 @@ export async function generateMetadata() {
 }
 export default async function Messages({params}: {params: Promise<{locale: string}>}) {
   const {locale} = await params, user = await currentUser();
-  if (!user) redirect('/' + locale + '/login');
+  if (!user) redirect(loginPath(locale, '/messages'));
   const t = await getTranslations('Chat');
   if (!user.profile) return <main className="form-page chat-page"><h1>{t('title')}</h1><p className="intro">{t('error_PROFILE_REQUIRED')}</p>
     <Link className="button" href={'/' + locale + '/profile'}>{t('createProfile')}</Link></main>;

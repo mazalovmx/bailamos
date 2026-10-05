@@ -1,3 +1,4 @@
+import {loginPath} from '../../../lib/login-path';
 import {getTranslations} from 'next-intl/server';
 import {redirect} from 'next/navigation';
 import Link from 'next/link';
@@ -5,10 +6,10 @@ import {postPath} from '../../../lib/blog/links';
 import {editableProfileIds, ownPosts} from '../../../lib/blog/posts';
 import {currentUser} from '../../../lib/session';
 import '../../styles/blog.css';
-export const metadata = {robots: {index: false, follow: false}};
+export async function generateMetadata() {const t = await getTranslations('Blog'); return {title: t('myPostsTitle'), robots: {index: false, follow: false}};}
 export default async function MyPosts({params}: {params: Promise<{locale: string}>}) {
   const {locale} = await params, user = await currentUser();
-  if (!user) redirect('/' + locale + '/login');
+  if (!user) redirect(loginPath(locale, '/posts'));
   const t = await getTranslations('Blog');
   // The author's own posts and the posts of the schools the author manages.
   const profileIds = editableProfileIds(user), posts = profileIds.length ? await ownPosts(profileIds) : [];

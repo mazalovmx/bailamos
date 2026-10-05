@@ -300,5 +300,9 @@
   "school.addMember": "Add member",
   "school.removeMember": "Remove member",
   "role.OWNER": "Platform owner",
-  "role.SCHOOL_ADMIN": "School administrator"
+  "role.SCHOOL_ADMIN": "School administrator",
+  "error.USE_EVENT_EDITOR": "Create events in the website editor.",
+  "error.PLACE_REQUIRED": "Choose the exact location in the event editor before publishing.",
+  "error.EVENT_CONFLICT": "The event changed. Reload and try again.",
+  "school.editEvent": "Edit event"
 }

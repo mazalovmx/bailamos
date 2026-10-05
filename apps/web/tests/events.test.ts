@@ -159,7 +159,7 @@ test('the preview shows the first ten dates and is the same computation as mater
   const preview = previewDates('2030-01-01T19:00', '2030-01-01T21:00', 'Europe/Moscow', rule);
   assert.equal(preview.length, 10);
   assert.deepEqual(preview, schedule('2030-01-01T19:00', '2030-01-01T21:00', 'Europe/Moscow', rule).occurrences.slice(0, 10).map(o => o.startsAt));
-  assert.throws(() => schedule('2030-01-01T19:00', '2030-01-01T21:00', 'Europe/Madrid', {until: '2032-01-01'}), /TOO_MANY_DATES/);
+  assert.throws(() => schedule('2030-01-01T19:00', '2030-01-01T21:00', 'Europe/Madrid', {until: '2042-01-01'}), /TOO_MANY_DATES/);
   assert.throws(() => schedule('2030-01-01T19:00', '2030-01-01T21:00', 'Europe/Madrid', {until: '2029-12-01'}), /INVALID_TIME/);
   assert.throws(() => schedule('2030-01-01T19:00', '2030-01-01T21:00', 'Europe/Madrid', {count: 4, interval: 9}), /INVALID_TIME/);
   assert.throws(() => schedule('2030-01-01T19:00', '2030-01-01T21:00', 'Europe/Madrid', {count: 4, byDay: ['XX']}), /INVALID_TIME/);
@@ -364,7 +364,7 @@ test('saving a series again keeps cancelled dates that did not move; venue coord
   const cityOnly = await input.prepareEvent(body);
   assert.deepEqual([cityOnly.fields.venueId, cityOnly.fields.lat, cityOnly.fields.lng], [null, 40.4, -3.7]);
   await rejects(() => input.prepareEvent({...body, venueId: foreign.id}), 'INVALID_VENUE');
-  await rejects(() => input.prepareEvent({...body, recurrenceWeeks: 1, recurrenceUntil: '2033-06-06'}), 'TOO_MANY_DATES');
+  await rejects(() => input.prepareEvent({...body, recurrenceWeeks: 1, recurrenceUntil: '2043-06-06'}), 'TOO_MANY_DATES');
 });
 
 test('artists: an existing profile by handle, or a stub profile without an owner', async () => {
@@ -614,7 +614,7 @@ test('moving one date: validation, DST, attendees are told, and saving the serie
   assert.ok(exported.includes('DTSTART;TZID=Europe/Madrid:20310310T200000') && exported.includes('DTEND;TZID=Europe/Madrid:20310310T220000'), exported);
   assert.ok(Number(/SEQUENCE:(\d+)/.exec(exported)![1]) > 1);
   assert.ok(!ics.includes('20310311T190000'), 'the original time is gone');
-  assert.equal(blocks.filter(b => b.includes('SEQUENCE:0')).length, 2, 'the other dates are untouched');
+  assert.equal(blocks.filter(b => b.includes('SEQUENCE:0')).length, 0, 'all exported dates carry the event revision, including restored dates');
   // Saving the series again with the same dates (and a new length): the moved date stays as the organizer left it,
   // nothing is created in its original slot, and the other dates take the new length.
   const times = event.occurrences.map(o => ({startsAt: o.startsAt, endsAt: new Date(o.endsAt!.getTime() + 1800000)}));
@@ -631,10 +631,12 @@ test('moving one date: validation, DST, attendees are told, and saving the serie
   await db.$transaction(tx => input.syncOccurrences(tx, event.id, [...times, clash]));
   rows = await db.eventOccurrence.findMany({where: {eventId: event.id}, orderBy: {startsAt: 'asc'}});
   assert.deepEqual(rows.map(r => r.id), [first.id, second.id, third.id]);
-  // When the series drops the slot the moved date stood for, the moved date goes with it.
+  // Removing a slot cancels its date, retaining its identity and participant answers.
   await db.$transaction(tx => input.syncOccurrences(tx, event.id, [times[0], times[2]]));
   rows = await db.eventOccurrence.findMany({where: {eventId: event.id}, orderBy: {startsAt: 'asc'}});
-  assert.deepEqual(rows.map(r => r.id), [first.id, third.id]);
+  assert.deepEqual(rows.map(r => r.id), [first.id, second.id, third.id]);
+  assert.equal(rows.find(r=>r.id===second.id)!.cancelled,true);
+  assert.equal(await db.occurrenceRsvp.count({where:{occurrenceId:second.id}}),2);
 });
 
 test('the preview image is a PNG that renders Cyrillic and accented Latin from the bundled font', async () => {

@@ -101,7 +101,7 @@
   "privacy_partner_title": "Búsqueda de pareja",
   "privacy_partner_text": "Apareces en la búsqueda de pareja solo en los estilos en los que tú marcaste «busco pareja». Nunca se activa automáticamente y puedes desactivarla cuando quieras en tu perfil.",
   "privacy_share_title": "Quién recibe los datos",
-  "privacy_share_text": "Nuestros proveedores de alojamiento y de envío de correo tratan datos por encargo nuestro. Si accedes con Google, Google nos comunica tu nombre, correo y foto de perfil. Las publicaciones de Instagram que incrustas se cargan desde Instagram. Solo comunicamos datos a las autoridades cuando la ley lo exige. Cuando nos pides rellenar el formulario de un evento a partir de un anuncio pegado, ese texto —y nada sobre ti— se envía al proveedor de IA DeepSeek; conservamos el texto 24 horas y después lo eliminamos.",
+  "privacy_share_text": "Nuestros proveedores de alojamiento y de envío de correo tratan datos por encargo nuestro. Si accedes con Google, Google nos comunica tu nombre, correo y foto de perfil. Las publicaciones de Instagram que incrustas se cargan desde Instagram. Solo comunicamos datos a las autoridades cuando la ley lo exige.",
   "privacy_retention_title": "Cuánto tiempo los conservamos",
   "privacy_retention_text": "Los datos de la cuenta y del perfil se conservan hasta que eliminas tu cuenta. Al eliminarla se borran de inmediato tu perfil, estilos, asistencias, publicaciones, medios subidos, suscripciones, consentimientos, notificaciones y mensajes.\nLas sesiones caducan tras 7 días sin uso; los enlaces de un solo uso caducan en minutos u horas.\nLas copias de seguridad cifradas de la base de datos se conservan 30 días y después se borran, por lo que los datos eliminados desaparecen de las copias en 30 días.\nLas decisiones de moderación pueden conservarse sin vínculo contigo para proteger a la comunidad. El registro de consentimientos se conserva mientras exista la cuenta.",
   "privacy_rights_title": "Tus derechos",
@@ -179,5 +179,11 @@
   "error_SESSION_NOT_FRESH": "Por seguridad, cierra la sesión, vuelve a iniciarla y repite la acción.",
   "error_SOCIAL_ACCOUNT_ALREADY_LINKED": "Esta cuenta de Google ya está conectada.",
   "error_PROVIDER_NOT_FOUND": "El acceso con Google no está disponible ahora.",
-  "error_CREDENTIAL_ACCOUNT_NOT_FOUND": "Esta cuenta aún no tiene contraseña. Crea una por correo primero."
+  "error_CREDENTIAL_ACCOUNT_NOT_FOUND": "Esta cuenta aún no tiene contraseña. Crea una por correo primero.",
+  "onboardingWho": "¿Para quién es esta cuenta?",
+  "onboardingKind_DANCER": "Una persona que baila",
+  "onboardingKind_SCHOOL": "Una escuela o estudio",
+  "onboardingKind_ORGANIZER": "Una organización de eventos",
+  "onboardingAllStyles": "Todos los demás estilos ({count})",
+  "onboardingSchoolNote": "A continuación llegarás a tu página pública, donde podrás añadir clases, talleres y eventos."
 }

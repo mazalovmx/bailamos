@@ -19,16 +19,16 @@
     "communityText": "Browse events, classes and schools without filling everything in at once. Open a section to get tips for that task."
   },
   "event": {
-    "introTitle": "Create from a post or start manually",
-    "introText": "If the announcement parser is enabled, paste the WhatsApp or Instagram text and review its suggestions. Otherwise, fill the form below.",
+    "introTitle": "Describe your event",
+    "introText": "Give it a title and a few lines of description. The form below takes about two minutes.",
     "detailsTitle": "Add the event details",
     "detailsText": "Choose a clear title, city and dance style. Add tags for the format, level and intensity so dancers can filter the listing.",
     "placeTitle": "Pin the exact place",
-    "placeText": "Choose a venue or switch to a custom map point for parks and outdoor socials. Check the location before publishing.",
+    "placeText": "Click the map, or choose the country and city and find the address. The marker is required: put it on the exact spot, especially for parks and squares.",
     "scheduleTitle": "Set the time and repeat pattern",
     "scheduleText": "Enter the local date and time for the selected city, then choose a one-off or recurring schedule.",
     "publishTitle": "Review, then save",
-    "publishText": "You can save as a draft or publish. Parser suggestions require your explicit review and confirmation."
+    "publishText": "You can save as a draft or publish. Check the marker on the map before you publish."
   },
   "schools": {
     "createTitle": "Create your school profile",

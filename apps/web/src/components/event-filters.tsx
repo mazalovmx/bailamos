@@ -3,7 +3,7 @@ import {eventKinds,danceFormats,classLevels,intensities,tempos} from '../lib/swi
 import {MultiFilter} from './multi-filter';
 import {type SearchQuery,values,first} from '../lib/search-query';
 export async function EventFilters({locale,query,cities,styles,tags}:{locale:string;query:SearchQuery;cities:{id:string;name:string}[];styles:{id:string;name:string}[];tags:{id:string;name:string}[]}) {
-  const t=await getTranslations('App');
+  const t=await getTranslations('App'),geo=await getTranslations('Geo');
   function select(name:string,label:string,all:string,items:{id:string;name:string}[]) {
     return <MultiFilter key={name+values(query[name]).join(',')} name={name} label={t(label)} all={t(all)} items={items} initial={values(query[name]).filter(id=>items.some(i=>i.id===id))}/>;
   }
@@ -12,10 +12,12 @@ export async function EventFilters({locale,query,cities,styles,tags}:{locale:str
   return <>
     <div className="quick-links"><a href={'/'+locale+'/events?style=lindy-hop'}>Lindy Hop</a><a href={'/'+locale+'/events?style=solo-jazz&format=SOLO'}>Solo Jazz</a><a href={'/'+locale+'/events?kind=CLASS&recurring=1'}>{t('regularClasses')}</a><a href={'/'+locale+'/events?kind=WORKSHOP'}>{t('kind_WORKSHOP')}</a></div>
     <form className="search-panel" action={'/'+locale+'/events'}>
+      <input type="hidden" name="city" value="all"/>
       <p className="filter-help">{t('filterHelp')}</p>
       <div className="filters">
         {select('city','city','allCities',cities)}{select('style','style','allStyles',styles)}{select('kind','kind','allKinds',opts(eventKinds,'kind_'))}
         <label>{t('search')}<input name="q" maxLength={100} defaultValue={first(query.q)} placeholder={t('searchPlaceholder')}/></label>
+        <label>{geo('from')}<input type="date" name="from" defaultValue={first(query.from)}/></label><label>{geo('to')}<input type="date" name="to" defaultValue={first(query.to)}/></label>
       </div>
       <details className="advanced-filters" open={advanced}><summary>{t('advancedFilters')}</summary><div className="filters">
         {select('format','format','allFormats',opts(danceFormats,'format_'))}

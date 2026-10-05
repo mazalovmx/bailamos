@@ -86,5 +86,6 @@
   "pinKeyboard": "Marcador del evento. Usa las flechas para moverlo; mantén Mayús para pasos más grandes.",
   "eventMap": "Mapa de la ubicación del evento",
   "pinMapUnavailable": "No se pudo cargar el mapa. Introduce las coordenadas abajo.",
-  "pinRequired": "Elige un punto en el mapa o introduce las dos coordenadas."
+  "pinRequired": "Elige un punto en el mapa o introduce las dos coordenadas.",
+  "popupPhotoAlt": "Foto del lugar"
 }

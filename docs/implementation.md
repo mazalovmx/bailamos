@@ -26,7 +26,7 @@ The feature branch now contains implementations across all fifteen epics. The ta
 | E12 Chat | Owner-approved custom database-backed chat, Redis SSE delivery/polling fallback, school/event/city/group conversations, image attachments, edits/deletes, mute and access/moderation checks | Browser/device and organizer acceptance; Matrix/Element was intentionally replaced. |
 | E13 Courses and digest | Class/school schedules, subscriptions, weekly digest and background scheduling | Production email/unsubscribe delivery and organizer acceptance of the schedule UI. |
 | E14 Imports and Telegram | RSS/iCal/Schema.org parsers, source jobs/retries, deduplication/moderation, Telegram handlers | Configure approved live sources and bot credentials; verify webhook/search/notification delivery and ambiguous-import moderation. |
-| E15 Event parser | Optional DeepSeek extraction from pasted announcements, validation, normalization, map location suggestions, human confirmation and edit-rate logging | Configure provider credentials and measure against the labelled sample of 50 real announcements. |
+| E15 Event parser | Withdrawn on 2 October 2026 and removed from the code. Replaced by the event place block: country → city → address or a click on the map, a required exact marker, and an optional map photo with a two-sentence note | Organizer acceptance of the place block on a phone. |
 
 ## Audit evidence
 

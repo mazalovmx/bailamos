@@ -5,7 +5,7 @@ import {useTranslations} from 'next-intl';
 import type {MediaDto} from '../../lib/media/dto';
 export type UploadedImage = {id?: string; key: string; url: string; item?: MediaDto};
 type Props = {
-  target: 'event' | 'post' | 'avatar' | 'cover' | 'chat';
+  target: 'event' | 'post' | 'avatar' | 'cover' | 'chat' | 'eventmap';
   targetId?: string;
   onUploaded?: (item: UploadedImage) => void;
   /** Mirrors the server limit (MEDIA_MAX_BYTES) for an early, friendly check; the server enforces the real one. */

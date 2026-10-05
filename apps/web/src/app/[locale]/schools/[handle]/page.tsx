@@ -1,5 +1,8 @@
+import {DateTime} from 'luxon';
+import {db} from '@dance/db';
 import {cache} from 'react';
 import Link from 'next/link';
+import {managesSchool} from '../../../../lib/schools/access';
 import type {Metadata} from 'next';
 import {notFound} from 'next/navigation';
 import {getTranslations} from 'next-intl/server';
@@ -33,8 +36,13 @@ export default async function SchoolPage({params, searchParams}: Props) {
   const week = weekOf(Array.isArray(rawWeek) ? rawWeek[0] : rawWeek, zone), current = weekOf(null, zone);
   const [t, app, user, timetable, specials, venues] = await Promise.all([getTranslations('Courses'), getTranslations('App'), currentUser(),
     weekTimetable(week, {profileId: profile.id}), upcomingSpecials(profile.id), schoolVenues(profile.id)]);
-  const own = !!user && profile.userId === user.id, following = own ? false : await isFollowing(user?.id, {profileId: profile.id});
+  const own = !!user && (profile.userId === user.id||managesSchool(user,profile.id)), following = own ? false : await isFollowing(user?.id, {profileId: profile.id});
   const origin = siteUrl(), path = '/' + locale + '/schools/' + profile.handle, label = await cityLabeler(locale), place = [label(profile.city?.name), profile.district].filter(Boolean).join(' · ');
+  // An empty week is not a dead end: point to the first week in which this school has a class.
+  const firstClass = timetable.total ? null : await db.eventOccurrence.findFirst({where: {cancelled: false, startsAt: {gte: new Date()},
+    event: {status: 'PUBLISHED', hiddenAt: null, rrule: {not: null}, kind: {in: ['CLASS', 'PRACTICE']}, members: {some: {profileId: profile.id, role: {in: ['OWNER', 'CO_ORGANIZER', 'ARTIST']}}}}},
+    orderBy: {startsAt: 'asc'}, select: {startsAt: true, event: {select: {timezone: true}}}});
+  const firstWeek = firstClass ? weekOf(DateTime.fromJSDate(firstClass.startsAt, {zone: firstClass.event.timezone}).toISODate(), zone).start : null;
   const zones = new Set(timetable.days.flatMap(day => day.entries.map(entry => entry.timezone)));
   return <main className="courses-page">
     {/* JSON-LD is a data block, not executable script, so it is CSP-safe; "<" is escaped so user text cannot close the element. */}
@@ -50,6 +58,7 @@ export default async function SchoolPage({params, searchParams}: Props) {
     </header>
     <div className="school-actions">
       {!own && <FollowButton target={{profileId: profile.id}} initialFollowing={following} signedIn={!!user}/>}
+      {own && <Link className="button" href={'/' + locale + '/events/new?school='+profile.id}>{t('ownerAddClass')}</Link>}
       <Link className="button secondary" href={'/' + locale + '/people/' + profile.handle}>{t('fullProfile')}</Link>
     </div>
     <p className="courses-meta">{t('followersCount', {count: profile._count.followers})}{profile.userId === null ? ' · ' + t('unclaimedHint') : ''}</p>
@@ -58,7 +67,8 @@ export default async function SchoolPage({params, searchParams}: Props) {
       <WeekNav week={week} current={current} path={path} query={{}} locale={locale}/>
       {timetable.total ? <><p className="courses-meta">{t('classesCount', {count: timetable.total})} · {zones.size === 1 ? t('timesLocalZone', {zone: [...zones][0]}) : t('timesLocal')}</p>
         <WeekTimetable timetable={timetable} locale={locale} showCity={zones.size > 1} hideHost={profile.handle}/></> :
-        <p className="notice" role="status">{t('noClassesSchool')}</p>}
+        <p className="notice" role="status">{t('noClassesSchool')}{firstWeek && firstWeek !== week.start && <> <Link href={path + '?week=' + firstWeek}>{t('classesStart', {date: new Intl.DateTimeFormat(locale, {dateStyle: 'long', timeZone: 'UTC'}).format(new Date(firstWeek + 'T00:00:00Z'))})}</Link></>}
+          {own && !firstWeek && <> {t('ownerAddHint')}</>}</p>}
     </section>
     <section aria-labelledby="school-specials"><h2 id="school-specials">{t('specials')}</h2>
       {specials.length ? <ul className="school-events">{specials.map(event => <li key={event.id}><Link href={'/' + locale + '/events/' + event.slug + '?date=' + encodeURIComponent(event.startsAt.toISOString())}>

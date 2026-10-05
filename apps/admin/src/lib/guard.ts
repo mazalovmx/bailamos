@@ -1,7 +1,7 @@
 import {headers} from 'next/headers';
 import {redirect} from 'next/navigation';
 import {ZodError} from 'zod';
-import {db, Prisma} from '@dance/db';
+import {db, Prisma, EventConflict} from '@dance/db';
 import {auth} from './auth';
 import {adminOrigin} from './env';
 import {HttpError} from './errors';
@@ -41,7 +41,7 @@ export async function jsonBody(request: Request): Promise<unknown> {
 }
 export function fail(error: unknown) {
   const reply = (code: string, status: number, extra?: object) => Response.json({error: code, ...extra}, {status});
-  if (error instanceof HttpError || error instanceof ModerationError) return reply(error.code, error.status);
+  if (error instanceof HttpError || error instanceof ModerationError || error instanceof EventConflict) return reply(error.code, error.status);
   if (error instanceof ZodError) return reply('INVALID_INPUT', 400, {fields: [...new Set(error.issues.map(issue => String(issue.path[0] ?? '')))].filter(Boolean)});
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === 'P2002') return reply('NOT_UNIQUE', 409);

@@ -7,9 +7,11 @@ import {importJobs} from '../lib/import/jobs';
 import {embedJobs} from '../lib/embeds/refresh';
 import {opsJobs} from '../lib/jobs/ops';
 import {blogJobs} from '../lib/jobs/blog';
+import {drainEventDeliveries} from '../lib/events/outbox';
 // Every background job of the platform. A feature exports JobDef[] and is added here; the worker entrypoint
 // (src/worker/index.ts) registers each definition as a repeatable job and removes schedules that left this list.
 export const jobs: JobDef[] = [
+  {name:'events.notifications',everyMs:10_000,attempts:3,handler:()=>drainEventDeliveries()},
   ...digestJobs,       // digest.weekly      — Monday 07:00 UTC
   ...reminderJobs,     // reminders.events   — every 5 minutes
   ...mediaJobs,        // media.sweep        — daily 04:15 UTC; media.purge — every 15 minutes; media.orphans — daily 04:45 UTC

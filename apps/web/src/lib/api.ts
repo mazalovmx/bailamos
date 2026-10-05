@@ -1,5 +1,5 @@
 import {auth} from './auth';
-import {db, Prisma} from '@dance/db';
+import {db, Prisma, EventConflict} from '@dance/db';
 import {ZodError} from 'zod';
 import {managedSchoolIds} from './schools/access';
 export class ApiError extends Error {
@@ -30,6 +30,7 @@ export async function jsonBody(request: Request) {
   try { return JSON.parse(text); } catch {throw new ApiError('INVALID_INPUT', 400);}
 }
 export function apiError(error: unknown) {
+  if (error instanceof EventConflict) return Response.json({error:error.code},{status:error.status});
   if (error instanceof ApiError) return Response.json({error: error.code}, {status: error.status});
   if (error instanceof ZodError) return Response.json({error: 'INVALID_INPUT'}, {status: 400});
   if (error instanceof Error && error.message === 'INVALID_TIME') return Response.json({error: 'INVALID_TIME'}, {status: 400});

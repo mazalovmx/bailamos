@@ -86,5 +86,6 @@
   "pinKeyboard": "Event location pin. Use arrow keys to move it; hold Shift for larger steps.",
   "eventMap": "Map for this event location",
   "pinMapUnavailable": "The map could not load. Enter the coordinates below instead.",
-  "pinRequired": "Choose a point on the map or enter both coordinates."
+  "pinRequired": "Choose a point on the map or enter both coordinates.",
+  "popupPhotoAlt": "Photo of the place"
 }

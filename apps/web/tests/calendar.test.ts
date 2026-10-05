@@ -107,14 +107,14 @@ test('a moved date is exported at its new time under the same UID with a SEQUENC
   assert.equal(first['es-o2@dance.example'].url, 'https://dance.example/en/events/es?date=2026-10-28T19%3A30%3A00.000Z');
   const revision = first['es-o2@dance.example'].sequence;
   assert.ok(Number.isInteger(revision) && revision > 1 && revision < 2 ** 31);
-  assert.deepEqual([first['es-o1@dance.example'].sequence, first['es-o3@dance.example'].sequence, first['es-o4@dance.example'].sequence], [0, revision + 1, 1],
-    'untouched 0, moved and cancelled one above moved, cancelled only 1');
+  assert.deepEqual([first['es-o1@dance.example'].sequence, first['es-o3@dance.example'].sequence, first['es-o4@dance.example'].sequence], [revision, revision + 1, revision + 1],
+    'every date carries the revision; cancellation also updates unchanged dates');
   assert.deepEqual([first['es-o2@dance.example'].status, first['es-o3@dance.example'].status], ['CONFIRMED', 'CANCELLED']);
   // Moving it again advances the event's timestamp, and with it the SEQUENCE.
   const again = vevents(buildCalendar({name: 'x', origin, events: [series('2026-09-01T10:05:00Z', '2026-10-29T19:00:00Z')]}));
   assert.equal(again['es-o2@dance.example'].start, 'DTSTART;TZID=Europe/Madrid:20261029T200000');
   assert.equal(again['es-o2@dance.example'].sequence, revision + 300);
-  assert.equal(again['es-o1@dance.example'].sequence, 0);
+  assert.equal(again['es-o1@dance.example'].sequence, revision+300);
   const parsed = Object.values(nodeIcal.sync.parseICS(body)).filter(e => e && e.type === 'VEVENT') as {uid: string; start: Date}[];
   assert.equal(new Date(parsed.find(p => p.uid === 'es-o2@dance.example')!.start).toISOString(), '2026-10-28T19:30:00.000Z');
 });

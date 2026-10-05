@@ -35,7 +35,7 @@ export const resources: Resource[] = [
   // Events are created in the web app, which also materialises occurrences; schedule and city stay read-only here.
   {name: 'events', model: 'event', modelName: 'Event', label: 'title', update: 'STAFF', remove: 'STAFF', hide: 'EVENT', sort: ['createdAt', 'desc'], fields: [
     id, str('slug', Q), str('shortCode', N), str('title', L, S, Q, W, R, {max: 200}), text('description', W, N), date('startsAt', L, S, F), date('endsAt', N),
-    str('timezone'), str('rrule', N), ref('cityId', 'cities', L, F), ref('venueId', 'venues', W, N, F),
+    str('timezone'), str('rrule', N), ref('cityId', 'cities', L, F), ref('venueId', 'venues', N, F),
     pick('status', EventStatus, L, F, W), pick('kind', EventKind, L, F, W), pick('format', DanceFormat, F, W), pick('level', EventLevel, F, W),
     pick('intensity', Intensity, W), pick('tempo', MusicTempo, W), text('prerequisites', W, N), bool('partnerRequired', W, N),
     str('priceText', W, N, {max: 200}), pick('attendeeVisibility', AttendeeVisibility, W), str('sourceUrl', W, N, {max: 2000}),
