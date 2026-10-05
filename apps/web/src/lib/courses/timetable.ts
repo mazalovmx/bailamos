@@ -2,6 +2,8 @@ import {db, type Prisma} from '@dance/db';
 import {DateTime} from 'luxon';
 import {classLevels} from '../swing';
 import {descendantIds, type StyleNode} from '../catalogue/tree';
+import {eventSearchAll} from '../event-search';
+import type {SearchQuery} from '../search-query';
 // Weekly timetable of regular classes (F12): recurring CLASS / PRACTICE events, one entry per materialized date.
 export const REGULAR_KINDS = ['CLASS', 'PRACTICE'] as const;
 export const HOST_ROLES = ['OWNER', 'CO_ORGANIZER', 'ARTIST'] as const;
@@ -10,6 +12,7 @@ export const MAX_ENTRIES = 400;
 export type DayPart = typeof DAY_PARTS[number];
 export type Level = typeof classLevels[number];
 export type TimetableFilters = {
+  query?:SearchQuery;
   cityId?: string | null;
   /** Style ids; the caller passes them already expanded with descendants (see `styleFilter`). */
   styleIds?: string[];
@@ -74,7 +77,7 @@ export type Timetable = {week: Week; days: {date: string; weekday: number; entri
 export async function weekTimetable(week: Week, filters: TimetableFilters = {}): Promise<Timetable> {
   const from = DateTime.fromISO(week.start, {zone: 'UTC'}).minus({hours: 14}).toJSDate(), to = DateTime.fromISO(week.start, {zone: 'UTC'}).plus({days: 7, hours: 12}).toJSDate();
   const rows = filters.styleIds && !filters.styleIds.length ? [] : await db.eventOccurrence.findMany({
-    where: {cancelled: false, startsAt: {gte: from, lt: to}, event: {status: 'PUBLISHED', hiddenAt: null, rrule: {not: null}, kind: {in: [...REGULAR_KINDS]},
+    where: {cancelled: false, startsAt: {gte: from, lt: to}, event: {AND:filters.query?[await eventSearchAll(filters.query)]:[],status: 'PUBLISHED', hiddenAt: null, rrule: {not: null}, kind: {in: [...REGULAR_KINDS]},
       ...(filters.cityId ? {cityId: filters.cityId} : {}),
       ...(filters.styleIds ? {styles: {some: {styleId: {in: filters.styleIds}}}} : {}),
       ...(filters.levels?.length ? {level: {in: filters.levels}} : {}),

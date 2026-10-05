@@ -32,7 +32,8 @@ type Invite={id:string;email:string|null;handle:string|null;name:string|null;exp
 export function TeamPanel({eventId,owner,coOrganizers,invites,canTeam,selfProfileId}:{eventId:string;owner:Person[];coOrganizers:Person[];invites:Invite[];canTeam:boolean;selfProfileId:string}) {
   const x=useTranslations('EventsX'),locale=useLocale(),router=useRouter(),a=useAction();
   const [who,setWho]=useState('');
-  const day=new Intl.DateTimeFormat(locale,{dateStyle:'medium'});
+  // A fixed zone keeps the server and the browser on the same calendar day.
+  const day=new Intl.DateTimeFormat(locale,{dateStyle:'medium',timeZone:'UTC'});
   return <section className="manage-panel" aria-labelledby="team-title"><h2 id="team-title">{x('team')}</h2>
     <ul className="people-list">
       {owner.map(p=><li key={p.profileId}><Link href={'/'+locale+'/@'+p.handle}>{p.name}</Link><span className="badge">{x('role_OWNER')}</span></li>)}

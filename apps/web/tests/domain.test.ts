@@ -33,7 +33,7 @@ test('weekly classes preserve local time across daylight-saving changes',()=>{
     '2026-10-18T17:00:00.000Z','2026-10-25T18:00:00.000Z','2026-11-01T18:00:00.000Z'
   ]);
   for(const occurrence of result.occurrences)assert.equal(DateTime.fromJSDate(occurrence.startsAt,{zone:'Europe/Madrid'}).hour,19);
-  assert.throws(()=>schedule('2026-10-18T19:00','2026-10-18T20:00','Europe/Madrid',53));
+  assert.throws(()=>schedule('2026-10-18T19:00','2026-10-18T20:00','Europe/Madrid',521));
 });
 test('swing search combines independent characteristics and includes style children',()=>{
   const filter=eventSearch({style:'charleston',format:'SOLO',level:'BEGINNER',intensity:'RELAXED',tempo:'FAST',kind:'WORKSHOP',tag:'musicality',noPartner:'1'});

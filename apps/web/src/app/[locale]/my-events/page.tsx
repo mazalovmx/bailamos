@@ -1,3 +1,4 @@
+import {loginPath} from '../../../lib/login-path';
 import {db} from '@dance/db';
 import {getTranslations} from 'next-intl/server';
 import {redirect} from 'next/navigation';
@@ -5,10 +6,10 @@ import Link from 'next/link';
 import {currentUser} from '../../../lib/session';
 import {EventCard} from '../../../components/event-card';
 import '../../styles/events.css';
-export const metadata={robots:{index:false,follow:false}};
+export async function generateMetadata(){const t=await getTranslations('App');return {title:t('myEvents'),robots:{index:false,follow:false}};}
 export default async function MyEvents({params}:{params:Promise<{locale:string}>}) {
   const {locale}=await params,user=await currentUser();
-  if(!user) redirect('/'+locale+'/login');
+  if(!user) redirect(loginPath(locale, '/my-events'));
   const t=await getTranslations('App'),x=await getTranslations('EventsX');
   const include={city:true,styles:{include:{style:true}}} as const,now=new Date();
   const [events,attending,invites]=await Promise.all([

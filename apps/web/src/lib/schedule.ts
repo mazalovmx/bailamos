@@ -6,7 +6,7 @@ export const weekdays=['MO','TU','WE','TH','FR','SA','SU'] as const;
 export type Weekday=typeof weekdays[number];
 // count = number of dates in the series (1 = single event); until = last local calendar day (yyyy-MM-dd), an alternative to count.
 export type Recurrence={count?:number;interval?:number;byDay?:readonly string[];until?:string|null};
-export const MAX_DATES=52,MAX_INTERVAL=4;
+export const MAX_DATES=520,MAX_INTERVAL=4;
 const stamp="yyyy-MM-dd'T'HH:mm";
 export function schedule(start:string,end:string,zone:string,recurrence:number|Recurrence=1) {
   const input:Recurrence=typeof recurrence==='number'?{count:recurrence}:recurrence;

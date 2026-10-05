@@ -83,5 +83,8 @@
   "digestOpenCalendar": "Abrir el calendario",
   "digestWhy": "Recibes este correo porque activaste el resumen semanal.",
   "digestUnsubscribe": "Darse de baja con un clic",
-  "digestSettings": "Ajustes de notificaciones"
+  "digestSettings": "Ajustes de notificaciones",
+  "ownerAddClass": "Añadir una clase o evento",
+  "classesStart": "Primeras clases: semana del {date} →",
+  "ownerAddHint": "Añade tu primera clase semanal para llenar el horario."
 }

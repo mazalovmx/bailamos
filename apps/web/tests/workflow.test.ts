@@ -13,6 +13,9 @@ const tag=randomUUID().slice(0,8),password='Test-only-Strong-'+randomUUID();
 const clients:Client[]=[{cookie:'',email:'owner-'+tag+'@example.test'},{cookie:'',email:'guest-'+tag+'@example.test'},{cookie:'',email:'co-'+tag+'@example.test'}];
 const eventIds:string[]=[],stubProfileIds:string[]=[];
 async function request(client:Client,path:string,body:unknown,method='POST'){
+  if(method==='PATCH'&&/^\/api\/events\/[^/]+$/.test(path)&&body&&typeof body==='object'&&'title' in body){
+    const event=await db.event.findUniqueOrThrow({where:{id:path.split('/').at(-1)}});body={...body,version:event.version};
+  }
   const response=await fetch(base+path,{method,headers:{'Content-Type':'application/json',Origin:base,Cookie:client.cookie},body:JSON.stringify(body),redirect:'manual'});
   const cookies=response.headers.getSetCookie().map(c=>c.split(';')[0]);
   if(cookies.length)client.cookie=cookies.join('; ');
@@ -54,7 +57,14 @@ test('real users: verification, profiles, draft privacy, permissions, publicatio
     }
     const [owner,guest,co]=clients;
     const input={title:'Integration dance '+tag,description:'A test event that will be removed after verification.',cityId:'madrid',styleId:'solo-jazz',startsLocal:'2030-06-14T19:00',endsLocal:'2030-06-14T22:00',status:'DRAFT',
-      kind:'CLASS',format:'SOLO',level:'BEGINNER',intensity:'RELAXED',tempo:'SLOW',partnerRequired:false,tagIds:['musicality','footwork'],recurrenceWeeks:4};
+      kind:'CLASS',format:'SOLO',level:'BEGINNER',intensity:'RELAXED',tempo:'SLOW',partnerRequired:false,tagIds:['musicality','footwork'],recurrenceWeeks:4,
+      pin:{lat:40.4153,lng:-3.7074},address:'Plaza Mayor, by the statue',mapNote:'Meet at the statue. We dance on the east side.'};
+    // An event without an exact marker is refused: a square or a park has no address to fall back on.
+    const {pin:_pin,...noPlace}=input;void _pin;
+    const refused=await request(owner,'/api/events',noPlace);
+    assert.equal(refused.status,400);assert.equal(refused.data.error,'PLACE_REQUIRED');
+    const wordy=await request(owner,'/api/events',{...input,mapNote:'One. Two. Three sentences are too many.'});
+    assert.equal(wordy.status,400);
     const created=await request(owner,'/api/events',input);
     assert.equal(created.status,201,JSON.stringify(created.data));
     const event=await db.event.findUniqueOrThrow({where:{slug:created.data.slug}});
@@ -89,7 +99,7 @@ test('real users: verification, profiles, draft privacy, permissions, publicatio
     // and the event is shown correctly to a viewer in another time zone.
     const party={title:'Weekly swing party '+tag,description:'Every Friday and Saturday: social dancing with a live band.',cityId:'madrid',styleId:'lindy-hop',
       startsLocal:'2031-06-06T21:00',endsLocal:'2031-06-07T01:00',status:'PUBLISHED',kind:'SOCIAL',format:'PARTNER',level:'OPEN',partnerRequired:false,tagIds:['live-music'],
-      recurrenceWeeks:6,recurrenceDays:['FR','SA'],priceText:'10 €',attendeeVisibility:'ATTENDEES'};
+      recurrenceWeeks:6,recurrenceDays:['FR','SA'],priceText:'10 €',attendeeVisibility:'ATTENDEES',pin:{lat:40.4203,lng:-3.7058}};
     const createdParty=await request(owner,'/api/events',party);
     assert.equal(createdParty.status,201,JSON.stringify(createdParty.data));
     assert.match(createdParty.data.shortCode,/^[a-z2-7]{6,8}$/);

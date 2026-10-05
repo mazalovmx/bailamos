@@ -222,9 +222,15 @@ Provide weekly classes with level/price/venue, school schedules, city/style/prof
 
 Import RSS, iCal and Schema.org events through retryable jobs. Deduplicate by title/time/location and send ambiguous matches to moderation. Add Telegram search and notifications. Acceptance requires real approved sources and bot delivery, not only parser fixtures.
 
-### E15 — Event parser
+### E15 — Event parser (withdrawn)
 
-The event creation page optionally accepts pasted WhatsApp/Instagram announcement text and uses DeepSeek JSON mode to suggest fields for the organizer to review. Validation, city-timezone date checks, style matching and address geocoding run on the server; the organizer must explicitly confirm before saving. The provider key is optional and secrets belong in environment variables. Acceptance still needs the specified labelled sample of 50 real announcements and measured field accuracy/edit rates.
+Withdrawn on 2 October 2026 by the product owner: extraction of pasted announcements through DeepSeek worked poorly and the code was removed. No `DEEPSEEK_*` variable is used any more.
+
+### Event place — exact marker required
+
+An event cannot be saved without an exact marker on the map; incomplete addresses and places without an address (a street, a park, a square) are the reason. The organizer either clicks the map — the nearest city and its country are filled in — or chooses country, then city, then types an address or picks a venue, and checks the marker that is placed. The server refuses an event with neither a venue nor a marker (`PLACE_REQUIRED`). The address is stored as free text next to the coordinates.
+
+The organizer may attach one image (for example the entrance) and a note of at most two sentences and 30 words. Both are shown in the map popup and on the event page.
 
 ## Risks and open decisions
 

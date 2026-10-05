@@ -3,7 +3,7 @@ import {actor, apiError, ApiError, jsonBody} from '../../../../lib/api';
 import {onboardingSchema} from '../../../../lib/validation';
 import {freeHandle} from '../../../../lib/account/handle';
 import {logRegistrationConsents} from '../../../../lib/account/consent';
-// First sign-in: creates a dancer profile from city, styles, role and level. Runs once; later edits use /api/profile.
+// First sign-in: creates the profile — a dancer with city, styles, role and level, or a school/organizer with its city. Runs once; later edits use /api/profile.
 export async function POST(request: Request) {
   try {
     const user = await actor(request);
@@ -21,8 +21,9 @@ export async function POST(request: Request) {
       await db.user.update({where: {id: user.id}, data: {ageConfirmed: true}});
       await logRegistrationConsents(user.id);
     }
-    const profile = await db.profile.create({data: {userId: user.id, type: 'DANCER', handle, name, cityId: input.cityId,
-      skills: {create: input.styleIds.map(styleId => ({styleId, role: input.role, level: input.level, lookingFor: false}))}}});
+    const {role, level} = input;
+    const profile = await db.profile.create({data: {userId: user.id, type: input.type, handle, name, cityId: input.cityId,
+      ...(role && level ? {skills: {create: input.styleIds.map(styleId => ({styleId, role, level, lookingFor: false}))}} : {})}});
     return Response.json({handle: profile.handle}, {status: 201});
   } catch (error) {return apiError(error);}
 }

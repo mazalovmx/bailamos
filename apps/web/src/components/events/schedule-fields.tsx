@@ -10,8 +10,8 @@ type Initial=Record<string,string>;
 export function ScheduleFields({initial,zone}:{initial:Initial;zone?:string}) {
   const t=useTranslations('App'),x=useTranslations('EventsX'),locale=useLocale();
   const [start,setStart]=useState(initial.startsLocal||''),[end,setEnd]=useState(initial.endsLocal||'');
-  const [weekly,setWeekly]=useState(Number(initial.recurrenceWeeks)>1||!!initial.recurrenceUntil);
-  const [count,setCount]=useState(Number(initial.recurrenceWeeks)>1?initial.recurrenceWeeks:'8');
+  const [weekly,setWeekly]=useState(Number(initial.recurrenceCount)>1||!!initial.recurrenceUntil);
+  const [count,setCount]=useState(Number(initial.recurrenceCount)>1?initial.recurrenceCount:'8');
   const [interval,setIntervalValue]=useState(initial.recurrenceInterval||'1');
   const [days,setDays]=useState<string[]>((initial.recurrenceDays||'').split(',').filter(Boolean));
   const [endMode,setEndMode]=useState(initial.recurrenceUntil?'UNTIL':'COUNT'),[until,setUntil]=useState(initial.recurrenceUntil||'');
@@ -43,11 +43,11 @@ export function ScheduleFields({initial,zone}:{initial:Initial;zone?:string}) {
           onChange={e=>setDays(current=>e.target.checked?[...current,day]:current.filter(value=>value!==day))}/>{dayName(index)}</label>)}
         <p className="field-note">{x('repeatDaysHint')}</p></fieldset>
       <div className="form-grid"><label>{x('repeatEnds')}<select value={endMode} onChange={e=>setEndMode(e.target.value)}><option value="COUNT">{x('endsAfterCount')}</option><option value="UNTIL">{x('endsOnDate')}</option></select></label>
-      {endMode==='COUNT'?<label>{x('repeatCount')}<input name="recurrenceWeeks" type="number" min={2} max={MAX_DATES} required value={count} onChange={e=>setCount(e.target.value)}/></label>
+      {endMode==='COUNT'?<label>{x('repeatCount')}<input name="recurrenceCount" type="number" min={2} max={MAX_DATES} required value={count} onChange={e=>setCount(e.target.value)}/></label>
         :<label>{x('repeatUntil')}<input name="recurrenceUntil" type="date" required min={start.slice(0,10)} value={until} onChange={e=>setUntil(e.target.value)}/></label>}</div>
-      {endMode==='UNTIL'&&<input type="hidden" name="recurrenceWeeks" value="1"/>}
+      {endMode==='UNTIL'&&<input type="hidden" name="recurrenceCount" value="1"/>}
       <p className="field-note">{x('repeatLimit',{max:MAX_DATES})}</p>
-    </>:<input type="hidden" name="recurrenceWeeks" value="1"/>}
+    </>:<input type="hidden" name="recurrenceCount" value="1"/>}
     <div className="date-preview" role="status" aria-live="polite">{preview&&(preview.error
       ?<p className="form-error">{preview.error==='TOO_MANY_DATES'?x('error_TOO_MANY_DATES'):t('error_INVALID_TIME')}</p>
       :<><h3>{x('previewTitle',{count:preview.total})}</h3><p className="field-note">{x('previewZone',{zone:zone||''})}</p>
