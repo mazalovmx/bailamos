@@ -1,22 +1,21 @@
-import {db} from '@dance/db';
+import {db,lockEvent,queueEventNotice} from '@dance/db';
 import {ApiError} from '../api';
 import {notify,type NotificationType} from '../notify';
 import {mailLocale,sendMail,siteUrl,type MailLocale} from '../mail';
 import {singleDate} from '../schedule';
 import {mailText,mailDate} from './mail-text';
 import {attendeeProfileIds} from './attendees';
-// "Date changed" is not in the NotificationType union of lib/notify.ts yet. Its data has the shape of EVENT_REMINDER
-// (title, startsAt, timezone, place), so the notification centre can render it from the same fields.
-export const MOVED_NOTIFICATION='EVENT_MOVED' as string as NotificationType;
+export const MOVED_NOTIFICATION:NotificationType='EVENT_MOVED';
 // Whether a date differs from what the series scheduled for it.
 export const isMoved=(occurrence:{originalStartsAt:Date|null})=>!!occurrence.originalStartsAt;
 type MovableEvent={id:string;timezone:string;startsAt:Date;endsAt:Date|null};
 // Moves one date of a series to new wall-clock times in the event's zone. The start the series had scheduled is kept
 // in `originalStartsAt`: it is the slot this row stands for when the series is saved again (see syncOccurrences).
 // Moving a date back to its slot, with the usual length, makes it an ordinary date of the series again.
-export async function moveOccurrence(event:MovableEvent,occurrenceId:string,input:{startsLocal:string;endsLocal:string},now=new Date()) {
+export async function moveOccurrence(event:MovableEvent,occurrenceId:string,input:{startsLocal:string;endsLocal:string},now=new Date(),actorId?:string) {
   const times=singleDate(input.startsLocal,input.endsLocal,event.timezone);
   return db.$transaction(async tx=>{
+    const current=await lockEvent(tx,event.id);
     const rows=await tx.eventOccurrence.findMany({where:{eventId:event.id},select:{id:true,startsAt:true,endsAt:true,cancelled:true,originalStartsAt:true}});
     const row=rows.find(r=>r.id===occurrenceId);
     if(!row) throw new ApiError('NOT_FOUND',404);
@@ -36,7 +35,8 @@ export async function moveOccurrence(event:MovableEvent,occurrenceId:string,inpu
       ...(times.startsAt>row.startsAt?{reminderSentAt:null}:{})},
       select:{id:true,startsAt:true,endsAt:true,cancelled:true,originalStartsAt:true}});
     // Calendar exports take DTSTAMP, Last-Modified and the SEQUENCE of moved dates from the event's own timestamp.
-    await tx.event.update({where:{id:event.id},data:{updatedAt:new Date()}});
+    const updated=await tx.event.update({where:{id:event.id},data:{version:{increment:1}}});
+    if(current.status==='PUBLISHED'&&!current.hiddenAt)await queueEventNotice(tx,updated,{type:'EVENT_MOVED',key:`event:${event.id}:${updated.version}:move`,occurrence,previous:previous.startsAt,exceptUserId:actorId});
     return {changed:true,previous,occurrence};
   });
 }

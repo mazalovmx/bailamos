@@ -1,3 +1,4 @@
+import {loginPath} from '../../../lib/login-path';
 import {getTranslations} from 'next-intl/server';
 import {redirect} from 'next/navigation';
 import Link from 'next/link';
@@ -12,7 +13,7 @@ export async function generateMetadata() {
 }
 export default async function Profile({params, searchParams}: {params: Promise<{locale: string}>; searchParams: Promise<{welcome?: string}>}) {
   const {locale} = await params, {welcome} = await searchParams, user = await currentUser();
-  if (!user) redirect('/' + locale + '/login');
+  if (!user) redirect(loginPath(locale, '/profile'));
   const p = user.profile;
   if (!p) redirect('/' + locale + '/onboarding');
   const app = await getTranslations('App'), t = await getTranslations('Account'), {cities, styles} = await catalogue();

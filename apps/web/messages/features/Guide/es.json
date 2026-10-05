@@ -19,16 +19,16 @@
     "communityText": "Explora eventos, clases y escuelas sin tener que completar todo a la vez. Abre una sección para recibir consejos sobre esa tarea."
   },
   "event": {
-    "introTitle": "Empieza con el texto o manualmente",
-    "introText": "Si el analizador está disponible, pega el anuncio de WhatsApp o Instagram y revisa las sugerencias. También puedes completar el formulario manualmente.",
+    "introTitle": "Describe tu evento",
+    "introText": "Ponle un título y unas líneas de descripción. El formulario lleva unos dos minutos.",
     "detailsTitle": "Añade los detalles del evento",
     "detailsText": "Elige un título claro, ciudad y estilo. Añade etiquetas de formato, nivel e intensidad para facilitar los filtros.",
     "placeTitle": "Marca el lugar exacto",
-    "placeText": "Elige un local o marca un punto en el mapa para parques y bailes al aire libre. Comprueba la ubicación antes de publicar.",
+    "placeText": "Haz clic en el mapa, o elige el país y la ciudad y busca la dirección. El marcador es obligatorio: colócalo en el punto exacto, sobre todo en parques y plazas.",
     "scheduleTitle": "Define el horario y la repetición",
     "scheduleText": "Indica la fecha y hora local de la ciudad y elige si será una vez o un evento recurrente.",
     "publishTitle": "Revisa y guarda",
-    "publishText": "Puedes guardar un borrador o publicar. Las sugerencias del analizador siempre requieren tu revisión y confirmación."
+    "publishText": "Puedes guardar un borrador o publicar. Revisa el marcador en el mapa antes de publicar."
   },
   "schools": {
     "createTitle": "Crea el perfil de tu escuela",

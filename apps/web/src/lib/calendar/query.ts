@@ -3,12 +3,15 @@ import {z} from 'zod';
 import {DateTime} from 'luxon';
 import {eventKinds, classLevels} from '../swing';
 import {wallClock} from './time';
+import {eventSearch} from '../event-search';
+import {type SearchQuery} from '../search-query';
 export const MAX_RANGE_DAYS = 100, MAX_OCCURRENCES = 500, FEED_DAYS = 183, FEED_MAX_EVENTS = 500;
-export type CalendarFilters = {city: string[]; style: string[]; level: string[]; kind: string[]};
+export type CalendarFilters = {city: string[]; style: string[]; level: string[]; kind: string[]; extra?:SearchQuery};
 const list = (params: URLSearchParams, key: string) => [...new Set(params.getAll(key).map(v => v.trim()).filter(v => v && v.length <= 80))].slice(0, 30);
 // Multi-value filters: OR inside a group, AND across groups. Unknown levels/kinds are ignored, like on the events page.
 export function calendarFilters(params: URLSearchParams): CalendarFilters {
-  return {city: list(params, 'city'), style: list(params, 'style'),
+  const extra=Object.fromEntries(['q','format','intensity','tempo','tag','noPartner','recurring'].filter(key=>params.has(key)).map(key=>[key,params.getAll(key)]));
+  return {city: list(params, 'city').filter(c=>c!=='all'), style: list(params, 'style'),...(Object.keys(extra).length?{extra}:{}),
     level: classLevels.filter(v => list(params, 'level').includes(v)), kind: eventKinds.filter(v => list(params, 'kind').includes(v))};
 }
 const instant = z.string().max(40).transform((value, ctx) => {
@@ -33,7 +36,7 @@ export async function styleIds(selected: string[]) {
 }
 // Public visibility lives here: never drafts, never hidden events. Cancelled events are only added for iCal output.
 export function eventWhere(filters: CalendarFilters, styles: string[], includeCancelled = false): Prisma.EventWhereInput {
-  return {status: includeCancelled ? {in: ['PUBLISHED', 'CANCELLED']} : 'PUBLISHED', hiddenAt: null,
+  return {...eventSearch(filters.extra||{}),status: includeCancelled ? {in: ['PUBLISHED', 'CANCELLED']} : 'PUBLISHED', hiddenAt: null,
     ...(filters.city.length ? {city: {OR: [{slug: {in: filters.city}}, {id: {in: filters.city}}]}} : {}),
     ...(filters.style.length ? {styles: {some: {styleId: {in: styles}}}} : {}),
     ...(filters.level.length ? {level: {in: filters.level as Prisma.EnumEventLevelFilter['in']}} : {}),
@@ -56,6 +59,7 @@ export async function findOccurrences(range: {from: Date; to: Date}, filters: Ca
 }
 export type CalendarOccurrence = Awaited<ReturnType<typeof findOccurrences>>['occurrences'][number];
 const icsSelect = {id: true, slug: true, title: true, description: true, timezone: true, status: true, updatedAt: true, startsAt: true, endsAt: true,
+  address:true,lat:true,lng:true,version:true,
   city: {select: {name: true}}, venue: {select: {name: true, address: true, hiddenAt: true}}} satisfies Prisma.EventSelect;
 const occurrenceSelect = {id: true, startsAt: true, endsAt: true, cancelled: true, originalStartsAt: true} satisfies Prisma.EventOccurrenceSelect;
 // One event by id or slug for the .ics download, with every materialized date. Drafts and hidden events do not exist here.
@@ -82,7 +86,7 @@ export async function filterNames(filters: CalendarFilters) {
   return {cities, styles};
 }
 export async function calendarCatalogue() {
-  const [cities, styles] = await Promise.all([db.city.findMany({orderBy: {name: 'asc'}, select: {slug: true, name: true}}),
-    db.danceStyle.findMany({orderBy: {name: 'asc'}, select: {slug: true, name: true}})]);
+  const [cities, styles] = await Promise.all([db.city.findMany({orderBy: {name: 'asc'}, select: {id:true,slug: true, name: true}}),
+    db.danceStyle.findMany({orderBy: {name: 'asc'}, select: {id:true,slug: true, name: true}})]);
   return {cities, styles};
 }

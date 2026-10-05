@@ -24,9 +24,12 @@ export const skillSchema = z.object({
 export const skillsSchema = z.object({skills: z.array(skillSchema).max(20)})
   .refine(value => new Set(value.skills.map(s => s.styleId + ':' + s.role)).size === value.skills.length, {path: ['skills'], message: 'DUPLICATE_SKILL'});
 export const onboardingSchema = z.object({
-  cityId: z.string().min(1).max(64), styleIds: z.array(z.string().min(1).max(64)).min(1).max(10),
-  role: z.enum(danceRoles), level: z.enum(skillLevels), consent: z.boolean().default(false)
-}).refine(value => new Set(value.styleIds).size === value.styleIds.length, {path: ['styleIds'], message: 'DUPLICATE_SKILL'});
+  // A dancer answers with styles, role and level; a school or an organizer only says where it is.
+  type: z.enum(['DANCER', 'SCHOOL', 'ORGANIZER']).default('DANCER'),
+  cityId: z.string().min(1).max(64), styleIds: z.array(z.string().min(1).max(64)).max(10).default([]),
+  role: z.enum(danceRoles).optional(), level: z.enum(skillLevels).optional(), consent: z.boolean().default(false)
+}).refine(value => new Set(value.styleIds).size === value.styleIds.length, {path: ['styleIds'], message: 'DUPLICATE_SKILL'})
+  .refine(value => value.type !== 'DANCER' || (value.styleIds.length > 0 && !!value.role && !!value.level), {path: ['styleIds'], message: 'STYLE_REQUIRED'});
 export const claimSchema = z.object({handle, message: z.string().trim().min(10).max(1000)});
 export const deleteAccountSchema = z.object({password: z.string().min(1).max(128).optional(), confirmEmail: z.string().trim().max(254).optional()});
 export const eventSchema = z.object({

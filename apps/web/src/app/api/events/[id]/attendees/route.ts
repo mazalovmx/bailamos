@@ -13,7 +13,7 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
     if (!event || (!isPublic(event) && !eventAbility(user?.profile?.id,event.members,managesSchool(user,event.schoolProfileId)).can('manage','Event'))) throw new ApiError('NOT_FOUND',404);
     const occurrenceId=new URL(request.url).searchParams.get('occurrence');
     if (occurrenceId&&!await db.eventOccurrence.count({where:{id:occurrenceId,eventId:id}})) throw new ApiError('NOT_FOUND',404);
-    const {going,interested,visible,visibility,attendees}=await listAttendees(event,user?.profile?.id,occurrenceId);
+    const {going,interested,visible,visibility,attendees}=await listAttendees(event,user?.profile?.id,occurrenceId,managesSchool(user,event.schoolProfileId));
     return Response.json({going,interested,visible,visibility,attendees},{headers:{'Cache-Control':'private, no-store'}});
   } catch(error) {return apiError(error);}
 }

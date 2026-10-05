@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import {getTranslations} from 'next-intl/server';
 import type {Week} from '../../lib/courses/timetable';
+import {queryParams,type SearchQuery} from '../../lib/search-query';
 // Previous / next week links that keep the other query parameters. `current` is the week containing today.
-export async function WeekNav({week, current, path, query, locale}: {week: Week; current: Week; path: string; query: Record<string, string>; locale: string}) {
+export async function WeekNav({week, current, path, query, locale}: {week: Week; current: Week; path: string; query: SearchQuery; locale: string}) {
   const t = await getTranslations('Courses');
   const href = (start?: string) => {
-    const params = new URLSearchParams(query);
-    if (start) params.set('week', start); else params.delete('week');
+    const params = queryParams(query);
+    if (start) params.set('week', start); else {params.delete('week');params.delete('from');params.delete('to');}
     const text = params.toString();
     return path + (text ? '?' + text : '');
   };

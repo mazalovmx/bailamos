@@ -34,12 +34,12 @@ export async function eventAudience(eventId:string,now=new Date()) {
 }
 // Counters and names. With `occurrenceId` (one date of a series) everything is computed from the effective answers
 // for that date; without it, from the answers for the whole event, as for a one-off event.
-export async function listAttendees(event:{id:string;attendeeVisibility:Visibility;members:{profileId:string;role:string}[]},viewerProfileId?:string|null,occurrenceId?:string|null) {
+export async function listAttendees(event:{id:string;attendeeVisibility:Visibility;members:{profileId:string;role:string}[]},viewerProfileId?:string|null,occurrenceId?:string|null,schoolManager=false) {
   const {series,overrides,effective}=await dateAnswers(event.id,occurrenceId);
   const rows=[...effective.values()];
   const seriesOwn=viewerProfileId?series.get(viewerProfileId)?.status??null:null,override=viewerProfileId?overrides.get(viewerProfileId)?.status??null:null;
   const own=effectiveAnswer(seriesOwn,override);
-  const isManager=!!viewerProfileId&&event.members.some(m=>m.profileId===viewerProfileId&&(m.role==='OWNER'||m.role==='CO_ORGANIZER'));
+  const isManager=!!viewerProfileId&&(schoolManager||event.members.some(m=>m.profileId===viewerProfileId&&(m.role==='OWNER'||m.role==='CO_ORGANIZER')));
   // Whoever answered positively for the series keeps access to the list on a date they skip.
   const visible=canSeeAttendees(event.attendeeVisibility,{isManager,hasRsvp:positive(own)||positive(seriesOwn)});
   const listed=visible?rows.filter(row=>positive(row.status))
@@ -56,7 +56,10 @@ type ProfileRef={id:string;handle:string;name:string};
 async function announceAttendee(event:EventRef,profile:ProfileRef) {
   const organizers=await db.eventMembership.findMany({where:{eventId:event.id,role:{in:['OWNER','CO_ORGANIZER']},profileId:{not:profile.id}},
     select:{profile:{select:{userId:true,user:{select:{locale:true}}}}}});
-  const users=organizers.flatMap(m=>m.profile.userId?[{id:m.profile.userId,locale:mailLocale(m.profile.user?.locale)}]:[]);
+  const school=await db.event.findUnique({where:{id:event.id},select:{schoolProfileId:true}});
+  const managers=school?.schoolProfileId?await db.schoolAdmin.findMany({where:{schoolProfileId:school.schoolProfileId,user:{bannedAt:null}},select:{user:{select:{id:true,locale:true}}}}):[];
+  const users=[...new Map([...organizers.flatMap(m=>m.profile.userId?[{id:m.profile.userId,locale:mailLocale(m.profile.user?.locale)}]:[]),
+    ...managers.map(m=>({id:m.user.id,locale:mailLocale(m.user.locale)}))].map(u=>[u.id,u])).values()];
   if(!users.length) return;
   const told=await db.notification.findMany({where:{userId:{in:users.map(u=>u.id)},type:'NEW_ATTENDEE',
     AND:[{data:{path:['eventId'],equals:event.id}},{data:{path:['profileId'],equals:profile.id}}]},select:{userId:true}});

@@ -83,5 +83,8 @@
   "digestOpenCalendar": "Open the calendar",
   "digestWhy": "You receive this email because you turned on the weekly digest.",
   "digestUnsubscribe": "Unsubscribe in one click",
-  "digestSettings": "Notification settings"
+  "digestSettings": "Notification settings",
+  "ownerAddClass": "Add a class or event",
+  "classesStart": "First classes: week of {date} →",
+  "ownerAddHint": "Add your first weekly class to fill the timetable."
 }

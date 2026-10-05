@@ -1,34 +1,46 @@
 import {db, Prisma} from '@dance/db';
-import {styleFamily} from '../swing';
+import {styleFamily,eventKinds,classLevels,danceFormats,intensities,tempos} from '../swing';
 import {haversine} from './coarsen';
 // PostGIS queries over the GiST-indexed `geo` geography columns. Everything user-supplied is a bound parameter.
 export type GeoEvent = {
   id: string; slug: string; title: string; kind: string; timezone: string; lat: number; lng: number;
   startsAt: Date; city: string; venue: string | null; styles: string[]; distanceM: number | null;
 };
-type Filter = {from: Date; to: Date; style?: string[]; limit: number};
+type Filter = {from: Date; to: Date; style?: string[]; limit: number;city?:string[];level?:string[];kind?:string[];format?:string[];intensity?:string[];tempo?:string[];tag?:string[];q?:string;noPartner?:string;recurring?:string};
 type Columns = {geo: Prisma.Sql; lat: Prisma.Sql; lng: Prisma.Sql};
 const point = (lat: number, lng: number) => Prisma.sql`ST_SetSRID(ST_MakePoint(${lng}::float8, ${lat}::float8), 4326)::geography`;
 const eventColumns: Columns = {geo: Prisma.sql`e.geo`, lat: Prisma.sql`e.lat`, lng: Prisma.sql`e.lng`};
 const venueColumns: Columns = {geo: Prisma.sql`v.geo`, lat: Prisma.sql`v.lat`, lng: Prisma.sql`v.lng`};
 // Published, visible events with at least one upcoming non-cancelled occurrence in the window, one row per event.
 // An event without its own coordinates is placed at its venue.
-function eventsQuery(within: (columns: Columns) => Prisma.Sql, distance: Prisma.Sql, order: Prisma.Sql, {from, to, style = [], limit}: Filter) {
+function eventsQuery(within: (columns: Columns) => Prisma.Sql, distance: Prisma.Sql, order: Prisma.Sql, {from, to, style = [], limit,...filters}: Filter) {
   // Style filter includes descendants: the hard-coded swing families plus the DanceStyle tree.
   const roots = [...new Set(style.flatMap(styleFamily))];
   const styleFilter = roots.length ? Prisma.sql`AND EXISTS (SELECT 1 FROM "EventStyle" es WHERE es."eventId" = c.id AND es."styleId" IN (SELECT id FROM family))` : Prisma.empty;
+  const city=(filters.city||[]).filter(c=>c!=='all');
+  const conditions:Prisma.Sql[]=[];
+  if(city.length)conditions.push(Prisma.sql`e."cityId" IN (SELECT id FROM "City" WHERE id=ANY(${city}::text[]) OR slug=ANY(${city}::text[]))`);
+  for(const [key,allowed] of [['level',classLevels],['kind',eventKinds],['format',danceFormats],['intensity',intensities],['tempo',tempos]] as const){
+    const selected=(filters[key]||[]).filter(v=>(allowed as readonly string[]).includes(v));
+    if(selected.length)conditions.push(Prisma.sql`${Prisma.raw('e."'+key+'"')}::text=ANY(${selected}::text[])`);
+  }
+  if(filters.tag?.length)conditions.push(Prisma.sql`EXISTS (SELECT 1 FROM "EventTag" et WHERE et."eventId"=e.id AND et."tagId"=ANY(${filters.tag}::text[]))`);
+  if(filters.q)conditions.push(Prisma.sql`e.title ILIKE ${'%'+filters.q.replace(/[\\%_]/g,'\\$&')+'%'}`);
+  if(filters.noPartner==='1')conditions.push(Prisma.sql`e."partnerRequired"=false`);
+  if(filters.recurring==='1')conditions.push(Prisma.sql`e.rrule IS NOT NULL`);
+  const common=conditions.length?Prisma.sql`AND ${Prisma.join(conditions,' AND ')}`:Prisma.empty;
   return db.$queryRaw<GeoEvent[]>`
     WITH RECURSIVE family AS (
-      SELECT id FROM "DanceStyle" WHERE id = ANY(${roots}::text[])
+      SELECT id FROM "DanceStyle" WHERE id = ANY(${roots}::text[]) OR slug = ANY(${roots}::text[])
       UNION SELECT s.id FROM "DanceStyle" s JOIN family f ON s."parentId" = f.id
     ), c AS (
       SELECT e.id, e.slug, e.title, e.kind::text AS kind, e.timezone, e."cityId", e."venueId", e.lat, e.lng, e.geo
       FROM "Event" e
-      WHERE e.status = 'PUBLISHED' AND e."hiddenAt" IS NULL AND ${within(eventColumns)}
+      WHERE e.status = 'PUBLISHED' AND e."hiddenAt" IS NULL ${common} AND ${within(eventColumns)}
       UNION ALL
       SELECT e.id, e.slug, e.title, e.kind::text AS kind, e.timezone, e."cityId", e."venueId", v.lat, v.lng, v.geo
       FROM "Venue" v JOIN "Event" e ON e."venueId" = v.id
-      WHERE e.geo IS NULL AND e.status = 'PUBLISHED' AND e."hiddenAt" IS NULL AND v."hiddenAt" IS NULL AND ${within(venueColumns)}
+      WHERE e.geo IS NULL AND e.status = 'PUBLISHED' AND e."hiddenAt" IS NULL AND v."hiddenAt" IS NULL ${common} AND ${within(venueColumns)}
     ), hit AS (
       SELECT c.*, o."startsAt", ${distance} AS "distanceM"
       FROM c JOIN LATERAL (

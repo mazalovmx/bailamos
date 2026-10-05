@@ -13,13 +13,14 @@ export function AuthForm({mode, token, google = false, initialError, next}: {mod
   const home = '/' + locale;
   // Return to the requested page (validated on the server), otherwise open the account dashboard.
   const after = next || home + '/account';
+  const onboarding = home + '/onboarding' + (next ? '?next=' + encodeURIComponent(next) : '');
   const title = {login: 'loginTitle', register: 'registerTitle', forgot: 'forgotTitle', reset: 'resetTitle'}[mode];
   const doneText = {register: app('checkEmail'), forgot: app('resetSent'), reset: app('passwordSaved'), magic: t('magicSent')};
   const usePassword = mode === 'register' || mode === 'reset' || (mode === 'login' && !magic);
   async function submit(form: HTMLFormElement) {
     const data = Object.fromEntries(new FormData(form)) as Record<string, string>, origin = window.location.origin;
     if (mode === 'register') await send('/api/auth/sign-up/email', 'POST', {name: data.name, email: data.email, password: data.password,
-      ageConfirmed: data.consent === 'on', locale, callbackURL: origin + home + '/onboarding'});
+      ageConfirmed: data.consent === 'on', locale, callbackURL: origin + onboarding});
     if (mode === 'login' && magic) {
       await send('/api/auth/sign-in/magic-link', 'POST', {email: data.email, callbackURL: origin + after, errorCallbackURL: origin + home + '/login'});
       setDone('magic'); return;
@@ -35,7 +36,7 @@ export function AuthForm({mode, token, google = false, initialError, next}: {mod
   async function withGoogle() {
     const origin = window.location.origin;
     const result = await send('/api/auth/sign-in/social', 'POST', {provider: 'google', callbackURL: origin + after,
-      newUserCallbackURL: origin + home + '/onboarding', errorCallbackURL: origin + home + '/login'});
+      newUserCallbackURL: origin + onboarding, errorCallbackURL: origin + home + '/login'});
     if (typeof result.url === 'string') window.location.assign(result.url);
   }
   return <section className="form-page narrow"><p className="eyebrow">DANCE COMMUNITY</p><h1>{app(title)}</h1>
@@ -64,7 +65,7 @@ export function AuthForm({mode, token, google = false, initialError, next}: {mod
         <button type="button" className="button secondary" disabled={s.busy} onClick={() => s.run(withGoogle)}>{t('google')}</button>
         {mode === 'register' && <p className="field-note">{t('googleConsentNote')}</p>}</>}
     </form>}
-    <div className="form-links"><Link href={home + (mode === 'login' ? '/register' : '/login')}>{app(mode === 'login' ? 'noAccount' : 'haveAccount')} {app(mode === 'login' ? 'signUp' : 'signIn')}</Link>
+    <div className="form-links"><Link href={home + (mode === 'login' ? '/register' : '/login') + (next ? '?next=' + encodeURIComponent(next) : '')}>{app(mode === 'login' ? 'noAccount' : 'haveAccount')} {app(mode === 'login' ? 'signUp' : 'signIn')}</Link>
       {mode === 'login' && <Link href={home + '/forgot-password'}>{app('forgot')}</Link>}
       <Link href={home + '/privacy'}>{t('privacyLink')}</Link></div>
   </section>;

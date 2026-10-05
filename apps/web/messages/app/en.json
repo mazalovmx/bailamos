@@ -24,13 +24,13 @@
   "ONCE": "One event",
   "WEEKLY": "Every week",
   "repeatWeeks": "Number of weekly sessions",
-  "repeatHint": "2–52 sessions, at the same local time. All dates are created when you save.",
+  "repeatHint": "2–520 sessions, at the same local time. All dates are created when you save.",
   "regularClasses": "Regular classes",
   "weekly": "Weekly",
   "nextSessions": "Class dates",
   "seriesRsvp": "Your RSVP applies to the whole series, not to an individual class.",
-  "editSeries": "Changes apply to every date in this series.",
-  "classification": "About this class",
+  "editSeries": "Schedule changes apply to future dates. Past dates, individual moves, cancellations and participant answers are preserved. Removing a date cancels it.",
+  "classification": "About this event",
   "sessionCount": "{count, plural, one {# session} other {# sessions}}",
   "intensityHint": "Effort and music speed are different. Describe both so dancers can choose what suits them.",
   "kind_CLASS": "Class",
@@ -306,5 +306,7 @@
   "homeShareText": "Every event comes with a ready-made image. Tap Share and pick Instagram or WhatsApp on your phone — or save the picture and copy the caption.",
   "homeShareCta": "Make an announcement",
   "navMore": "More",
-  "adminPanel": "Admin panel"
+  "adminPanel": "Admin panel",
+  "accountSchoolPage": "Your public page and timetable",
+  "accountAddClass": "Add a class, workshop or event"
 }

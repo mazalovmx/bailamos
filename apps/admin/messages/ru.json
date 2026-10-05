@@ -300,5 +300,9 @@
   "school.addMember": "Добавить участника",
   "school.removeMember": "Удалить участника",
   "role.OWNER": "Владелец платформы",
-  "role.SCHOOL_ADMIN": "Администратор школы"
+  "role.SCHOOL_ADMIN": "Администратор школы",
+  "error.USE_EVENT_EDITOR": "Создавайте события в редакторе сайта.",
+  "error.PLACE_REQUIRED": "Перед публикацией укажите точное место в редакторе события.",
+  "error.EVENT_CONFLICT": "Событие изменилось. Обновите страницу.",
+  "school.editEvent": "Редактировать событие"
 }
