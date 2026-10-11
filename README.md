@@ -65,6 +65,7 @@ On Windows, stop web/admin processes before regenerating Prisma or running pnpm 
 - [Cities, styles and catalogue APIs](docs/catalogue.md)
 - [Photographs and announcement export](docs/community-photos.md)
 - [Git branches and Railway](docs/deployment.md)
+- [Admin access and Google sign-in](docs/admin-access.md)
 - [Background worker and readiness](docs/worker.md)
 
 The original Russian requirements document is retained at the repository root as source material. Subsequent owner decisions override it: English by default, a swing/Lindy Hop focus, multi-select discovery filters and Railway releases from deploy.
