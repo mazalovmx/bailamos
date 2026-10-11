@@ -4,9 +4,10 @@ import {useRouter} from 'next/navigation';
 import {useState} from 'react';
 import Link from 'next/link';
 import {send, useErrorText, useStatus} from './shared';
+import {socialProviderNames, socialSignInRequest, type SocialProviderId} from '../../lib/account/social-providers';
 import '../../app/styles/account.css';
 type Mode = 'login' | 'register' | 'forgot' | 'reset';
-export function AuthForm({mode, token, google = false, initialError, next}: {mode: Mode; token?: string; google?: boolean; initialError?: string; next?: string}) {
+export function AuthForm({mode, token, providers = [], emailEnabled = true, initialError, next}: {mode: Mode; token?: string; providers?: SocialProviderId[]; emailEnabled?: boolean; initialError?: string; next?: string}) {
   const t = useTranslations('Account'), app = useTranslations('App'), locale = useLocale(), router = useRouter(), s = useStatus(), errorText = useErrorText();
   const [done, setDone] = useState<'' | 'register' | 'forgot' | 'reset' | 'magic'>('');
   const [magic, setMagic] = useState(false);
@@ -33,17 +34,18 @@ export function AuthForm({mode, token, google = false, initialError, next}: {mod
     if (mode === 'reset') await send('/api/auth/reset-password', 'POST', {newPassword: data.password, token});
     setDone(mode);
   }
-  async function withGoogle() {
+  async function withProvider(provider: SocialProviderId) {
+    if (mode === 'reset') return;
     const origin = window.location.origin;
-    const result = await send('/api/auth/sign-in/social', 'POST', {provider: 'google', callbackURL: origin + after,
-      newUserCallbackURL: origin + onboarding, errorCallbackURL: origin + home + '/login'});
-    if (typeof result.url === 'string') window.location.assign(result.url);
+    const result = await send('/api/auth/sign-in/social', 'POST', socialSignInRequest(provider, mode, locale, origin, next));
+    if (typeof result.url !== 'string') throw new Error('GENERIC');
+    window.location.assign(result.url);
   }
   return <section className="form-page narrow"><p className="eyebrow">DANCE COMMUNITY</p><h1>{app(title)}</h1>
     {mode === 'register' && <p className="intro">{app('registerText')}</p>}
     {mode === 'login' && <p className="intro">{app('loginText')}</p>}
     {initialError && !s.error && !done && <p role="alert" className="form-error">{errorText(initialError)}</p>}
-    {done ? <p className="notice" role="status">{doneText[done]}</p> :
+    {!emailEnabled ? <><p className="notice" role="status">{t('emailAuthUnavailable')}</p>{s.feedback}</> : done ? <p className="notice" role="status">{doneText[done]}</p> :
     <form onSubmit={e => {e.preventDefault(); const form = e.currentTarget; s.run(() => submit(form));}}>
       {mode === 'login' && <fieldset className="account-switch"><legend>{t('signInMethod')}</legend>
         <label><input type="radio" name="method" checked={!magic} onChange={() => setMagic(false)}/>{t('methodPassword')}</label>
@@ -61,12 +63,17 @@ export function AuthForm({mode, token, google = false, initialError, next}: {mod
       {s.feedback}
       <button className="button" disabled={s.busy}>{s.busy ? app('working') : mode === 'login' ? (magic ? t('sendMagic') : app('signIn')) :
         mode === 'register' ? app('signUp') : mode === 'forgot' ? app('sendLink') : app('savePassword')}</button>
-      {google && (mode === 'login' || mode === 'register') && <><p className="account-or" aria-hidden="true">{t('or')}</p>
-        <button type="button" className="button secondary" disabled={s.busy} onClick={() => s.run(withGoogle)}>{t('google')}</button>
-        {mode === 'register' && <p className="field-note">{t('googleConsentNote')}</p>}</>}
     </form>}
+    {providers.length > 0 && mode !== 'reset' && <div className="social-signin">
+      {emailEnabled && <p className="account-or" aria-hidden="true">{t('or')}</p>}
+      {mode === 'forgot' && <p className="field-note">{t('socialRecoveryHint')}</p>}
+      {providers.map(provider => <button key={provider} type="button" className="button secondary" disabled={s.busy}
+        onClick={() => s.run(() => withProvider(provider))}>{t('socialContinue', {provider: socialProviderNames[provider]})}</button>)}
+      {mode === 'register' && <p className="field-note">{t('socialConsentNote')}</p>}
+      {done && s.feedback}
+    </div>}
     <div className="form-links"><Link href={home + (mode === 'login' ? '/register' : '/login') + (next ? '?next=' + encodeURIComponent(next) : '')}>{app(mode === 'login' ? 'noAccount' : 'haveAccount')} {app(mode === 'login' ? 'signUp' : 'signIn')}</Link>
-      {mode === 'login' && <Link href={home + '/forgot-password'}>{app('forgot')}</Link>}
+      {mode === 'login' && <Link href={home + '/forgot-password' + (next ? '?next=' + encodeURIComponent(next) : '')}>{app('forgot')}</Link>}
       <Link href={home + '/privacy'}>{t('privacyLink')}</Link></div>
   </section>;
 }

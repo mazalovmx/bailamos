@@ -18,8 +18,14 @@ import '../community.css';
 import '../mobile-controls.css';
 import '../navigation.css';
 import '../home-actions.css';
+import '../visual-system.css';
+import localFont from 'next/font/local';
+const uiFont = localFont({src: [
+  {path: '../../../assets/fonts/PT_Sans-Web-Regular.ttf', weight: '400', style: 'normal'},
+  {path: '../../../assets/fonts/PT_Sans-Web-Bold.ttf', weight: '700', style: 'normal'}
+], variable: '--font-ui', display: 'swap'});
 export const dynamic = 'force-dynamic';
-export const viewport = {themeColor: '#253b2f'};
+export const viewport = {themeColor: '#203c32'};
 export async function generateMetadata({params}: {params: Promise<{locale: string}>}) {
   const {locale} = await params;
   const t = await getTranslations({locale, namespace: 'Home'});
@@ -36,7 +42,7 @@ export default async function Layout({children, params}: {
   // Staff see a link to the admin panel, which is a separate application; school administrators land in their cabinet.
   const adminBase = (process.env.ADMIN_URL || 'http://localhost:3001').replace(/\/+$/, '');
   const adminUrl = user && user.role !== 'USER' ? adminBase + (user.role === 'SCHOOL_ADMIN' ? '/schools' : '') : undefined;
-  return <html lang={locale}><body><NextIntlClientProvider>
+  return <html lang={locale}><body className={uiFont.variable}><NextIntlClientProvider>
     <Header signedIn={!!user} adminUrl={adminUrl}/>{children}<footer className="app-footer"><span>dance community</span><p>{t('footer')}</p>
       <a href={'/' + locale + '/privacy'}>{account('privacyLink')}</a></footer>
     <RegisterSw signedIn={!!user}/><InstallPrompt/>
