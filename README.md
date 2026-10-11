@@ -65,6 +65,7 @@ On Windows, stop web/admin processes before regenerating Prisma or running pnpm 
 - [Cities, styles and catalogue APIs](docs/catalogue.md)
 - [Photographs and announcement export](docs/community-photos.md)
 - [Git branches and Railway](docs/deployment.md)
+- [Admin access and Google sign-in](docs/admin-access.md)
 - [Background worker and readiness](docs/worker.md)
 
 The original Russian requirements document is retained at the repository root as source material. Subsequent owner decisions override it: English by default, a swing/Lindy Hop focus, multi-select discovery filters and Railway releases from deploy.
@@ -80,3 +81,7 @@ MinIO remains an optional Compose storage profile: its original registry downloa
 The promotion path is experiments → stable → deploy. Railway configuration is versioned, but services, PostGIS, SMTP, domains, backups and monitoring still require deployment setup. Additional integrations need their runtime credentials/services. The web Railway config does not automatically deploy admin or workers.
 
 Ticket sales, payments, video hosting, federation and native app-store wrappers are outside this iteration.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

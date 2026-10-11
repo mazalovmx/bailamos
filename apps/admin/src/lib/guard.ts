@@ -6,6 +6,7 @@ import {auth} from './auth';
 import {adminOrigin} from './env';
 import {HttpError} from './errors';
 import {ModerationError} from './moderation';
+import {mayEnterAdmin} from './auth-policy';
 export type Staff = {id: string; name: string; email: string; role: 'OWNER' | 'ADMIN' | 'MODERATOR' | 'SCHOOL_ADMIN'};
 // The single place that decides who is staff. Role and ban are read from the database on every request,
 // so a demotion or a ban takes effect at once even while the session cookie is still valid.
@@ -14,7 +15,7 @@ async function staffFrom(source: Headers): Promise<Staff | null> {
   if (!session) return null;
   const user = await db.user.findUnique({where: {id: session.user.id},
     select: {id: true, name: true, email: true, role: true, bannedAt: true, emailVerified: true}});
-  if (!user || user.bannedAt || !user.emailVerified || user.role === 'USER') return null;
+  if (!user || !mayEnterAdmin(user)) return null;
   return {id: user.id, name: user.name, email: user.email, role: user.role};
 }
 // Guard for every API route. Anything that is not a read must come from the panel's own origin.

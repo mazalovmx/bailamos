@@ -304,5 +304,6 @@
   "error.USE_EVENT_EDITOR": "Create events in the website editor.",
   "error.PLACE_REQUIRED": "Choose the exact location in the event editor before publishing.",
   "error.EVENT_CONFLICT": "The event changed. Reload and try again.",
-  "school.editEvent": "Edit event"
+  "school.editEvent": "Edit event",
+  "signInGoogle": "Sign in with Google"
 }
