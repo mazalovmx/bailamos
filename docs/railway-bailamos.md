@@ -12,7 +12,7 @@ SMTP пока отсутствует: локальный `.env` содержит
 
 Проверено: `SELECT PostGIS_Version()` на Railway возвращает 3.5; через драйвер приложения выполнены запись/чтение/удаление временного объекта S3, CORS разрешает PUT с `https://bailamos.me`. Production preflight web сообщает только недостающие SMTP-параметры. Локальный полный `pnpm test` прошёл 251 проверку (237 web, 9 admin, 5 общих), без ошибок и пропусков. Это не заменяет production login, mail, upload и worker acceptance после публикации.
 
-Старой версии `stable` добавлены совместимые `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` вместе с новыми именами. Для следующего deployment настроены явные build/start, миграции до запуска и healthcheck readiness. Google production callback: `https://bailamos.me/api/auth/callback/google`; успешный вход владельца ещё не проверен. Microsoft/Apple credentials и SMTP отсутствуют.
+Старой версии `stable` добавлены совместимые `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` вместе с новыми именами. Для следующего deployment настроены явные build/start, миграции до запуска и healthcheck readiness. Deployment с совместимыми именами завершён SUCCESS. Google production endpoint возвращает HTTP 200 и URL accounts.google.com, но Google отклоняет этот callback с `redirect_uri_mismatch`: владелец должен добавить `https://bailamos.me/api/auth/callback/google` в Authorized redirect URIs существующего клиента. Успешный вход владельца ещё не проверен. Microsoft/Apple credentials и SMTP отсутствуют.
 
 ## Сервисы
 
@@ -37,6 +37,10 @@ Web и worker используют одинаковые DB, Redis, auth secret, 
 Настроить отдельный S3-compatible bucket (например уже имеющееся хранилище): web и worker не могут совместно читать один Railway volume. Для AWS S3 удалить S3_ENDPOINT и поставить S3_FORCE_PATH_STYLE=false, указать фактический регион. Для другого провайдера использовать его endpoint/region. Разрешить browser upload CORS для `https://bailamos.me`: PUT, GET, HEAD; заголовки Content-Type и заголовки подписи провайдера. Проверить загрузку, чтение после перезапуска и удаление worker. Не публиковать ключи в NEXT_PUBLIC variables.
 
 SMTP должен доставлять verification и reset письма. Добавить рекомендованные провайдером SPF, DKIM, DMARC для bailamos.me; SMTP_SECURE=true для 465, false для STARTTLS на 587. Проверить доставку на внешний адрес. Локальные аккаунты и медиа автоматически в production не переносятся.
+
+Для небольшого старта подготовлен [SMTP пример Resend](../deploy/smtp.resend.env.example). [Free](https://resend.com/pricing) даёт 3000 писем в месяц, максимум 100 в день; платный тариф не подключать. По [официальной инструкции](https://resend.com/docs/send-with-smtp): smtp.resend.com, 465/TLS, пользователь resend, пароль — API key. Владелец создаёт аккаунт/ключ и подтверждает домен; ключ не отправлять в чат и не коммитить. После добавления SMTP в локальную .env перенести значения в web/worker и проверить настоящее письмо.
+
+`www.bailamos.me` добавлен к web с портом 3000. В Cloudflare сохранены CNAME www → l2ck69gk.up.railway.app (DNS only) и TXT _railway-verify.www. DNS записи опубликованы; отдельный сертификат и перенаправление на основной домен ещё требуют проверки.
 
 ## Домены и OAuth
 
