@@ -9,6 +9,7 @@ export default async function Home({params}:{params:Promise<{locale:string}>}){
   const kinds=[['Events',events],['Socials',events+'?kind=SOCIAL'],['Classes',base+'/classes'],['Schools',base+'/schools'],['Masterclasses',events+'?kind=MASTERCLASS&kind=WORKSHOP']];
   const posts=featuredPosts();
   return <main className="community-home"><section className="home-hero"><div><p className="eyebrow">Lindy Hop · Solo Jazz · Swing</p><h1>{t('homeTitle')}</h1><p className="intro">{t('homeIntro')}</p><div className="home-cta"><a className="button" href={events}>{t('homeFind')} ↗</a><a className="button secondary" href={base+'/register'}>{t('homeJoin')}</a></div><p className="home-reassurance">{t('homeBrowse')}</p></div><CommunityPhoto name="hero" alt="Lindy Hop" label={t('photoSoon')} priority/></section>
+    <section id="ways" className="home-section"><h2>{t('danceWays')}</h2><div className="discovery-grid">{sections.map(([key,photo,query],i)=><Link className={'discovery-card discovery-'+key} key={key} href={events+query}><CommunityPhoto name={photo} alt={t(key+'Title')} label={t('photoSoon')}/><div className="discovery-copy"><span className="eyebrow">0{i+1}</span><h3>{t(key+'Title')} ↗</h3><p>{t(key+'Text')}</p></div></Link>)}</div></section>
     <section className="home-section home-what" aria-labelledby="home-what"><h2 id="home-what">{t('homeWhatTitle')}</h2><p>{t('homeWhatText')}</p>
       <ul className="home-kinds">{kinds.map(([key,href])=><li key={key}><Link href={href}>{t('homeKind'+key)} ↗</Link></li>)}</ul>
       <p className="home-create"><Link className="button secondary" href={events+'/new'}>{t('newEvent')} ↗</Link></p>
@@ -21,7 +22,7 @@ export default async function Home({params}:{params:Promise<{locale:string}>}){
       <div className="home-instagram" role="group" aria-labelledby="home-instagram" tabIndex={0}>{posts.map((post,i)=><div className="ig-frame" key={post.code}>
         <iframe src={post.embedUrl} title={t('homeInstagramPost',{number:i+1})} loading="lazy" referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"/>
         <a href={post.permalink} target="_blank" rel="nofollow noopener">{t('homeInstagramOpen')} ↗</a></div>)}</div></section>}
-    <section id="ways" className="home-section"><h2>{t('danceWays')}</h2><div className="discovery-grid">{sections.map(([key,photo,query],i)=><Link className={'discovery-card discovery-'+key} key={key} href={events+query}><CommunityPhoto name={photo} alt={t(key+'Title')} label={t('photoSoon')}/><div className="discovery-copy"><span className="eyebrow">0{i+1}</span><h3>{t(key+'Title')} ↗</h3><p>{t(key+'Text')}</p></div></Link>)}</div></section>
+
     <section className="tempo-banner"><h2>{t('tempoTitle')}</h2><p>{t('tempoText')}</p><div className="tempo-links">{['RELAXED','MODERATE','ENERGETIC'].map(value=><Link key={value} href={events+'?intensity='+value}>{t('intensity_'+value)} ↗</Link>)}</div></section>
   </main>;
 }

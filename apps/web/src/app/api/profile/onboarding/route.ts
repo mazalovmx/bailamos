@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     if (user.profile) throw new ApiError('PROFILE_EXISTS', 409);
     const input = onboardingSchema.parse(await jsonBody(request));
     const account = await db.user.findUnique({where: {id: user.id}, select: {ageConfirmed: true}});
-    // Accounts created through Google have not confirmed their age or accepted the policy yet.
+    // Accounts created through social providers have not yet confirmed age or accepted the policy.
     if (!account?.ageConfirmed && !input.consent) throw new ApiError('AGE_CONFIRMATION_REQUIRED', 403);
     const [city, styles] = await Promise.all([db.city.findUnique({where: {id: input.cityId}, select: {id: true}}),
       db.danceStyle.count({where: {id: {in: input.styleIds}}})]);

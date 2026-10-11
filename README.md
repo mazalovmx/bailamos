@@ -60,6 +60,7 @@ On Windows, stop web/admin processes before regenerating Prisma or running pnpm 
 - `compose.yaml` — local infrastructure.
 - [Implementation and epic status](docs/implementation.md)
 - [Requirements in English](docs/requirements.md)
+- [Google, Microsoft and Apple sign-in setup](docs/social-sign-in.md)
 - [Swing class model](docs/swing-model.md)
 - [Cities, styles and catalogue APIs](docs/catalogue.md)
 - [Photographs and announcement export](docs/community-photos.md)
@@ -69,6 +70,8 @@ On Windows, stop web/admin processes before regenerating Prisma or running pnpm 
 The original Russian requirements document is retained at the repository root as source material. Subsequent owner decisions override it: English by default, a swing/Lindy Hop focus, multi-select discovery filters and Railway releases from deploy.
 
 ## Media and infrastructure
+
+Production release for **bailamos.me**: [Railway runbook](docs/railway-bailamos.md) and [variables template](deploy/railway.variables.example). Production configuration is validated before migration/start; the web rollout checks database and Redis readiness.
 
 The supplied images are installed on the homepage; originals remain in images/. Announcement photos are processed in the browser. The separate media module includes local/S3 adapters; persistent production storage must be configured and tested.
 
