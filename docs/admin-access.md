@@ -4,6 +4,8 @@ The production panel uses `https://admin.bailamos.me`. It is a separate Railway 
 
 Add `https://admin.bailamos.me/api/auth/callback/google` to the existing Google OAuth client's authorized redirect URIs. The web callback remains `https://bailamos.me/api/auth/callback/google`.
 
+Set `RAILPACK_BUILD_CMD=pnpm db:generate && pnpm --filter @dance/admin build` on the admin service. This explicitly selects the admin build in Railpack; otherwise the monorepo's `build:railway` script can select the web app even when the service build command is set. Apply the matching build/start/health settings directly to the new service: Railway no longer allows new services to opt into `railway.admin.json` as Config as Code.
+
 Sign in with Google on the panel's login page. Registration happens on the main site; the panel never creates users, even when a social sign-in request explicitly asks to sign up. Only verified, unbanned `OWNER`, `ADMIN`, `MODERATOR`, and `SCHOOL_ADMIN` accounts can receive an admin session. The session cookie has its own `dance-admin` prefix. Roles are read from the database on every protected request, so demotion or a ban takes effect immediately.
 
 Bootstrap an existing owner account with:

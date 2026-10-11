@@ -25,8 +25,8 @@ test('Google admin sign-in issues a separate session only for verified staff and
   };
   const ids: string[] = [];
   try {
-    const {auth} = await import('../src/lib/auth');
-    const login = (jwt: string, requestSignUp = false) => auth.handler(new Request(origin + '/api/auth/sign-in/social', {
+    const {POST, GET} = await import('../src/app/api/auth/[...all]/route');
+    const login = (jwt: string, requestSignUp = false) => POST(new Request(origin + '/api/auth/sign-in/social', {
       method: 'POST', headers: {origin, 'content-type': 'application/json', 'x-forwarded-for': '10.' + [...randomUUID().slice(0, 6).matchAll(/../g)].map(value => parseInt(value[0], 16) % 250 + 1).join('.')},
       body: JSON.stringify({provider: 'google', idToken: {token: jwt}, callbackURL: '/', requestSignUp})
     }));
@@ -53,13 +53,20 @@ test('Google admin sign-in issues a separate session only for verified staff and
     const unknown = await login(token('unknown-' + tag, unknownEmail, true), true);
     assert.equal(unknown.status, 403, await unknown.clone().text());
     assert.equal(await db.user.count({where: {email: unknownEmail}}), 0);
-    const authorization = await auth.handler(new Request(origin + '/api/auth/sign-in/social', {method: 'POST', headers: {origin, 'content-type': 'application/json', 'x-forwarded-for': '10.17.18.19'},
+    const authorization = await POST(new Request(origin + '/api/auth/sign-in/social', {method: 'POST', headers: {origin, 'content-type': 'application/json', 'x-forwarded-for': '10.17.18.19'},
       body: JSON.stringify({provider: 'google', callbackURL: '/', disableRedirect: true})}));
     assert.equal(authorization.status, 200);
     const url = new URL((await authorization.json()).url);
     assert.equal(url.searchParams.get('redirect_uri'), origin + '/api/auth/callback/google');
     const state = url.searchParams.get('state');
     if (state) await db.verification.deleteMany({where: {identifier: state}});
+    for (const path of ['/sign-up/email', '/link-social', '/change-password', '/update-user', '/callback/microsoft']) {
+      const denied = await POST(new Request(origin + '/api/auth' + path, {method: 'POST'}));
+      assert.equal(denied.status, 404, path);
+    }
+    const callback = await GET(new Request(origin + '/api/auth/callback/google?error=access_denied'));
+    assert.notEqual(callback.status, 404, 'Google callbacks must reach the auth handler');
+    assert.equal(new URL(callback.headers.get('location')!).pathname, '/login');
   } finally {
     globalThis.fetch = originalFetch;
     await db.user.deleteMany({where: {OR: [{id: {in: ids}}, {email: 'unknown-' + tag + '@example.test'}]}});
