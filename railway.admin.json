@@ -5,7 +5,8 @@
     "buildCommand": "pnpm db:generate && pnpm --filter @dance/admin build"
   },
   "deploy": {
-    "startCommand": "pnpm start:admin",
+    "sleepApplication": true,
+    "startCommand": "node scripts/check-production-env.mjs admin && pnpm start:admin",
     "healthcheckPath": "/login",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",

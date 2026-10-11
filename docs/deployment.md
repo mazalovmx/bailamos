@@ -1,5 +1,7 @@
 # GitHub and Railway
 
+Production domain and release checklist: [bailamos.me on Railway](railway-bailamos.md). Variables template: [railway.variables.example](../deploy/railway.variables.example).
+
 Repository: https://github.com/mazalovmx/bailamos
 
 ## Branches
@@ -25,7 +27,7 @@ The root railway.json defines build/start settings but does not connect GitHub o
 - Build: pnpm build:railway (Prisma generation and web build).
 - Pre-deploy: pnpm release:railway (migrations, then idempotent catalogue seeding).
 - Start: pnpm start, binding 0.0.0.0 and Railway's PORT.
-- Health: /api/health tests process liveness; pre-deploy checks schema application separately.
+- Health: /api/health/ready checks database and configured Redis reachability; /api/health remains process liveness. Pre-deploy validates production variables before applying migrations.
 
 ## Required configuration
 
