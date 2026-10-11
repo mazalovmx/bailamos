@@ -80,3 +80,7 @@ MinIO remains an optional Compose storage profile: its original registry downloa
 The promotion path is experiments → stable → deploy. Railway configuration is versioned, but services, PostGIS, SMTP, domains, backups and monitoring still require deployment setup. Additional integrations need their runtime credentials/services. The web Railway config does not automatically deploy admin or workers.
 
 Ticket sales, payments, video hosting, federation and native app-store wrappers are outside this iteration.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
