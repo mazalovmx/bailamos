@@ -5,10 +5,11 @@ import {headers} from 'next/headers';
 import {redirect} from 'next/navigation';
 import Link from 'next/link';
 import {currentUser} from '../../../lib/session';
-import {auth, googleEnabled} from '../../../lib/auth';
+import {auth} from '../../../lib/auth';
+import {enabledSocialProviders, socialProviderIds, socialProviderNames} from '../../../lib/account/social-providers';
 import {describeAgent} from '../../../lib/account/sessions';
 import {DeleteAccount} from '../../../components/account/delete-account';
-import {ChangeEmail, ChangePassword, GoogleLink, SignOutOthers} from '../../../components/account/security';
+import {ChangeEmail, ChangePassword, SocialLink, SignOutOthers} from '../../../components/account/security';
 import {NotificationPreferencesSection} from '../../../components/notifications/preferences-section';
 import {TelegramLink} from '../../../components/notifications/telegram-link';
 import '../../styles/account.css';
@@ -26,12 +27,14 @@ export default async function Settings({params, searchParams}: {params: Promise<
     db.session.findMany({where: {userId: user.id, expiresAt: {gt: new Date()}}, orderBy: {createdAt: 'desc'}, take: 50,
       select: {id: true, createdAt: true, ipAddress: true, userAgent: true}}),
     auth.api.getSession({headers: await headers()})]);
-  const hasPassword = accounts.some(a => a.providerId === 'credential' && !!a.password), hasGoogle = accounts.some(a => a.providerId === 'google');
+  const hasPassword = accounts.some(a => a.providerId === 'credential' && !!a.password), availableProviders = enabledSocialProviders();
+  const linkedProviders = new Set(accounts.map(a => a.providerId));
+  const visibleProviders = socialProviderIds.filter(provider => availableProviders.includes(provider) || linkedProviders.has(provider));
   const date = new Intl.DateTimeFormat(locale, {dateStyle: 'medium'}), dateTime = new Intl.DateTimeFormat(locale, {dateStyle: 'medium', timeStyle: 'short'});
   const currentId = current?.session.id, changed = query.emailChanged !== undefined, failed = typeof query.error === 'string';
   return <main className="form-page"><h1>{t('settingsTitle')}</h1><p className="intro">{t('settingsText', {email: user.email})}</p>
     {changed && !failed && <p className="notice" role="status">{t('emailChanged', {email: user.email})}</p>}
-    {failed && <p className="form-error" role="alert">{t(changed ? 'emailChangeFailed' : 'googleLinkFailed')}</p>}
+    {failed && <p className="form-error" role="alert">{t(changed ? 'emailChangeFailed' : 'socialLinkFailed')}</p>}
     <section className="account-section" aria-labelledby="email-title"><h2 id="email-title">{t('emailTitle')}</h2>
       <p>{t('emailText', {email: user.email})}</p>
       <ChangeEmail hasPassword={hasPassword}/>
@@ -40,11 +43,12 @@ export default async function Settings({params, searchParams}: {params: Promise<
       <ul className="account-list">
         <li>{t('methodPasswordState')}: {t(hasPassword ? 'enabled' : 'notSet')}{!hasPassword && <> · <Link href={'/' + locale + '/forgot-password'}>{t('setPassword')}</Link></>}</li>
         <li>{t('methodMagicState')}: {t('enabled')}</li>
-        {(googleEnabled() || hasGoogle) && <li>{t('methodGoogleState')}: {t(hasGoogle ? 'connected' : 'notConnected')}</li>}
+        {visibleProviders.map(provider => <li key={provider}>{socialProviderNames[provider]}: {t(linkedProviders.has(provider) ? 'connected' : 'notConnected')}</li>)}
       </ul>
       <div className="account-actions">
         {hasPassword && <ChangePassword/>}
-        <GoogleLink connected={hasGoogle} available={googleEnabled()} canUnlink={hasPassword}/>
+        {visibleProviders.map(provider => <SocialLink key={provider} provider={provider} connected={linkedProviders.has(provider)}
+          available={availableProviders.includes(provider)} canUnlink={hasPassword}/>)}
       </div>
     </section>
     <section className="account-section" aria-labelledby="sessions-title"><h2 id="sessions-title">{t('sessionsTitle')}</h2><p>{t('sessionsText')}</p>

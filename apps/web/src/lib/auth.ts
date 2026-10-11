@@ -6,6 +6,8 @@ import {magicLink} from 'better-auth/plugins/magic-link';
 import {db} from '@dance/db';
 import {sendMail, mailLocale, type MailLocale} from './mail';
 import {logRegistrationConsents} from './account/consent';
+import {enabledSocialProviders, socialClientCredentials} from './account/social-providers';
+import {appleClientSecret} from './account/apple-secret';
 type MailKind = 'verify' | 'reset' | 'magic' | 'change';
 const emailText: Record<MailLocale, {verify: string; reset: string; magic: string; change: string; body: string; magicBody: string; changeBody: string}> = {
   en: {verify: 'Confirm your email', change: 'Confirm your new email address',
@@ -22,8 +24,10 @@ async function send(user: {email: string; locale?: string | null}, url: string, 
   const copy = emailText[mailLocale(user.locale)];
   await sendMail(user.email, copy[kind], (kind === 'magic' ? copy.magicBody : kind === 'change' ? copy.changeBody : copy.body) + '\n\n' + url);
 }
-// Google sign-in exists only when both credentials are configured; the UI hides the button otherwise.
-export const googleEnabled = () => !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
+// Only completely configured providers are offered in the UI.
+export const googleEnabled = () => enabledSocialProviders().includes('google');
+const providers = enabledSocialProviders();
+const googleCredentials = socialClientCredentials('google'), microsoftCredentials = socialClientCredentials('microsoft');
 // Set by lib/account/email-change.ts once the password (or a fresh sign-in) has been checked; the bare Better Auth route is refused.
 export const confirmedEmailChange = new AsyncLocalStorage<boolean>();
 const fail = (code: string, status: 'BAD_REQUEST' | 'FORBIDDEN' = 'BAD_REQUEST') => new APIError(status, {message: code, code});
@@ -47,16 +51,29 @@ export const auth = betterAuth({
         stored && stored.email.toLowerCase() !== user.email.toLowerCase() ? 'change' : 'verify');
     }
   },
-  ...(googleEnabled() ? {socialProviders: {google: {
-    clientId: process.env.GOOGLE_CLIENT_ID as string, clientSecret: process.env.GOOGLE_CLIENT_SECRET as string
-  }}} : {}),
-  // Explicit linking from settings only attaches a Google account with the same email address.
+  socialProviders: {
+    ...(providers.includes('google') ? {google: {
+      ...googleCredentials!,
+      prompt: 'select_account' as const, disableImplicitSignUp: true
+    }} : {}),
+    ...(providers.includes('microsoft') ? {microsoft: {
+      ...microsoftCredentials!,
+      tenantId: process.env.MICROSOFT_TENANT_ID?.trim() || 'common', prompt: 'select_account' as const, disableImplicitSignUp: true
+    }} : {}),
+    ...(providers.includes('apple') ? {apple: async () => ({
+      clientId: process.env.APPLE_CLIENT_ID!.trim(), disableImplicitSignUp: true,
+      clientSecret: appleClientSecret({clientId: process.env.APPLE_CLIENT_ID!.trim(), teamId: process.env.APPLE_TEAM_ID!.trim(),
+        keyId: process.env.APPLE_KEY_ID!.trim(), privateKey: process.env.APPLE_PRIVATE_KEY!})
+    })} : {})
+  },
+  ...(providers.includes('apple') ? {trustedOrigins: ['https://appleid.apple.com']} : {}),
+  // Keep same-email linking and provider email-verification checks; never trust an unverified Microsoft address.
   account: {accountLinking: {enabled: true, allowDifferentEmails: false}},
   user: {
     // The new address must open a link before it replaces the old one; see lib/account/email-change.ts.
     changeEmail: {enabled: true},
     additionalFields: {
-    // Google accounts start unconfirmed; onboarding collects the confirmation before a profile can exist.
+    // Social accounts start unconfirmed; onboarding collects consent before a profile can exist.
     ageConfirmed: {type: 'boolean', required: false, defaultValue: false},
     locale: {type: 'string', required: false, defaultValue: 'en'},
     // Declared only so that Better Auth rejects or overrides any client attempt to set them.

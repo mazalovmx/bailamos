@@ -2,6 +2,7 @@
 import {useLocale, useTranslations} from 'next-intl';
 import {useRouter} from 'next/navigation';
 import {useState} from 'react';
+import {socialProviderNames, type SocialProviderId} from '../../lib/account/social-providers';
 import {send, useStatus} from './shared';
 // Asks for a new sign-in email. Nothing changes until the link mailed to the new address is opened.
 export function ChangeEmail({hasPassword}: {hasPassword: boolean}) {
@@ -45,20 +46,23 @@ export function ChangePassword() {
 }
 // Connects Google through the provider round trip, or disconnects it while a password remains.
 export function GoogleLink({connected, available, canUnlink}: {connected: boolean; available: boolean; canUnlink: boolean}) {
+  return <SocialLink provider="google" connected={connected} available={available} canUnlink={canUnlink}/>;
+}
+export function SocialLink({provider, connected, available, canUnlink}: {provider: SocialProviderId; connected: boolean; available: boolean; canUnlink: boolean}) {
   const t = useTranslations('Account'), app = useTranslations('App'), locale = useLocale(), router = useRouter(), s = useStatus();
   if (!connected && !available) return null;
   const link = () => s.run(async () => {
     const settings = window.location.origin + '/' + locale + '/settings';
-    const result = await send('/api/auth/link-social', 'POST', {provider: 'google', callbackURL: settings, errorCallbackURL: settings});
+    const result = await send('/api/auth/link-social', 'POST', {provider, callbackURL: settings, errorCallbackURL: settings});
     if (typeof result.url !== 'string') throw new Error('GENERIC');
     window.location.assign(result.url);
   });
-  const unlink = () => s.run(async () => {await send('/api/account/google', 'DELETE', {}); router.refresh();});
+  const unlink = () => s.run(async () => {await send('/api/account/providers/' + provider, 'DELETE', {}); router.refresh();});
   return <div>
-    {connected && !canUnlink ? <p className="field-note">{t('googleUnlinkNeedsPassword')}</p> :
+    {connected && !canUnlink ? <p className="field-note">{t('socialUnlinkNeedsPassword', {provider: socialProviderNames[provider]})}</p> :
       <button type="button" className="button secondary" disabled={s.busy} onClick={connected ? unlink : link}>
-        {s.busy ? app('working') : t(connected ? 'googleUnlink' : 'googleLink')}</button>}
-    {!connected && <p className="field-note">{t('googleLinkHint')}</p>}
+        {s.busy ? app('working') : t(connected ? 'socialUnlink' : 'socialLink', {provider: socialProviderNames[provider]})}</button>}
+    {!connected && <p className="field-note">{t(provider === 'apple' ? 'appleLinkHint' : 'socialLinkHint')}</p>}
     {s.feedback}
   </div>;
 }
