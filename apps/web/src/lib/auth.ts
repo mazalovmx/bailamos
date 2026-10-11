@@ -8,6 +8,7 @@ import {sendMail, mailLocale, type MailLocale} from './mail';
 import {logRegistrationConsents} from './account/consent';
 import {enabledSocialProviders, socialClientCredentials} from './account/social-providers';
 import {appleClientSecret} from './account/apple-secret';
+import {emailAuthEnabled} from './account/email-auth';
 type MailKind = 'verify' | 'reset' | 'magic' | 'change';
 const emailText: Record<MailLocale, {verify: string; reset: string; magic: string; change: string; body: string; magicBody: string; changeBody: string}> = {
   en: {verify: 'Confirm your email', change: 'Confirm your new email address',
@@ -38,12 +39,12 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
   database: prismaAdapter(db, {provider: 'postgresql'}),
   emailAndPassword: {
-    enabled: true, minPasswordLength: 10, requireEmailVerification: true,
+    enabled: emailAuthEnabled(), minPasswordLength: 10, requireEmailVerification: true,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({user, url}) => send(user, url, 'reset')
   },
   emailVerification: {
-    sendOnSignUp: true, sendOnSignIn: true, autoSignInAfterVerification: true,
+    sendOnSignUp: emailAuthEnabled(), sendOnSignIn: emailAuthEnabled(), autoSignInAfterVerification: true,
     // During an email change the link goes to the new address, which is not yet the stored one.
     sendVerificationEmail: async ({user, url}) => {
       const stored = await db.user.findUnique({where: {id: user.id}, select: {email: true, locale: true}});
@@ -108,6 +109,8 @@ export const auth = betterAuth({
     }}}
   },
   hooks: {before: createAuthMiddleware(async ctx => {
+    if (!emailAuthEnabled() && ['/sign-up/email', '/sign-in/email', '/sign-in/magic-link', '/request-password-reset', '/reset-password', '/send-verification-email', '/verify-email', '/change-email', '/set-password', '/change-password'].includes(ctx.path))
+      throw new APIError('SERVICE_UNAVAILABLE', {message: 'EMAIL_AUTH_UNAVAILABLE', code: 'EMAIL_AUTH_UNAVAILABLE'});
     // Sign-up is the only Better Auth route allowed to confirm age; later confirmation goes through onboarding, which logs it.
     if (ctx.path === '/update-user' && ctx.body && 'ageConfirmed' in ctx.body) throw fail('FIELD_NOT_ALLOWED');
     if (ctx.path === '/change-email' && !confirmedEmailChange.getStore()) throw fail('CONFIRMATION_REQUIRED', 'FORBIDDEN');

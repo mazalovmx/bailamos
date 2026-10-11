@@ -13,13 +13,16 @@ export function productionProblems(env, service = 'web') {
   catch {problems.push('DATABASE_URL must reference production PostgreSQL');}
   if (env.RAILPACK_PRUNE_DEPS !== 'false') problems.push('RAILPACK_PRUNE_DEPS must be false');
   if (service === 'admin') {required(['ADMIN_URL', 'WEB_URL']); https('ADMIN_URL'); https('WEB_URL'); return problems;}
-  required(['BETTER_AUTH_URL', 'REDIS_URL', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_FROM']);
+  required(['BETTER_AUTH_URL', 'REDIS_URL']);
+  if (env.EMAIL_AUTH_ENABLED !== undefined && !['true', 'false'].includes(env.EMAIL_AUTH_ENABLED)) problems.push('EMAIL_AUTH_ENABLED must be true or false');
+  const needsMail = service === 'worker' || env.EMAIL_AUTH_ENABLED !== 'false';
+  if (needsMail) required(['SMTP_HOST', 'SMTP_PORT', 'SMTP_FROM']);
   https('BETTER_AUTH_URL');
   try {const url = new URL(env.REDIS_URL); if (!['redis:', 'rediss:'].includes(url.protocol) || ['localhost', '127.0.0.1'].includes(url.hostname)) throw new Error();}
   catch {problems.push('REDIS_URL must reference production Redis');}
-  if (['localhost', '127.0.0.1', 'mailpit'].includes(env.SMTP_HOST)) problems.push('SMTP_HOST must use a real mail provider');
-  if (!['true', 'false'].includes(env.SMTP_SECURE)) problems.push('SMTP_SECURE must be true or false');
-  if (!/^\d+$/.test(env.SMTP_PORT || '') || +env.SMTP_PORT < 1 || +env.SMTP_PORT > 65535) problems.push('SMTP_PORT is invalid');
+  if (needsMail && ['localhost', '127.0.0.1', 'mailpit'].includes(env.SMTP_HOST)) problems.push('SMTP_HOST must use a real mail provider');
+  if (needsMail && !['true', 'false'].includes(env.SMTP_SECURE)) problems.push('SMTP_SECURE must be true or false');
+  if (needsMail && (!/^\d+$/.test(env.SMTP_PORT || '') || +env.SMTP_PORT < 1 || +env.SMTP_PORT > 65535)) problems.push('SMTP_PORT is invalid');
   // Web and worker cannot share a Railway volume. Use the same object store.
   if (env.MEDIA_STORAGE !== 's3') problems.push('MEDIA_STORAGE must be s3 for the web/worker deployment');
   required(['S3_BUCKET', 'S3_ACCESS_KEY', 'S3_SECRET_KEY']);

@@ -197,5 +197,7 @@
   "socialLinkFailed": "No se ha podido conectar el proveedor. Usa el mismo correo y comprueba que esta identidad no esté conectada a otra cuenta.",
   "error_SOCIAL_ACCOUNT_NOT_LINKED": "Este proveedor no está conectado a tu cuenta.",
   "error_SIGNUP_DISABLED": "Esta identidad no está conectada a una cuenta existente. Usa tu método habitual o registra una cuenta nueva.",
-  "error_UNABLE_TO_LINK_ACCOUNT": "No se ha podido conectar esta identidad. Accede con tu método habitual y conéctala desde los ajustes."
+  "error_UNABLE_TO_LINK_ACCOUNT": "No se ha podido conectar esta identidad. Accede con tu método habitual y conéctala desde los ajustes.",
+  "emailAuthUnavailable": "El acceso por correo no está disponible temporalmente. Usa una de las opciones de acceso que aparecen abajo.",
+  "error_EMAIL_AUTH_UNAVAILABLE": "El acceso por correo no está disponible temporalmente. Usa una de las opciones de acceso que aparecen abajo."
 }

@@ -1,3 +1,4 @@
+import {emailAuthEnabled} from '../../../lib/account/email-auth';
 import {getTranslations as pageTitle} from 'next-intl/server';
 import {redirect} from 'next/navigation';
 import {AuthForm} from '../../../components/account/auth-form';
@@ -12,5 +13,5 @@ export default async function Page({params, searchParams}: {params: Promise<{loc
   if (!error && await currentUser()) redirect(target || '/' + locale + '/account');
   // Magic-link and Google failures come back as ?error=<code>; only a short code is passed on, never free text.
   const code = typeof error === 'string' && /^[A-Za-z0-9_]{1,60}$/.test(error) ? error.toUpperCase() : undefined;
-  return <main><AuthForm mode="login" providers={enabledSocialProviders()} initialError={code} next={target}/></main>;
+  return <main><AuthForm emailEnabled={emailAuthEnabled()} mode="login" providers={enabledSocialProviders()} initialError={code} next={target}/></main>;
 }

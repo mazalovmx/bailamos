@@ -15,3 +15,11 @@ test('deployment rejects local dependencies, ephemeral storage and incomplete cr
   assert.ok(problems.some(value => value.includes('APPLE')));
   assert.ok(!problems.join().includes('do-not-print'));
 });
+
+test('web may explicitly disable email auth, while worker still requires real SMTP', () => {
+  const withoutMail = {...env, EMAIL_AUTH_ENABLED: 'false', SMTP_HOST: undefined, SMTP_PORT: undefined, SMTP_SECURE: undefined, SMTP_FROM: undefined};
+  assert.deepEqual(productionProblems(withoutMail, 'web'), []);
+  assert.ok(productionProblems(withoutMail, 'worker').some(p => p.includes('SMTP')));
+  assert.ok(productionProblems({...withoutMail, EMAIL_AUTH_ENABLED: undefined}, 'web').some(p => p.includes('SMTP')));
+  assert.ok(productionProblems({...env, EMAIL_AUTH_ENABLED: 'off'}, 'web').some(p => p.includes('EMAIL_AUTH_ENABLED')));
+});

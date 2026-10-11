@@ -8,11 +8,11 @@
 
 Созданы PostGIS (`postgis/postgis:17-3.5`, постоянный volume `/var/lib/postgresql/data`, RAM 256 МБ/CPU 0.25), Redis (RAM 128 МБ/CPU 0.25) и приватный S3 bucket `bailamos-media` в sjc. Postgres запущен и принимает подключения. Web ограничен RAM 512 МБ/CPU 0.5, включён сон при отсутствии запросов. DB/Redis/S3 и Google credentials перенесены в web; секреты не включаются в исходники. Эти пределы требуют проверки на реальной нагрузке; они не означают фиксированной стоимости сервисов.
 
-SMTP пока отсутствует: локальный `.env` содержит только Mailpit. Доставка verification/reset и production preflight требуют настоящего почтового провайдера. GitHub MCP читает репозиторий, но запись tree отклонена с 403 Resource not accessible by integration. Обычный `git push` также не прошёл: User cancelled dialog и недоступный канал авторизации VS Code. Нужен рабочий вход Git для push готовой ветки.
+SMTP пока отсутствует: локальный `.env` содержит только Mailpit. Доставка verification/reset и production preflight требуют настоящего почтового провайдера. GitHub MCP читает репозиторий, но запись tree отклонена с 403 Resource not accessible by integration. Обычный `git push` также не прошёл: User cancelled dialog и недоступный канал авторизации VS Code. Владелец завершил Git Credential Manager login; обычный git push ветки fix/ux-audit выполнен успешно.
 
 Проверено: `SELECT PostGIS_Version()` на Railway возвращает 3.5; через драйвер приложения выполнены запись/чтение/удаление временного объекта S3, CORS разрешает PUT с `https://bailamos.me`. Production preflight web сообщает только недостающие SMTP-параметры. Локальный полный `pnpm test` прошёл 251 проверку (237 web, 9 admin, 5 общих), без ошибок и пропусков. Это не заменяет production login, mail, upload и worker acceptance после публикации.
 
-Старой версии `stable` добавлены совместимые `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` вместе с новыми именами. Для следующего deployment настроены явные build/start, миграции до запуска и healthcheck readiness. Deployment с совместимыми именами завершён SUCCESS. Google production endpoint возвращает HTTP 200 и URL accounts.google.com, но Google отклоняет этот callback с `redirect_uri_mismatch`: владелец должен добавить `https://bailamos.me/api/auth/callback/google` в Authorized redirect URIs существующего клиента. Успешный вход владельца ещё не проверен. Microsoft/Apple credentials и SMTP отсутствуют.
+Старой версии `stable` добавлены совместимые `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` вместе с новыми именами. Для следующего deployment настроены явные build/start, миграции до запуска и healthcheck readiness. Deployment с совместимыми именами завершён SUCCESS. Google production endpoint возвращает HTTP 200 и URL accounts.google.com, владелец добавил `https://bailamos.me/api/auth/callback/google`; свежий запрос открывает страницу Google без redirect_uri_mismatch и invalid_client. Успешный вход владельца ещё не проверен. Microsoft/Apple credentials и SMTP отсутствуют.
 
 ## Сервисы
 
@@ -70,3 +70,7 @@ Microsoft и Apple реализованы, но реальные ключи от
 Перед выпуском доступны `node scripts/check-production-env.mjs web|worker|admin` в окружении Railway. Проверка не печатает секреты и не подтверждает доступность внешних сервисов. Web deployment healthcheck теперь использует readiness; ошибки DB/Redis блокируют успешный rollout.
 
 Источники: [Railway DNS и SSL](https://docs.railway.com/networking/domains/working-with-domains), [Railpack Node settings](https://railpack.com/languages/node/), [deployment config](https://docs.railway.com/config-as-code/reference).
+
+## Временный запуск без почтового входа
+
+Пока SMTP отсутствует, для web явно установить EMAIL_AUTH_ENABLED=false. Формы почтового входа/регистрации/восстановления скрыты с понятным сообщением на en/es/ru; соответствующие серверные маршруты отклоняются с EMAIL_AUTH_UNAVAILABLE. Social OAuth остаётся доступным. Это не подтверждает готовность почты: worker по-прежнему требует настоящего SMTP. После подключения и проверки SMTP установить EMAIL_AUTH_ENABLED=true в web и перевыпустить приложение. По умолчанию почтовый вход включён, поэтому неполная конфигурация SMTP блокирует обычный production preflight.

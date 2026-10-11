@@ -197,5 +197,7 @@
   "socialLinkFailed": "The sign-in provider could not be connected. Use the same email address and check that the identity is not connected to another account.",
   "error_SOCIAL_ACCOUNT_NOT_LINKED": "This sign-in provider is not connected to your account.",
   "error_SIGNUP_DISABLED": "No existing account is connected to this identity. Use your original sign-in method, or register a new account.",
-  "error_UNABLE_TO_LINK_ACCOUNT": "This identity could not be connected. Sign in with your original method and connect it in account settings."
+  "error_UNABLE_TO_LINK_ACCOUNT": "This identity could not be connected. Sign in with your original method and connect it in account settings.",
+  "emailAuthUnavailable": "Email sign-in is temporarily unavailable. Use one of the sign-in options below.",
+  "error_EMAIL_AUTH_UNAVAILABLE": "Email sign-in is temporarily unavailable. Use one of the sign-in options below."
 }

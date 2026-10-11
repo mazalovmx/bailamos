@@ -7,7 +7,7 @@ import {send, useErrorText, useStatus} from './shared';
 import {socialProviderNames, socialSignInRequest, type SocialProviderId} from '../../lib/account/social-providers';
 import '../../app/styles/account.css';
 type Mode = 'login' | 'register' | 'forgot' | 'reset';
-export function AuthForm({mode, token, providers = [], initialError, next}: {mode: Mode; token?: string; providers?: SocialProviderId[]; initialError?: string; next?: string}) {
+export function AuthForm({mode, token, providers = [], emailEnabled = true, initialError, next}: {mode: Mode; token?: string; providers?: SocialProviderId[]; emailEnabled?: boolean; initialError?: string; next?: string}) {
   const t = useTranslations('Account'), app = useTranslations('App'), locale = useLocale(), router = useRouter(), s = useStatus(), errorText = useErrorText();
   const [done, setDone] = useState<'' | 'register' | 'forgot' | 'reset' | 'magic'>('');
   const [magic, setMagic] = useState(false);
@@ -45,7 +45,7 @@ export function AuthForm({mode, token, providers = [], initialError, next}: {mod
     {mode === 'register' && <p className="intro">{app('registerText')}</p>}
     {mode === 'login' && <p className="intro">{app('loginText')}</p>}
     {initialError && !s.error && !done && <p role="alert" className="form-error">{errorText(initialError)}</p>}
-    {done ? <p className="notice" role="status">{doneText[done]}</p> :
+    {!emailEnabled ? <><p className="notice" role="status">{t('emailAuthUnavailable')}</p>{s.feedback}</> : done ? <p className="notice" role="status">{doneText[done]}</p> :
     <form onSubmit={e => {e.preventDefault(); const form = e.currentTarget; s.run(() => submit(form));}}>
       {mode === 'login' && <fieldset className="account-switch"><legend>{t('signInMethod')}</legend>
         <label><input type="radio" name="method" checked={!magic} onChange={() => setMagic(false)}/>{t('methodPassword')}</label>
@@ -65,7 +65,7 @@ export function AuthForm({mode, token, providers = [], initialError, next}: {mod
         mode === 'register' ? app('signUp') : mode === 'forgot' ? app('sendLink') : app('savePassword')}</button>
     </form>}
     {providers.length > 0 && mode !== 'reset' && <div className="social-signin">
-      <p className="account-or" aria-hidden="true">{t('or')}</p>
+      {emailEnabled && <p className="account-or" aria-hidden="true">{t('or')}</p>}
       {mode === 'forgot' && <p className="field-note">{t('socialRecoveryHint')}</p>}
       {providers.map(provider => <button key={provider} type="button" className="button secondary" disabled={s.busy}
         onClick={() => s.run(() => withProvider(provider))}>{t('socialContinue', {provider: socialProviderNames[provider]})}</button>)}
