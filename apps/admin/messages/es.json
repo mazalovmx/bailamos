@@ -304,5 +304,6 @@
   "error.USE_EVENT_EDITOR": "Crea eventos en el editor del sitio.",
   "error.PLACE_REQUIRED": "Elige el lugar exacto en el editor antes de publicar.",
   "error.EVENT_CONFLICT": "El evento cambió. Recarga la página.",
-  "school.editEvent": "Editar evento"
+  "school.editEvent": "Editar evento",
+  "signInGoogle": "Iniciar sesión con Google"
 }

@@ -1,6 +1,7 @@
 {
   "name": "dance-community",
   "private": true,
+  "license": "MIT",
   "packageManager": "pnpm@10.15.1",
   "engines": {
     "node": ">=22.18.0 <25"
