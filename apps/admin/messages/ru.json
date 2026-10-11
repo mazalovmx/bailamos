@@ -304,5 +304,6 @@
   "error.USE_EVENT_EDITOR": "Создавайте события в редакторе сайта.",
   "error.PLACE_REQUIRED": "Перед публикацией укажите точное место в редакторе события.",
   "error.EVENT_CONFLICT": "Событие изменилось. Обновите страницу.",
-  "school.editEvent": "Редактировать событие"
+  "school.editEvent": "Редактировать событие",
+  "signInGoogle": "Войти через Google"
 }
