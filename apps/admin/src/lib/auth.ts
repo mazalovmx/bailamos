@@ -10,6 +10,7 @@ const google = adminGoogleCredentials();
 export const auth = betterAuth({
   appName: 'Dance Community Admin',
   baseURL: adminOrigin(),
+  onAPIError: {errorURL: adminOrigin() + '/login'},
   secret: process.env.BETTER_AUTH_SECRET,
   database: prismaAdapter(db, {provider: 'postgresql'}),
   emailAndPassword: {enabled: process.env.EMAIL_AUTH_ENABLED !== 'false', disableSignUp: true, requireEmailVerification: true, minPasswordLength: 10},
