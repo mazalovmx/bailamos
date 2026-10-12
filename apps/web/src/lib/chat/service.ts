@@ -484,7 +484,7 @@ async function unreadMap(profileIds: string[]) {
     SELECT m."conversationId", m."profileId", count(x.id)::int AS count FROM "ConversationMember" m
     JOIN "Message" x ON x."conversationId" = m."conversationId" AND x."createdAt" > COALESCE(m."lastReadAt", m."joinedAt")
       AND x."senderProfileId" <> m."profileId" AND x."hiddenAt" IS NULL AND x."deletedAt" IS NULL
-    WHERE m."profileId" IN (${Prisma.join(profileIds)}) GROUP BY m."conversationId", m."profileId"`;
+    WHERE m."profileId" = ANY(${profileIds}::text[]) GROUP BY m."conversationId", m."profileId"`;
   return new Map(rows.map(row => [pair(row.conversationId, row.profileId), Number(row.count)]));
 }
 // Summaries as seen by the member rows that match `where`: the caller's own row, or the row of a school they manage.
