@@ -308,5 +308,8 @@
   "navMore": "More",
   "adminPanel": "Admin panel",
   "accountSchoolPage": "Your public page and timetable",
-  "accountAddClass": "Add a class, workshop or event"
+  "accountAddClass": "Add a class, workshop or event",
+  "error_LAST_SCHOOL_MANAGER": "Add another school manager before removing the last one.",
+  "error_EMAIL_CONFLICT": "Several accounts use this email. Contact the platform owner.",
+  "error_USER_BANNED": "This account is suspended."
 }

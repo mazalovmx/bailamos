@@ -92,8 +92,8 @@ dialog { border: 0; border-radius: 12px; padding: 20px; width: min(480px, calc(1
 dialog::backdrop { background: rgba(0, 0, 0, .5); }
 dialog form { display: grid; gap: 12px; }
 dialog p { margin: 0; }
-.add-admin-dialog { width: min(480px, calc(100vw - 32px)); max-width: calc(100vw - 32px); left: 50vw; right: auto; margin-inline: 0; transform: translateX(-50%); overflow-wrap: anywhere; }
-.add-admin-dialog input { width: 100%; }
+.add-admin-dialog { width: min(480px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); left: 50vw; right: auto; top: 50dvh; bottom: auto; margin: 0; transform: translate(-50%, -50%); overflow: auto; overflow-wrap: anywhere; }
+.add-admin-dialog input, .add-admin-dialog select { width: 100%; min-width: 0; }
 @media (max-width: 800px) {
   .layout { flex-direction: column; }
   .sidebar { width: auto; border-right: 0; border-bottom: 1px solid var(--line); }

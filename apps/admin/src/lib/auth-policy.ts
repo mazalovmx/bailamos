@@ -6,15 +6,14 @@ export function adminGoogleCredentials(env: Env = process.env) {
   }
   return null;
 }
-type AdminRole = 'OWNER' | 'ADMIN' | 'MODERATOR' | 'SCHOOL_ADMIN';
-export function mayEnterAdmin<T extends {role: string; bannedAt: Date | null; emailVerified: boolean}>(user: T | null): user is T & {role: AdminRole} {
-  return !!user && !user.bannedAt && user.emailVerified && ['OWNER', 'ADMIN', 'MODERATOR', 'SCHOOL_ADMIN'].includes(user.role);
+export function mayEnterAdmin<T extends {role: string; bannedAt: Date | null; emailVerified: boolean; hasSchoolAccess?: boolean}>(user: T | null): user is T {
+  return !!user && !user.bannedAt && user.emailVerified && (['OWNER', 'ADMIN', 'MODERATOR'].includes(user.role) || user.hasSchoolAccess === true);
 }
 
 // Invited accounts may start with an unverified local email. Only a fresh verified Google identity
 // with the same email may link to them; role and ban still come from our database.
-export function mayUseAdminGoogle(user: {email: string; role: string; bannedAt: Date | null} | null,
+export function mayUseAdminGoogle(user: {email: string; role: string; bannedAt: Date | null; hasSchoolAccess?: boolean} | null,
   identity: {email: string; emailVerified: boolean}) {
-  return !!user && !user.bannedAt && ['OWNER', 'ADMIN', 'MODERATOR', 'SCHOOL_ADMIN'].includes(user.role)
+  return !!user && !user.bannedAt && (['OWNER', 'ADMIN', 'MODERATOR'].includes(user.role) || user.hasSchoolAccess === true)
     && identity.emailVerified && user.email.toLowerCase() === identity.email.toLowerCase();
 }

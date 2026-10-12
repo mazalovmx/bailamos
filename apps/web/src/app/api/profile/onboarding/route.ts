@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     }
     const {role, level} = input;
     const profile = await db.profile.create({data: {userId: user.id, type: input.type, handle, name, cityId: input.cityId,
+      ...(input.type === 'SCHOOL' ? {schoolAdmins: {create: {userId: user.id, canManageAdmins: true}}} : {}),
       ...(role && level ? {skills: {create: input.styleIds.map(styleId => ({styleId, role, level, lookingFor: false}))}} : {})}});
     return Response.json({handle: profile.handle}, {status: 201});
   } catch (error) {return apiError(error);}
