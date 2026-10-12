@@ -3,7 +3,7 @@ import {prismaAdapter} from '@better-auth/prisma-adapter';
 import {APIError} from 'better-auth/api';
 import {db} from '@dance/db';
 import {adminOrigin} from './env';
-import {adminGoogleCredentials, mayEnterAdmin} from './auth-policy';
+import {adminGoogleCredentials, mayEnterAdmin, mayUseAdminGoogle} from './auth-policy';
 // Same users, database and secret as the web app, but a separate instance: its own cookie prefix (so a web session on the
 // same host never doubles as an admin session), no registration, and sessions only for verified staff.
 const google = adminGoogleCredentials();
@@ -15,8 +15,13 @@ export const auth = betterAuth({
   database: prismaAdapter(db, {provider: 'postgresql'}),
   emailAndPassword: {enabled: process.env.EMAIL_AUTH_ENABLED !== 'false', disableSignUp: true, requireEmailVerification: true, minPasswordLength: 10},
   socialProviders: google ? {google: {...google, prompt: 'select_account', disableSignUp: true, disableImplicitSignUp: true}} : {},
-  account: {accountLinking: {enabled: true, allowDifferentEmails: false}},
-  user: {additionalFields: {
+  account: {accountLinking: {enabled: true, allowDifferentEmails: false, requireLocalEmailVerified: false, updateUserInfoOnLink: true}},
+  user: {validateUserInfo: async ({user, source}) => {
+    if (source.method !== 'oauth') return;
+    const local = user.id ? await db.user.findUnique({where: {id: user.id}, select: {email: true, role: true, bannedAt: true}}) : null;
+    if (source.oauth?.providerId !== 'google' || !mayUseAdminGoogle(local, {email: user.email ?? '', emailVerified: user.emailVerified === true}))
+      return {error: 'NOT_STAFF'};
+  }, additionalFields: {
     role: {type: 'string', required: false, defaultValue: 'USER', input: false},
     bannedAt: {type: 'date', required: false, input: false, returned: false},
     banReason: {type: 'string', required: false, input: false, returned: false}

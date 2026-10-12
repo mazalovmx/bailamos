@@ -19,12 +19,13 @@ async function staffFrom(source: Headers): Promise<Staff | null> {
   return {id: user.id, name: user.name, email: user.email, role: user.role};
 }
 // Guard for every API route. Anything that is not a read must come from the panel's own origin.
-export async function staff(request: Request, need: 'STAFF' | 'ADMIN' | 'SCHOOL' = 'STAFF') {
+export async function staff(request: Request, need: 'STAFF' | 'ADMIN' | 'OWNER' | 'SCHOOL' = 'STAFF') {
   if (!['GET', 'HEAD'].includes(request.method) && request.headers.get('origin') !== adminOrigin()) throw new HttpError('FORBIDDEN', 403);
   const user = await staffFrom(request.headers);
   if (!user) throw new HttpError('UNAUTHORIZED', 401);
   if ((user.role === 'SCHOOL_ADMIN' && need !== 'SCHOOL') || (need === 'SCHOOL' && user.role === 'MODERATOR')) throw new HttpError('FORBIDDEN', 403);
   if (need === 'ADMIN' && !['OWNER','ADMIN'].includes(user.role)) throw new HttpError('ADMIN_ONLY', 403);
+  if (need === 'OWNER' && user.role !== 'OWNER') throw new HttpError('OWNER_ONLY', 403);
   return user;
 }
 // Guard for every server-rendered page.
@@ -53,7 +54,7 @@ export function fail(error: unknown) {
   return reply('SERVER_ERROR', 500);
 }
 // Wraps a route handler: authenticates staff first, then turns thrown errors into JSON responses.
-export function route<C>(need: 'STAFF' | 'ADMIN' | 'SCHOOL', handler: (request: Request, user: Staff, context: C) => Promise<Response>) {
+export function route<C>(need: 'STAFF' | 'ADMIN' | 'OWNER' | 'SCHOOL', handler: (request: Request, user: Staff, context: C) => Promise<Response>) {
   return async (request: Request, context: C) => {
     try {return await handler(request, await staff(request, need), context);} catch (error) {return fail(error);}
   };
