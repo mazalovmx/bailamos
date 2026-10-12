@@ -12,10 +12,15 @@ test('admin Google credentials require a complete pair and support both env conv
 
 test('admin sessions require an existing verified staff account and deny bans and ordinary users', () => {
   assert.equal(mayEnterAdmin(null), false);
-  for (const role of ['OWNER', 'ADMIN', 'MODERATOR', 'SCHOOL_ADMIN']) {
+  for (const role of ['OWNER', 'ADMIN', 'MODERATOR']) {
     assert.equal(mayEnterAdmin({role, bannedAt: null, emailVerified: true}), true);
     assert.equal(mayEnterAdmin({role, bannedAt: new Date(), emailVerified: true}), false);
     assert.equal(mayEnterAdmin({role, bannedAt: null, emailVerified: false}), false);
   }
-  for (const role of ['USER', 'UNKNOWN', '']) assert.equal(mayEnterAdmin({role, bannedAt: null, emailVerified: true}), false);
+  for (const role of ['USER', 'SCHOOL_ADMIN', 'UNKNOWN', '']) assert.equal(mayEnterAdmin({role, bannedAt: null, emailVerified: true}), false);
+  for (const role of ['USER', 'SCHOOL_ADMIN']) {
+    assert.equal(mayEnterAdmin({role, bannedAt: null, emailVerified: true, hasSchoolAccess: true}), true);
+    assert.equal(mayEnterAdmin({role, bannedAt: new Date(), emailVerified: true, hasSchoolAccess: true}), false);
+    assert.equal(mayEnterAdmin({role, bannedAt: null, emailVerified: false, hasSchoolAccess: true}), false);
+  }
 });
