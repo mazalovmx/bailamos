@@ -1,6 +1,7 @@
 import createMiddleware from 'next-intl/middleware';
 import {NextRequest, NextResponse} from 'next/server';
 import {routing} from './i18n/routing';
+import {mediaOrigins} from './lib/storage/origins';
 const intl = createMiddleware(routing);
 const origin = (value: string | undefined) => {try {return value ? new URL(value).origin : '';} catch {return '';}};
 // Strict CSP: scripts run only with the per-request nonce (Next adds it to its own tags), never inline.
@@ -8,7 +9,7 @@ const origin = (value: string | undefined) => {try {return value ? new URL(value
 function contentSecurityPolicy(nonce: string) {
   const dev = process.env.NODE_ENV !== 'production';
   const tiles = origin(process.env.NEXT_PUBLIC_MAP_STYLE_URL) || 'https://tiles.openfreemap.org';
-  const media = [origin(process.env.S3_PUBLIC_URL), origin(process.env.S3_ENDPOINT)].filter(Boolean).join(' ');
+  const media = mediaOrigins(process.env).join(' ');
   return [
     "default-src 'self'",
     "script-src 'self' 'nonce-" + nonce + "' 'strict-dynamic'" + (dev ? " 'unsafe-eval'" : ''),
