@@ -24,6 +24,7 @@ test('Google admin sign-in protects staff sessions and lets only owners provisio
     return message + '.' + sign('RSA-SHA256', Buffer.from(message), privateKey).toString('base64url');
   };
   const ids: string[] = [];
+  const schools: string[] = [];
   const emails = ['invited-', 'existing-', 'forbidden-', 'mixed-', 'duplicate-'].map(prefix => prefix + tag + '@example.test');
   try {
     const {POST, GET} = await import('../src/app/api/auth/[...all]/route');
@@ -127,6 +128,39 @@ test('Google admin sign-in protects staff sessions and lets only owners provisio
       await db.user.create({data: {id, name: 'Duplicate fixture', email}});
     }
     assert.equal((await add({email: emails[4]})).status, 409, 'ambiguous legacy emails are not assigned arbitrarily');
+    const {createSchool, grantSchool} = await import('../src/lib/schools');
+    const a = await createSchool(ownerId, {name: 'Scoped login A', handle: 'login-a-' + tag.slice(0, 8)}); schools.push(a.id);
+    const b = await createSchool(ownerId, {name: 'Scoped login B', handle: 'login-b-' + tag.slice(0, 8)}); schools.push(b.id);
+    const schoolEmail = 'school-' + tag + '@example.test'; emails.push(schoolEmail);
+    const schoolAdded = await add({email: schoolEmail, scope: 'school', schoolId: a.id, role: 'MANAGER'});
+    assert.equal(schoolAdded.status, 201, await schoolAdded.clone().text());
+    const scoped = await schoolAdded.json(); ids.push(scoped.id);
+    assert.equal((await db.user.findUniqueOrThrow({where: {id: scoped.id}})).role, 'USER');
+    const unverifiedSchoolLogin = await login(token('school-' + tag, schoolEmail, false));
+    assert.ok(unverifiedSchoolLogin.status >= 400 && unverifiedSchoolLogin.status < 500);
+    assert.equal(await db.session.count({where: {userId: scoped.id}}), 0);
+    const schoolLogin = await login(token('school-' + tag, schoolEmail, true));
+    assert.equal(schoolLogin.status, 200, await schoolLogin.clone().text());
+    const schoolCookie = cookieOf(schoolLogin);
+    const {GET: globalRead} = await import('../src/app/api/resources/[resource]/route');
+    assert.equal((await globalRead(new Request(origin+'/api/resources/users',{headers:{cookie:schoolCookie}}),{params:Promise.resolve({resource:'users'})})).status,403);
+    const {GET: schoolRead} = await import('../src/app/api/schools/[id]/route');
+    const {POST: schoolTeam} = await import('../src/app/api/schools/[id]/admins/route');
+    const read = (id: string) => schoolRead(new Request(origin + '/api/schools/' + id, {headers: {cookie: schoolCookie}}), {params: Promise.resolve({id})});
+    assert.equal((await read(a.id)).status, 200);
+    assert.equal((await read(b.id)).status, 403);
+    assert.equal((await add({email: emails[2]}, schoolCookie)).status, 403, 'school managers cannot grant global access');
+    const teamEmail = 'team-' + tag + '@example.test'; emails.push(teamEmail);
+    const teamAdd = await schoolTeam(new Request(origin + '/api/schools/' + a.id + '/admins', {method: 'POST', headers: {origin, cookie: schoolCookie, 'content-type': 'application/json'},
+      body: JSON.stringify({email: teamEmail})}), {params: Promise.resolve({id: a.id})});
+    assert.equal(teamAdd.status, 200, await teamAdd.clone().text()); ids.push((await teamAdd.json()).id);
+    await grantSchool(ownerId, b.id, {email: schoolEmail});
+    await grantSchool(ownerId, a.id, {email: schoolEmail, revoke: true});
+    assert.equal((await read(a.id)).status, 403, 'one school can be revoked independently');
+    assert.equal((await read(b.id)).status, 200);
+    await grantSchool(ownerId, b.id, {email: schoolEmail, revoke: true});
+    assert.equal((await read(b.id)).status, 401, 'last-scope revocation invalidates a still-valid admin cookie');
+    assert.equal((await login(token('school-' + tag, schoolEmail, true))).status, 403);
     await setUserRole(invited.id, 'USER', ownerId);
     assert.equal(await db.session.count({where: {userId: invited.id}}), 0);
     assert.equal((await login(token('google-' + invited.id, emails[0], true))).status, 403);
@@ -153,6 +187,7 @@ test('Google admin sign-in protects staff sessions and lets only owners provisio
     assert.equal(new URL(callback.headers.get('location')!).pathname, '/login');
   } finally {
     globalThis.fetch = originalFetch;
+    await db.profile.deleteMany({where: {id: {in: schools}}});
     await db.auditLog.deleteMany({where: {OR: [{actorUserId: {in: ids}}, {targetId: {in: ids}}]}});
     await db.user.deleteMany({where: {OR: [{id: {in: ids}}, {email: {in: [...emails, ...emails.map(email => email.toUpperCase()), 'unknown-' + tag + '@example.test']}}]}});
     await db.$disconnect();

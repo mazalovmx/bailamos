@@ -111,7 +111,7 @@ export function setUserRole(userId: string, role: 'USER' | 'MODERATOR' | 'ADMIN'
     // Nobody changes their own role, so the last administrator cannot lock the panel by accident.
     if (userId === actorUserId) throw new ModerationError('SELF_ACTION');
     const actor = await tx.user.findUnique({where: {id: actorUserId}, select: {role: true}});
-    if (!['OWNER','ADMIN'].includes(actor?.role ?? '') || role === 'OWNER' || (role === 'ADMIN' && actor?.role !== 'OWNER')) throw new ModerationError('FORBIDDEN', 403);
+    if (!['OWNER','ADMIN'].includes(actor?.role ?? '') || role === 'OWNER' || role === 'SCHOOL_ADMIN' || (role === 'ADMIN' && actor?.role !== 'OWNER')) throw new ModerationError('FORBIDDEN', 403);
     const user = await tx.user.findUnique({where: {id: userId}, select: {role: true}});
     if (!user) throw new ModerationError('NOT_FOUND', 404);
     if (user.role === 'OWNER' || (user.role === 'ADMIN' && actor?.role !== 'OWNER')) throw new ModerationError('FORBIDDEN', 403);
@@ -177,8 +177,7 @@ export async function decideClaim(claimId: string, approve: boolean, actorUserId
         // The verified owner of a school also gets its cabinet in the admin panel; staff roles are left as they are.
         if (claim.profile.type === 'SCHOOL') {
           const grant = {userId: claim.userId, schoolProfileId: claim.profileId};
-          await tx.schoolAdmin.upsert({where: {userId_schoolProfileId: grant}, create: grant, update: {}});
-          if (claim.user.role === 'USER') await tx.user.update({where: {id: claim.userId}, data: {role: 'SCHOOL_ADMIN'}});
+          await tx.schoolAdmin.upsert({where: {userId_schoolProfileId: grant}, create: {...grant, canManageAdmins: true}, update: {canManageAdmins: true}});
         }
         await tx.profileClaim.update({where: {id: claimId}, data: {status: 'APPROVED', ...decided}});
         rejected = await tx.profileClaim.findMany({where: {profileId: claim.profileId, status: 'PENDING', id: {not: claimId}}, select: {id: true, userId: true}});

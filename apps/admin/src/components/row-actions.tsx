@@ -6,7 +6,7 @@ import type {ResourceMeta} from '../lib/resources';
 import {useT} from './i18n';
 import {usePanel, type Row} from './panel';
 import {ReasonDialog, type Ask} from './reason-dialog';
-const roles = ['USER', 'MODERATOR', 'SCHOOL_ADMIN', 'ADMIN'];
+const roles = ['USER', 'MODERATOR', 'ADMIN'];
 // Audited actions available on a record: visibility, deletion, bans, roles and import review.
 export function RowActions({meta, row, onDone, onDeleted}: {meta: ResourceMeta; row: Row; onDone: () => void; onDeleted?: () => void}) {
   const {t} = useT(), {user} = usePanel();
@@ -34,7 +34,7 @@ export function RowActions({meta, row, onDone, onDeleted}: {meta: ResourceMeta; 
         const role = event.target.value;
         setAsk({title: t('confirmRole', {name, role}), confirm: t('changeRole'), reason: 'none',
           run: () => done(api('/api/users/' + id + '/role', {method: 'POST', body: {role}}))});
-      }}>{roles.filter(role=>role!=='ADMIN'||user.role==='OWNER').map(role => <option key={role} value={role}>{role}</option>)}</select></label>}
+      }}>{row.role==='SCHOOL_ADMIN'&&<option value="SCHOOL_ADMIN" disabled>{t('role.SCHOOL_ADMIN')}</option>}{roles.filter(role=>role!=='ADMIN'||user.role==='OWNER').map(role => <option key={role} value={role}>{t('role.'+role)}</option>)}</select></label>}
     {meta.name === 'imported-items' && row.status === 'REVIEW' && <>
       <button type="button" className="button small" onClick={() => review(true)}>{t('approve')}</button>
       <button type="button" className="button small" onClick={() => review(false)}>{t('reject')}</button></>}

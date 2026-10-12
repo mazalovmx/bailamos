@@ -215,5 +215,13 @@
   "extensionSaved": "Fechas añadidas. Horario actualizado.",
   "discoveryViews": "Vistas de eventos",
   "mapView": "Mapa",
-  "calendarView": "Calendario"
+  "calendarView": "Calendario",
+  "schoolAccessRole": "Rol en la escuela",
+  "schoolRoleAdmin": "Administrador de escuela",
+  "schoolRoleManager": "Gestor de escuela",
+  "schoolGlobalAccess": "Administrador global",
+  "schoolPanel": "Panel de la escuela",
+  "schoolTeamHelp": "Los gestores gestionan la escuela y su equipo. Los administradores solo gestionan sus recursos. Invita su correo de Google; no necesita registrarse antes.",
+  "schoolInviteSaved": "Acceso concedido a {email}. Comparte este enlace; debe iniciar sesión con el mismo correo de Google:",
+  "schoolCreatorAccess": "Al crear una escuela recibes automáticamente permisos para gestionarla. Puedes gestionar varias escuelas sin cambiar tu rol en la plataforma."
 }

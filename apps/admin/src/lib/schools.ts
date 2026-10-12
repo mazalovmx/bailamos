@@ -1,44 +1,28 @@
 import {randomUUID} from 'node:crypto';
-import {db, Prisma, changeEventStatus, lockEvent} from '@dance/db';
+import {db, Prisma, changeEventStatus, lockEvent, schoolPermissions, schoolIdsFor, assignSchoolMember} from '@dance/db';
 import {z} from 'zod';
 import {HttpError} from './errors';
 type Tx=Prisma.TransactionClient;
-const globalRole=(role:string)=>role==='OWNER'||role==='ADMIN';
 export async function schoolAccess(userId:string,schoolId:string,tx:Tx=db){
-  const user=await tx.user.findUnique({where:{id:userId},select:{role:true,bannedAt:true,emailVerified:true}});
-  if(!user||user.bannedAt||!user.emailVerified)throw new HttpError('FORBIDDEN',403);
-  if(!globalRole(user.role)&&(user.role!=='SCHOOL_ADMIN'||!await tx.schoolAdmin.findUnique({where:{userId_schoolProfileId:{userId,schoolProfileId:schoolId}}})))throw new HttpError('FORBIDDEN',403);
-  const school=await tx.profile.findFirst({where:{id:schoolId,type:'SCHOOL'}});
-  if(!school)throw new HttpError('NOT_FOUND',404);
-  return school;
+  if(tx!==db)await tx.$queryRaw`SELECT id FROM "Profile" WHERE id=${schoolId} FOR SHARE`;
+  return (await schoolPermissions(userId,schoolId,tx)).school;
 }
 async function globalAccess(userId:string,tx:Tx){
   const user=await tx.user.findUnique({where:{id:userId}});
-  if(!user||user.bannedAt||!user.emailVerified||!globalRole(user.role))throw new HttpError('FORBIDDEN',403);
+  if(!user||user.bannedAt||!user.emailVerified||!['OWNER','ADMIN'].includes(user.role))throw new HttpError('FORBIDDEN',403);
 }
 export async function schoolList(userId:string){
-  const user=await db.user.findUniqueOrThrow({where:{id:userId}});
-  if(user.bannedAt||!user.emailVerified||!['OWNER','ADMIN','SCHOOL_ADMIN'].includes(user.role))throw new HttpError('FORBIDDEN',403);
-  return db.profile.findMany({where:{type:'SCHOOL',...(!globalRole(user.role)?{schoolAdmins:{some:{userId}}}:{})},select:{id:true,name:true,handle:true},orderBy:{name:'asc'}});
+  const ids=await schoolIdsFor(userId);
+  return db.profile.findMany({where:{id:{in:ids},type:'SCHOOL'},select:{id:true,name:true,handle:true},orderBy:{name:'asc'}});
 }
 export async function createSchool(userId:string,input:unknown){
   const data=z.object({name:z.string().trim().min(2).max(80),handle:z.string().regex(/^[a-z0-9][a-z0-9_-]{2,29}$/)}).strict().parse(input);
-  return db.$transaction(async tx=>{await globalAccess(userId,tx);const school=await tx.profile.create({data:{...data,type:'SCHOOL'}});await audit(tx,userId,school.id,'SCHOOL_CREATE',school.id);return {id:school.id};});
+  return db.$transaction(async tx=>{await globalAccess(userId,tx);const school=await tx.profile.create({data:{...data,type:'SCHOOL',schoolAdmins:{create:{userId,canManageAdmins:true}}}});await audit(tx,userId,school.id,'SCHOOL_CREATE',school.id);return {id:school.id};});
 }
 async function audit(tx:Tx,userId:string,schoolId:string,action:string,id:string){await tx.auditLog.create({data:{actorUserId:userId,action,targetType:'School',targetId:id,data:{schoolProfileId:schoolId}}});}
 export async function grantSchool(userId:string,schoolId:string,input:unknown){
-  const {email,revoke}=z.object({email:z.email().toLowerCase(),revoke:z.boolean().default(false)}).strict().parse(input);
-  return db.$transaction(async tx=>{
-    await globalAccess(userId,tx);await schoolAccess(userId,schoolId,tx);
-    const target=await tx.user.findUnique({where:{email}});
-    if(!target)throw new HttpError('NOT_FOUND',404);
-    if(globalRole(target.role)||target.bannedAt)throw new HttpError('FORBIDDEN',403);
-    if(revoke)await tx.schoolAdmin.deleteMany({where:{userId:target.id,schoolProfileId:schoolId}});
-    else{await tx.schoolAdmin.upsert({where:{userId_schoolProfileId:{userId:target.id,schoolProfileId:schoolId}},create:{userId:target.id,schoolProfileId:schoolId},update:{}});await tx.user.update({where:{id:target.id},data:{role:'SCHOOL_ADMIN'}});}
-    await tx.session.deleteMany({where:{userId:target.id}});
-    await audit(tx,userId,schoolId,revoke?'SCHOOL_ADMIN_REVOKE':'SCHOOL_ADMIN_GRANT',target.id);
-    return {ok:true};
-  });
+  const {email,revoke,role}=z.strictObject({email:z.string().trim().toLowerCase().pipe(z.email().max(254)),revoke:z.boolean().default(false),role:z.enum(['ADMIN','MANAGER']).default('ADMIN')}).parse(input);
+  return assignSchoolMember(userId,schoolId,{email,revoke,canManageAdmins:role==='MANAGER'});
 }
 export async function schoolResources(userId:string,schoolId:string){
   await schoolAccess(userId,schoolId);

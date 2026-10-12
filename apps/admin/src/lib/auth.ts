@@ -1,7 +1,7 @@
 import {betterAuth} from 'better-auth';
 import {prismaAdapter} from '@better-auth/prisma-adapter';
 import {APIError} from 'better-auth/api';
-import {db} from '@dance/db';
+import {db, adminAccessIdentity} from '@dance/db';
 import {adminOrigin} from './env';
 import {adminGoogleCredentials, mayEnterAdmin, mayUseAdminGoogle} from './auth-policy';
 // Same users, database and secret as the web app, but a separate instance: its own cookie prefix (so a web session on the
@@ -18,7 +18,7 @@ export const auth = betterAuth({
   account: {accountLinking: {enabled: true, allowDifferentEmails: false, requireLocalEmailVerified: false, updateUserInfoOnLink: true}},
   user: {validateUserInfo: async ({user, source}) => {
     if (source.method !== 'oauth') return;
-    const local = user.id ? await db.user.findUnique({where: {id: user.id}, select: {email: true, role: true, bannedAt: true}}) : null;
+    const local = user.id ? await adminAccessIdentity(user.id) : null;
     if (source.oauth?.providerId !== 'google' || !mayUseAdminGoogle(local, {email: user.email ?? '', emailVerified: user.emailVerified === true}))
       return {error: 'NOT_STAFF'};
   }, additionalFields: {
@@ -32,7 +32,7 @@ export const auth = betterAuth({
   databaseHooks: {user: {create: {before: async () => {
     throw new APIError('FORBIDDEN', {message: 'ADMIN_REGISTRATION_DISABLED', code: 'ADMIN_REGISTRATION_DISABLED'});
   }}}, session: {create: {before: async session => {
-    const user = await db.user.findUnique({where: {id: session.userId}, select: {role: true, bannedAt: true, emailVerified: true}});
+    const user = await adminAccessIdentity(session.userId);
     if (!mayEnterAdmin(user)) throw new APIError('FORBIDDEN', {message: 'NOT_STAFF', code: 'NOT_STAFF'});
   }}}}
 });

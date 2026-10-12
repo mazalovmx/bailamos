@@ -1,9 +1,9 @@
-// Bootstraps staff access: pnpm --filter @dance/db exec dotenv -e ../../.env -- tsx prisma/grant-role.ts <email> <OWNER|ADMIN|MODERATOR|SCHOOL_ADMIN|USER>
+// Bootstraps platform access: pnpm --filter @dance/db exec dotenv -e ../../.env -- tsx prisma/grant-role.ts <email> <OWNER|ADMIN|MODERATOR|USER>
 import {db, UserRole} from '../src/index';
 const [email, role] = process.argv.slice(2);
 async function main() {
-  if (!email || !role || !(role in UserRole)) {
-    console.error('Usage: tsx prisma/grant-role.ts <email> <OWNER|ADMIN|MODERATOR|SCHOOL_ADMIN|USER>');
+  if (!email || !role || !(role in UserRole) || role === 'SCHOOL_ADMIN') {
+    console.error('Usage: tsx prisma/grant-role.ts <email> <OWNER|ADMIN|MODERATOR|USER>. Assign school access through its team, with a school scope.');
     return 1;
   }
   const user = await db.user.findUnique({where: {email: email.toLowerCase()}, select: {id: true, role: true, emailVerified: true, bannedAt: true}});
@@ -13,10 +13,11 @@ async function main() {
   }
   await db.$transaction([
     db.user.update({where: {id: user.id}, data: {role: role as UserRole}}),
+    db.session.deleteMany({where: {userId: user.id}}),
     db.auditLog.create({data: {actorUserId: null, action: 'USER_ROLE', targetType: 'User', targetId: user.id, data: {from: user.role, to: role, via: 'cli'}}})
   ]);
   console.log(email.toLowerCase() + ': ' + user.role + ' -> ' + role);
-  if (!user.emailVerified) console.warn('Warning: the email is not verified; the admin panel refuses sign-in until it is.');
+  if (!user.emailVerified) console.warn('Google must verify this exact email on sign-in. Email/password access requires an already verified address.');
   if (user.bannedAt) console.warn('Warning: the user is banned; the admin panel refuses banned accounts.');
   return 0;
 }
