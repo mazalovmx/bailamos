@@ -215,7 +215,7 @@ test('local driver: objects round-trip and keys cannot escape the media director
 });
 
 test('browser media policy includes the actual presigned upload origin for S3 addressing modes', async () => {
-  const cases: NodeJS.ProcessEnv[] = [
+  const cases: Record<string, string | undefined>[] = [
     {S3_ENDPOINT: 'https://t3.storageapi.dev', S3_REGION: 'auto', S3_FORCE_PATH_STYLE: 'false'},
     {S3_ENDPOINT: 'https://objects.example.test:9443', S3_FORCE_PATH_STYLE: 'false'},
     {S3_ENDPOINT: 'http://127.0.0.1:9000'},
@@ -227,7 +227,7 @@ test('browser media policy includes the actual presigned upload origin for S3 ad
     {S3_BUCKET: 'bucket_with_underscores'}
   ];
   for (const options of cases) {
-    const env = {S3_BUCKET: 'bailamos-media', S3_ACCESS_KEY: 'fixture-key', S3_SECRET_KEY: 'fixture-secret', ...options};
+    const env = {NODE_ENV: 'test' as const, S3_BUCKET: 'bailamos-media', S3_ACCESS_KEY: 'fixture-key', S3_SECRET_KEY: 'fixture-secret', ...options};
     const ticket = await s3Storage(s3Settings(env)!).presignUpload('raw/profile/avatar/fixture', {mime: 'image/jpeg', size: 1024});
     const uploadOrigin = new URL(ticket.url).origin;
     assert.ok(mediaOrigins(env).includes(uploadOrigin), `missing ${uploadOrigin}`);

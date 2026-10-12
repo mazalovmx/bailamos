@@ -5,7 +5,7 @@ const origin = (value: string | undefined) => {
   } catch {return '';}
 };
 /** Browser policy must allow the bucket host used by virtual-hosted S3 uploads, as well as the endpoint/CDN. */
-export function mediaOrigins(env: NodeJS.ProcessEnv): string[] {
+export function mediaOrigins(env: Record<string, string | undefined>): string[] {
   const origins = new Set([origin(env.S3_PUBLIC_URL), origin(env.S3_ENDPOINT)].filter(Boolean));
   if (env.MEDIA_STORAGE === 'local' || !env.S3_BUCKET) return [...origins];
   const region = env.S3_REGION || 'us-east-1';
