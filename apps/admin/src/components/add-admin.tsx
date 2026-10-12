@@ -10,7 +10,7 @@ function AddAdminDialog({onClose, onAdded}: {onClose: () => void; onAdded: () =>
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [added, setAdded] = useState<Added | null>(null);
   const [copied, setCopied] = useState(false);
   useEffect(() => {dialog.current?.showModal();}, []);
-  return <dialog ref={dialog} aria-labelledby={titleId} onClose={onClose} onCancel={event => {if (busy) event.preventDefault();}}>
+  return <dialog className="add-admin-dialog" ref={dialog} aria-labelledby={titleId} onClose={onClose} onCancel={event => {if (busy) event.preventDefault();}}>
     <form onSubmit={async event => {
       event.preventDefault();
       const email = String(new FormData(event.currentTarget).get('email') ?? '').trim();
