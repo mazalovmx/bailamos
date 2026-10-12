@@ -14,7 +14,8 @@ import {rateLimit, resetMemoryRateLimits} from '../src/lib/rate-limit';
 import {closeRedis} from '../src/lib/redis';
 import {readObject, storage} from '../src/lib/storage';
 import {signLocalUpload, verifyLocalUpload} from '../src/lib/storage/local';
-import {s3Storage} from '../src/lib/storage/s3';
+import {s3Settings, s3Storage} from '../src/lib/storage/s3';
+import {mediaOrigins} from '../src/lib/storage/origins';
 // Hermetic: no Redis, no S3, no Meta, no database. Everything below runs against the in-memory and local-disk fallbacks.
 for (const name of ['REDIS_URL', 'S3_BUCKET', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_PUBLIC_URL', 'INSTAGRAM_OEMBED_URL', 'INSTAGRAM_OEMBED_TOKEN', 'MEDIA_MAX_PIXELS', 'MEDIA_ALLOW_HEIC'])
   delete process.env[name];
@@ -211,6 +212,35 @@ test('local driver: objects round-trip and keys cannot escape the media director
   assert.equal(await store.exists(key), false);
   for (const bad of ['../outside', 'raw/../../outside', '/etc/passwd', 'raw//x', 'raw/.hidden', 'C:\\Windows\\win.ini', 'raw/a b'])
     await assert.rejects(store.putObject(bad, Buffer.from('x'), 'text/plain'), /INVALID_STORAGE_KEY/, bad);
+});
+
+test('browser media policy includes the actual presigned upload origin for S3 addressing modes', async () => {
+  const cases: Record<string, string | undefined>[] = [
+    {S3_ENDPOINT: 'https://t3.storageapi.dev', S3_REGION: 'auto', S3_FORCE_PATH_STYLE: 'false'},
+    {S3_ENDPOINT: 'https://objects.example.test:9443', S3_FORCE_PATH_STYLE: 'false'},
+    {S3_ENDPOINT: 'http://127.0.0.1:9000'},
+    {S3_ENDPOINT: 'https://objects.example.test', S3_FORCE_PATH_STYLE: 'true'},
+    {},
+    {S3_REGION: 'eu-west-1'},
+    {S3_REGION: 'cn-north-1'},
+    {S3_BUCKET: 'dotted.bucket'},
+    {S3_BUCKET: 'bucket_with_underscores'}
+  ];
+  for (const options of cases) {
+    const env = {NODE_ENV: 'test' as const, S3_BUCKET: 'bailamos-media', S3_ACCESS_KEY: 'fixture-key', S3_SECRET_KEY: 'fixture-secret', ...options};
+    const ticket = await s3Storage(s3Settings(env)!).presignUpload('raw/profile/avatar/fixture', {mime: 'image/jpeg', size: 1024});
+    const uploadOrigin = new URL(ticket.url).origin;
+    assert.ok(mediaOrigins(env).includes(uploadOrigin), `missing ${uploadOrigin}`);
+    assert.ok(mediaOrigins(env).every(value => !value.includes('*')), 'allow only configured storage hosts');
+  }
+});
+
+test('media origins preserve CDN addresses and ignore malformed or non-HTTP configuration', () => {
+  assert.deepEqual(mediaOrigins({S3_PUBLIC_URL: 'https://cdn.example.test/images/', S3_ENDPOINT: 'https://objects.example.test',
+    S3_BUCKET: 'bailamos-media', S3_FORCE_PATH_STYLE: 'false'}),
+  ['https://cdn.example.test', 'https://objects.example.test', 'https://bailamos-media.objects.example.test']);
+  assert.deepEqual(mediaOrigins({S3_PUBLIC_URL: 'javascript:alert(1)', S3_ENDPOINT: 'not-a-url', S3_BUCKET: 'bailamos-media'}), []);
+  assert.deepEqual(mediaOrigins({MEDIA_STORAGE: 'local', S3_BUCKET: 'unused-bucket'}), []);
 });
 
 test('S3 driver: the presigned PUT signs content type and length (computed offline, no network)', async () => {
