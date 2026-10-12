@@ -8,6 +8,7 @@ import {Cell} from './cells';
 import {useT} from './i18n';
 import {useResourceMeta, type Row} from './panel';
 import {RowActions} from './row-actions';
+import {AddAdmin} from './add-admin';
 const pageSize = 25;
 // Parents first, children indented beneath them; rows whose parent is not on the page stay at the top level.
 function treeOrder(rows: Row[]) {
@@ -40,6 +41,7 @@ export function ResourceList({name, initial}: {name: string; initial: Record<str
   const title = t('resource.' + name);
   return <>
     <div className="heading"><h1>{title}</h1>
+      {name === 'users' && <AddAdmin onAdded={() => void query.refetch()}/>}
       {meta.canCreate && <Link className="button" href={'/r/' + name + '/new'}>{t('create')}</Link>}</div>
     <form className="filters" role="search" aria-label={t('filters')} onSubmit={event => {event.preventDefault();
       setSearch(String(new FormData(event.currentTarget).get('q') ?? '').trim()); setPage(1);}}>

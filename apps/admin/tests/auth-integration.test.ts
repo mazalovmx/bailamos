@@ -5,7 +5,7 @@ import {config} from 'dotenv';
 import {db, type UserRole} from '@dance/db';
 config({path: '../../.env', quiet: true});
 
-test('Google admin sign-in issues a separate session only for verified staff and never registers users', {timeout: 120000}, async () => {
+test('Google admin sign-in protects staff sessions and lets only owners provision administrators by email', {timeout: 120000}, async () => {
   const origin = 'http://localhost:3001', clientId = 'admin-fixture.apps.googleusercontent.com', tag = randomUUID();
   Object.assign(process.env, {ADMIN_URL: origin, GOOGLE_CLIENT_ID: clientId, GOOGLE_CLIENT_SECRET: 'fixture-only', EMAIL_AUTH_ENABLED: 'false'});
   const {privateKey, publicKey} = generateKeyPairSync('rsa', {modulusLength: 2048});
@@ -24,6 +24,7 @@ test('Google admin sign-in issues a separate session only for verified staff and
     return message + '.' + sign('RSA-SHA256', Buffer.from(message), privateKey).toString('base64url');
   };
   const ids: string[] = [];
+  const emails = ['invited-', 'existing-', 'forbidden-', 'mixed-', 'duplicate-'].map(prefix => prefix + tag + '@example.test');
   try {
     const {POST, GET} = await import('../src/app/api/auth/[...all]/route');
     const login = (jwt: string, requestSignUp = false) => POST(new Request(origin + '/api/auth/sign-in/social', {
@@ -40,6 +41,8 @@ test('Google admin sign-in issues a separate session only for verified staff and
         assert.equal(response.status, 200, await response.clone().text());
         assert.ok(response.headers.getSetCookie().some(cookie => cookie.includes('dance-admin.session_token=')));
         assert.equal(await db.session.count({where: {userId: id}}), 1);
+        assert.equal((await login(token(subject, 'wrong-' + email, true))).status, 403, 'a linked Google identity must still match the approved email');
+        assert.equal((await login(token(subject, email, false))).status, 403, 'a fresh unverified Google email must not issue a staff session');
         await db.user.update({where: {id}, data: {role: 'USER'}});
         const denied = await login(token(subject, email, verified));
         assert.equal(denied.status, 403);
@@ -49,6 +52,87 @@ test('Google admin sign-in issues a separate session only for verified staff and
         assert.equal(await db.session.count({where: {userId: id}}), 0);
       }
     }
+    const {POST: addUser} = await import('../src/app/api/users/route');
+    const {addAdminByEmail} = await import('../src/lib/admin-users');
+    const {setUserRole} = await import('../src/lib/moderation');
+    const ownerId = 'add-owner-' + tag, ownerEmail = ownerId + '@example.test', ownerSubject = 'google-' + ownerId;
+    ids.push(ownerId);
+    await db.user.create({data: {id: ownerId, name: 'Owner', email: ownerEmail, emailVerified: true, role: 'OWNER',
+      accounts: {create: {id: randomUUID(), providerId: 'google', accountId: ownerSubject}}}});
+    const cookieOf = (response: Response) => response.headers.getSetCookie().map(value => value.split(';')[0]).join('; ');
+    const ownerLogin = await login(token(ownerSubject, ownerEmail, true));
+    assert.equal(ownerLogin.status, 200);
+    const ownerCookie = cookieOf(ownerLogin);
+    const add = (body: unknown, cookie = ownerCookie, source = origin) => addUser(new Request(origin + '/api/users', {
+      method: 'POST', headers: {origin: source, cookie, 'content-type': 'application/json'}, body: JSON.stringify(body)
+    }), undefined);
+    assert.equal((await add({email: emails[2]}, '')).status, 401);
+    assert.equal((await add({email: emails[2]}, ownerCookie, 'https://other.example')).status, 403);
+    assert.equal((await add({email: 'invalid'})).status, 400);
+    assert.equal((await add({email: emails[2], role: 'OWNER'})).status, 400);
+    assert.equal((await add({email: ownerEmail})).status, 400, 'owners cannot overwrite their own role');
+
+    const provision = await add({email: '  ' + emails[0].toUpperCase() + '  '});
+    assert.equal(provision.status, 201, await provision.clone().text());
+    const invited = await provision.json();
+    ids.push(invited.id);
+    assert.equal(invited.email, emails[0]);
+    assert.equal(invited.loginUrl, origin + '/login');
+    let stored = await db.user.findUniqueOrThrow({where: {id: invited.id}});
+    assert.equal(stored.role, 'ADMIN');
+    assert.equal(stored.emailVerified, false, 'adding an email does not verify it');
+    assert.equal(await db.account.count({where: {userId: invited.id}}), 0);
+    assert.equal(await db.session.count({where: {userId: invited.id}}), 0);
+    const repeat = await add({email: emails[0]});
+    assert.equal(repeat.status, 200);
+    assert.equal((await repeat.json()).id, invited.id);
+    assert.equal(await db.auditLog.count({where: {targetId: invited.id, action: 'USER_ADMIN_ADD'}}), 1);
+    const unverified = await login(token('google-' + invited.id, emails[0], false));
+    assert.ok(unverified.status >= 400 && unverified.status < 500, 'unverified Google email must be denied');
+    assert.equal(await db.account.count({where: {userId: invited.id}}), 0, 'an unverified provider must not link to an invitation');
+    const invitedLogin = await login(token('google-' + invited.id, emails[0], true));
+    assert.equal(invitedLogin.status, 200, await invitedLogin.clone().text());
+    assert.ok(invitedLogin.headers.getSetCookie().some(value => value.includes('dance-admin.session_token=')));
+    stored = await db.user.findUniqueOrThrow({where: {id: invited.id}});
+    assert.equal(stored.emailVerified, true);
+    assert.equal(stored.name, 'Admin fixture', 'the new Google account supplies its display name');
+    assert.equal(await db.account.count({where: {userId: invited.id, providerId: 'google'}}), 1);
+    assert.equal((await add({email: emails[2]}, cookieOf(invitedLogin))).status, 403, 'administrators cannot appoint more administrators');
+    await assert.rejects(addAdminByEmail(invited.id, {email: emails[2]}), /OWNER_ONLY/);
+    assert.equal(await db.user.count({where: {email: emails[2]}}), 0);
+
+    const existingId = 'existing-admin-' + tag;
+    ids.push(existingId);
+    await db.user.create({data: {id: existingId, name: 'Existing user', email: emails[1], emailVerified: true,
+      sessions: {create: {id: randomUUID(), token: randomUUID(), expiresAt: new Date(Date.now() + 60000)}}}});
+    const upgraded = await add({email: emails[1]});
+    assert.equal(upgraded.status, 200);
+    assert.equal((await upgraded.json()).id, existingId);
+    assert.equal((await db.user.findUniqueOrThrow({where: {id: existingId}})).role, 'ADMIN');
+    assert.equal(await db.session.count({where: {userId: existingId}}), 0, 'changing a role revokes prior sessions');
+    assert.equal(await db.auditLog.count({where: {targetId: existingId, action: 'USER_ROLE'}}), 1);
+    await db.user.update({where: {id: existingId}, data: {bannedAt: new Date()}});
+    const blocked = await add({email: emails[1]});
+    assert.equal(blocked.status, 409);
+    assert.equal((await blocked.json()).error, 'USER_BANNED');
+
+    const mixedId = 'mixed-admin-' + tag;
+    ids.push(mixedId);
+    await db.user.create({data: {id: mixedId, name: 'Legacy email', email: emails[3].toUpperCase()}});
+    assert.equal((await add({email: emails[3]})).status, 200);
+    assert.equal((await db.user.findUniqueOrThrow({where: {id: mixedId}})).email, emails[3]);
+    assert.equal((await login(token('google-' + mixedId, emails[3], true))).status, 200);
+    for (const email of [emails[4], emails[4].toUpperCase()]) {
+      const id = randomUUID(); ids.push(id);
+      await db.user.create({data: {id, name: 'Duplicate fixture', email}});
+    }
+    assert.equal((await add({email: emails[4]})).status, 409, 'ambiguous legacy emails are not assigned arbitrarily');
+    await setUserRole(invited.id, 'USER', ownerId);
+    assert.equal(await db.session.count({where: {userId: invited.id}}), 0);
+    assert.equal((await login(token('google-' + invited.id, emails[0], true))).status, 403);
+    assert.equal((await add({email: emails[2]}, cookieOf(invitedLogin))).status, 401, 'revocation also invalidates existing API access');
+    await db.user.update({where: {id: ownerId}, data: {bannedAt: new Date()}});
+    await assert.rejects(addAdminByEmail(ownerId, {email: emails[2]}), /OWNER_ONLY/);
     const unknownEmail = 'unknown-' + tag + '@example.test';
     const unknown = await login(token('unknown-' + tag, unknownEmail, true), true);
     assert.equal(unknown.status, 403, await unknown.clone().text());
@@ -69,7 +153,8 @@ test('Google admin sign-in issues a separate session only for verified staff and
     assert.equal(new URL(callback.headers.get('location')!).pathname, '/login');
   } finally {
     globalThis.fetch = originalFetch;
-    await db.user.deleteMany({where: {OR: [{id: {in: ids}}, {email: 'unknown-' + tag + '@example.test'}]}});
+    await db.auditLog.deleteMany({where: {OR: [{actorUserId: {in: ids}}, {targetId: {in: ids}}]}});
+    await db.user.deleteMany({where: {OR: [{id: {in: ids}}, {email: {in: [...emails, ...emails.map(email => email.toUpperCase()), 'unknown-' + tag + '@example.test']}}]}});
     await db.$disconnect();
   }
 });

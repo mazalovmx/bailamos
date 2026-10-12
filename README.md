@@ -1,5 +1,9 @@
 # Bailamos — Dance Community
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+Open source under the [MIT License](LICENSE). Copyright (c) 2026 mazalovmx.
+
 A multilingual social dance platform focused on swing, Lindy Hop and solo jazz. English is the default language, with Spanish and Russian available through the visible language switch.
 
 Repository: [mazalovmx/bailamos](https://github.com/mazalovmx/bailamos). See [implementation status](docs/implementation.md) for the epic audit. Source code, locally tested functionality and production acceptance are tracked separately.
