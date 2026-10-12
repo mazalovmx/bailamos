@@ -308,5 +308,8 @@
   "navMore": "Más",
   "adminPanel": "Panel de administración",
   "accountSchoolPage": "Tu página pública y horario",
-  "accountAddClass": "Añadir una clase, taller o evento"
+  "accountAddClass": "Añadir una clase, taller o evento",
+  "error_LAST_SCHOOL_MANAGER": "Añade otro gestor antes de eliminar al último.",
+  "error_EMAIL_CONFLICT": "Varias cuentas utilizan este correo. Contacta con el propietario de la plataforma.",
+  "error_USER_BANNED": "Esta cuenta está suspendida."
 }

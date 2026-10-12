@@ -1,29 +1,29 @@
 import {headers} from 'next/headers';
 import {redirect} from 'next/navigation';
 import {ZodError} from 'zod';
-import {db, Prisma, EventConflict} from '@dance/db';
+import {Prisma, EventConflict, SchoolAccessError, adminAccessIdentity} from '@dance/db';
 import {auth} from './auth';
 import {adminOrigin} from './env';
 import {HttpError} from './errors';
 import {ModerationError} from './moderation';
 import {mayEnterAdmin} from './auth-policy';
-export type Staff = {id: string; name: string; email: string; role: 'OWNER' | 'ADMIN' | 'MODERATOR' | 'SCHOOL_ADMIN'};
+export type Staff = {id: string; name: string; email: string; role: 'OWNER' | 'ADMIN' | 'MODERATOR' | 'SCHOOL_ADMIN'; hasSchoolAccess?: boolean};
 // The single place that decides who is staff. Role and ban are read from the database on every request,
 // so a demotion or a ban takes effect at once even while the session cookie is still valid.
 async function staffFrom(source: Headers): Promise<Staff | null> {
   const session = await auth.api.getSession({headers: source});
   if (!session) return null;
-  const user = await db.user.findUnique({where: {id: session.user.id},
-    select: {id: true, name: true, email: true, role: true, bannedAt: true, emailVerified: true}});
+  const user = await adminAccessIdentity(session.user.id);
   if (!user || !mayEnterAdmin(user)) return null;
-  return {id: user.id, name: user.name, email: user.email, role: user.role};
+  const role = ['OWNER', 'ADMIN', 'MODERATOR'].includes(user.role) ? user.role as 'OWNER' | 'ADMIN' | 'MODERATOR' : 'SCHOOL_ADMIN';
+  return {id: user.id, name: user.name, email: user.email, role, hasSchoolAccess: user.hasSchoolAccess};
 }
 // Guard for every API route. Anything that is not a read must come from the panel's own origin.
 export async function staff(request: Request, need: 'STAFF' | 'ADMIN' | 'OWNER' | 'SCHOOL' = 'STAFF') {
   if (!['GET', 'HEAD'].includes(request.method) && request.headers.get('origin') !== adminOrigin()) throw new HttpError('FORBIDDEN', 403);
   const user = await staffFrom(request.headers);
   if (!user) throw new HttpError('UNAUTHORIZED', 401);
-  if ((user.role === 'SCHOOL_ADMIN' && need !== 'SCHOOL') || (need === 'SCHOOL' && user.role === 'MODERATOR')) throw new HttpError('FORBIDDEN', 403);
+  if ((user.role === 'SCHOOL_ADMIN' && need !== 'SCHOOL') || (need === 'SCHOOL' && user.role === 'MODERATOR' && !user.hasSchoolAccess)) throw new HttpError('FORBIDDEN', 403);
   if (need === 'ADMIN' && !['OWNER','ADMIN'].includes(user.role)) throw new HttpError('ADMIN_ONLY', 403);
   if (need === 'OWNER' && user.role !== 'OWNER') throw new HttpError('OWNER_ONLY', 403);
   return user;
@@ -43,7 +43,7 @@ export async function jsonBody(request: Request): Promise<unknown> {
 }
 export function fail(error: unknown) {
   const reply = (code: string, status: number, extra?: object) => Response.json({error: code, ...extra}, {status});
-  if (error instanceof HttpError || error instanceof ModerationError || error instanceof EventConflict) return reply(error.code, error.status);
+  if (error instanceof HttpError || error instanceof ModerationError || error instanceof EventConflict || error instanceof SchoolAccessError) return reply(error.code, error.status);
   if (error instanceof ZodError) return reply('INVALID_INPUT', 400, {fields: [...new Set(error.issues.map(issue => String(issue.path[0] ?? '')))].filter(Boolean)});
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === 'P2002') return reply('NOT_UNIQUE', 409);

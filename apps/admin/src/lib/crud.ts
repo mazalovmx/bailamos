@@ -59,6 +59,9 @@ export async function create(item: Resource, input: unknown, user: Staff) {
     await check(tx, item, data);
     // Catalogue entries are addressed by slug across the app (seeded as id = slug), so new ones follow the same rule.
     const row = await delegate(tx, item).create({data: item.idFromSlug ? {...data, id: data.slug} : data, select: selectOf(item)});
+    if (item.name === 'profiles' && data.type === 'SCHOOL') {
+      await tx.schoolAdmin.create({data: {userId: user.id, schoolProfileId: row.id, canManageAdmins: true}});
+    }
     await audit(tx, user.id, 'RECORD_CREATE', item.modelName, row.id, {values: plain(data)});
     return row;
   });

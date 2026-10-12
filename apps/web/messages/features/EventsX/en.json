@@ -215,5 +215,13 @@
   "extensionSaved": "Dates added. The schedule has been refreshed.",
   "discoveryViews": "Event views",
   "mapView": "Map",
-  "calendarView": "Calendar"
+  "calendarView": "Calendar",
+  "schoolAccessRole": "School role",
+  "schoolRoleAdmin": "School administrator",
+  "schoolRoleManager": "School manager",
+  "schoolGlobalAccess": "Global administrator",
+  "schoolPanel": "School admin panel",
+  "schoolTeamHelp": "Managers manage the school and its team. Administrators manage its resources only. Invite their Google email; registration is not required.",
+  "schoolInviteSaved": "Access granted to {email}. Share this login link; they must sign in with the same Google email:",
+  "schoolCreatorAccess": "Creating a school automatically gives you management rights. You can manage several schools without changing your platform role."
 }

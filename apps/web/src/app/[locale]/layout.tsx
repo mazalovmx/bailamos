@@ -41,7 +41,8 @@ export default async function Layout({children, params}: {
   const user = await currentUser(), t = await getTranslations('App'), account = await getTranslations('Account');
   // Staff see a link to the admin panel, which is a separate application; school administrators land in their cabinet.
   const adminBase = (process.env.ADMIN_URL || 'http://localhost:3001').replace(/\/+$/, '');
-  const adminUrl = user && user.role !== 'USER' ? adminBase + (user.role === 'SCHOOL_ADMIN' ? '/schools' : '') : undefined;
+  const globalStaff = user && ['OWNER','ADMIN','MODERATOR'].includes(user.role);
+  const adminUrl = globalStaff ? adminBase : user?.schoolIds.length ? adminBase + '/schools' : undefined;
   return <html lang={locale}><body className={uiFont.variable}><NextIntlClientProvider>
     <Header signedIn={!!user} adminUrl={adminUrl}/>{children}<footer className="app-footer"><span>dance community</span><p>{t('footer')}</p>
       <a href={'/' + locale + '/privacy'}>{account('privacyLink')}</a></footer>
