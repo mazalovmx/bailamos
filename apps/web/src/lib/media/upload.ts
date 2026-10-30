@@ -57,7 +57,7 @@ export async function completeUpload(user: MediaUser, input: unknown): Promise<U
     for (const file of processed.files) await store.putObject(variantKey(base, file.width, file.format), file.body, file.contentType);
     // A chat attachment has no MediaItem and no public URL: the key is handed to the message that is sent next.
     if (raw.target === 'chat') return {key: base, url: ''};
-    // The map photo has no MediaItem either: Event.mapImageKey points at it once the event is saved.
+    // The map photo and the cover have no MediaItem either: Event.mapImageKey / imageKey points at it once the event is saved.
     if (raw.target === 'eventmap') return {key: base, url: mediaUrl(base)};
     if (raw.target === 'avatar' || raw.target === 'cover') {
       const field = raw.target === 'avatar' ? 'avatarKey' : 'coverKey';

@@ -6,7 +6,7 @@ import nodeIcal from 'node-ical';
 import {db} from '@dance/db';
 import {schedule} from '../src/lib/schedule';
 import {buildCalendar, etagOf, notModified, type IcsEvent} from '../src/lib/calendar/ics';
-import {googleCalendarUrl, feedPath, siteOrigin} from '../src/lib/calendar/links';
+import {googleCalendarUrl, outlookCalendarUrl, yahooCalendarUrl, feedPath, siteOrigin} from '../src/lib/calendar/links';
 import {transitions, vtimezone, wallClock, zoneLabel} from '../src/lib/calendar/time';
 import {calendarFilters, eventWhere, findFeedEvents, findOccurrences, MAX_RANGE_DAYS, rangeSchema, withDescendants} from '../src/lib/calendar/query';
 config({path: '../../.env', quiet: true});
@@ -155,6 +155,28 @@ test('Google Calendar link carries local wall-clock dates, ctz and correctly enc
   assert.equal(open.searchParams.has('details') || open.searchParams.has('location'), false);
   assert.equal(feedPath({citySlug: 'madrid', styleSlug: 'lindy-hop', locale: 'es'}), '/api/feeds/ical?city=madrid&style=lindy-hop&locale=es');
   assert.equal(feedPath({}), '/api/feeds/ical');
+});
+
+test('Outlook and Yahoo links carry UTC instants, the details with the event link, and the place', () => {
+  const event = {title: 'Clase de Lindy & Blues', timezone: 'Europe/Madrid', location: 'Sala Swing, Calle Mayor 1', details: 'Nivel 1', url: 'https://dance.example/es/events/clase'};
+  const when = {startsAt: '2026-10-25T18:00:00.000Z', endsAt: new Date('2026-10-25T19:30:00Z')};
+  for (const [host, origin] of [['live', 'https://outlook.live.com'], ['office', 'https://outlook.office.com']] as const) {
+    const url = new URL(outlookCalendarUrl(event, when, host));
+    assert.equal(url.origin + url.pathname, origin + '/calendar/0/action/compose');
+    assert.deepEqual([url.searchParams.get('rru'), url.searchParams.get('subject'), url.searchParams.get('startdt'), url.searchParams.get('enddt')],
+      ['addevent', 'Clase de Lindy & Blues', '2026-10-25T18:00:00Z', '2026-10-25T19:30:00Z']);
+    assert.equal(url.searchParams.get('body'), 'Nivel 1\n\nhttps://dance.example/es/events/clase');
+    assert.equal(url.searchParams.get('location'), 'Sala Swing, Calle Mayor 1');
+  }
+  const yahoo = new URL(yahooCalendarUrl(event, when));
+  assert.equal(yahoo.origin + yahoo.pathname, 'https://calendar.yahoo.com/');
+  assert.deepEqual([yahoo.searchParams.get('v'), yahoo.searchParams.get('st'), yahoo.searchParams.get('et'), yahoo.searchParams.get('in_loc')],
+    ['60', '20261025T180000Z', '20261025T193000Z', 'Sala Swing, Calle Mayor 1']);
+  // Without an end the entry lasts one hour; without details or place those parameters are left out.
+  const bare = new URL(outlookCalendarUrl({title: 'Practice', timezone: 'America/Mexico_City'}, {startsAt: '2026-11-15T02:00:00.000Z'}));
+  assert.equal(bare.searchParams.get('enddt'), '2026-11-15T03:00:00Z');
+  assert.equal(bare.searchParams.has('body') || bare.searchParams.has('location'), false);
+  assert.equal(new URL(yahooCalendarUrl({title: 'Practice', timezone: 'UTC'}, {startsAt: '2026-11-15T02:00:00.000Z'})).searchParams.get('et'), '20261115T030000Z');
 });
 test('filter parsing, style descendants, visibility and the range cap', () => {
   const tree = [{id: 's', slug: 'swing', parentId: null}, {id: 'c', slug: 'charleston', parentId: 's'}, {id: 'sc', slug: 'solo-charleston', parentId: 'c'},

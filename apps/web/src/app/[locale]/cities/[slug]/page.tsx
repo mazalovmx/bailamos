@@ -8,6 +8,7 @@ import {currentCitySlug} from '../../../../lib/catalogue/current-city';
 import {isFollowing} from '../../../../lib/catalogue/follows';
 import {currentUser} from '../../../../lib/session';
 import {EventCard} from '../../../../components/event-card';
+import {cardInclude} from '../../../../lib/events/card';
 import {FollowButton} from '../../../../components/catalogue/follow-button';
 import {UseCityButton} from '../../../../components/catalogue/city-switcher';
 import '../../../styles/catalogue.css';
@@ -23,7 +24,7 @@ export default async function City({params}: Props) {
   if (!city) notFound();
   const t = await getTranslations('Catalogue'), name = cityName(city, locale), user = await currentUser(), where = upcomingOccurrences({cityId: city.id});
   const [occurrences, total, followers, following, mine] = await Promise.all([
-    db.eventOccurrence.findMany({where, orderBy: [{startsAt: 'asc'}, {id: 'asc'}], take: 30, include: {event: {include: {city: true, styles: {include: {style: true}}}}}}),
+    db.eventOccurrence.findMany({where, orderBy: [{startsAt: 'asc'}, {id: 'asc'}], take: 30, include: {event: {include: cardInclude}}}),
     db.eventOccurrence.count({where}), db.follow.count({where: {cityId: city.id}}), isFollowing(user?.id, {cityId: city.id}), currentCitySlug()]);
   // The agenda is grouped by calendar day in the city's own time zone, not the visitor's.
   const dayKey = new Intl.DateTimeFormat('en-CA', {timeZone: city.timezone, year: 'numeric', month: '2-digit', day: '2-digit'});

@@ -22,5 +22,10 @@
   "subscribeWebcal": "Abrir en la aplicación de calendario",
   "subscribeGoogle": "Suscribirse en Google Calendar",
   "feedName": "Eventos de baile",
-  "feedAll": "todas las ciudades y estilos"
+  "feedAll": "todas las ciudades y estilos",
+  "otherCalendars": "Otros calendarios",
+  "addApple": "Calendario de Apple (.ics)",
+  "addOutlook": "Outlook.com",
+  "addOffice": "Outlook (Microsoft 365)",
+  "addYahoo": "Yahoo Calendar"
 }
