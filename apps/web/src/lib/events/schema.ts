@@ -24,6 +24,7 @@ export const eventInput=z.object({
   priceText:z.string().trim().max(120).nullish().transform(value=>value||null),
   address:z.string().trim().max(200).nullish().transform(value=>value||null),
   // The photo and the two-sentence note shown when the event is opened on the map.
+  imageKey:z.string().max(200).nullish().transform(value=>value||null).refine(value=>!value||isBaseKey(value),{message:'INVALID_IMAGE'}),
   mapImageKey:z.string().max(200).nullish().transform(value=>value||null).refine(value=>!value||isBaseKey(value),{message:'INVALID_MAP_IMAGE'}),
   mapNote:z.string().trim().max(300).nullish().transform(value=>value||null).refine(value=>!value||!mapNoteProblem(value),{message:'MAP_NOTE_TOO_LONG'}),
   attendeeVisibility:z.enum(attendeeVisibilities).default('PUBLIC'),

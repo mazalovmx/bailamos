@@ -7,6 +7,7 @@ import Link from 'next/link';
 import {PostBody} from '../../../../../../components/blog/post-body';
 import {FollowButton} from '../../../../../../components/catalogue/follow-button';
 import {EventCard} from '../../../../../../components/event-card';
+import {cardInclude} from '../../../../../../lib/events/card';
 import {ReportButton} from '../../../../../../components/moderation/report-button';
 import {postJsonLd, safeJson} from '../../../../../../lib/blog/jsonld';
 import {absoluteUrl, alternates, postPath, postsPath, rssPath} from '../../../../../../lib/blog/links';
@@ -26,7 +27,7 @@ const publicPost = cache(async (handle: string, slug: string) => {
   const post = await db.post.findFirst({where: {...publicPostWhere, slug, profile: {handle: handle.toLowerCase(), hiddenAt: null}}, select: {
     id: true, slug: true, title: true, excerpt: true, content: true, publishedAt: true, updatedAt: true, hiddenAt: true, profileId: true,
     profile: {select: {id: true, handle: true, name: true, type: true}},
-    event: {include: {city: true, styles: {include: {style: true}}}},
+    event: {include: cardInclude},
     // Photos and embeds hidden by moderation leave the page even though the stored body still names them.
     // The Instagram cards are drawn from the rows stored with the post, so they survive an outage on Meta's side.
     media: {where: {OR: [{hiddenAt: {not: null}}, {kind: 'instagram'}]},

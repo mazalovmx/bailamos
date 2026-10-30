@@ -197,6 +197,8 @@ test('event input: an optional seat limit and a web link for participants', () =
   for (const capacity of ['0', '-3', '2.5', '10001', 'many']) assert.equal(eventInput.safeParse({...base, capacity}).success, false, capacity);
   for (const link of ['javascript:alert(1)', 'data:text/html,hi', 'mailto:a@example.test', 'meet.example.test', 'https://' + 'a'.repeat(500)])
     assert.equal(eventInput.safeParse({...base, link}).success, false, link);
+  assert.equal(eventInput.parse({...base, imageKey: ''}).imageKey, null);
+  assert.equal(eventInput.safeParse({...base, imageKey: '../etc/passwd'}).success, false);
   assert.equal(attendees.seatsLeft(null, 5), null);
   assert.deepEqual([attendees.seatsLeft(3, 1), attendees.seatsLeft(3, 3), attendees.seatsLeft(3, 7)], [2, 0, 0]);
 });

@@ -283,6 +283,8 @@ model Event {
   priceText String?
   // What a visitor sees when they open the event on the map: a photo (for example of the entrance) and a short note.
   mapImageKey String?
+  // The cover photo shown on the event page and its cards. Without one the school's logo stands in.
+  imageKey String?
   // Free-text address for places that are not a venue of the directory.
   address String?
   mapNote String?

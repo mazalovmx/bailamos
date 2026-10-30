@@ -29,7 +29,7 @@ export async function prepareEvent(body:unknown) {
   const {occurrences,...when}=times;
   const fields={title:input.title,description:input.description,cityId:city.id,timezone:city.timezone,...when,
     venueId:venue?.id??null,lat:position.lat,lng:position.lng,placeConfirmed:!!venue||!!input.pin,
-    priceText:input.priceText,address:input.address,mapImageKey:input.mapImageKey,mapNote:input.mapNote,attendeeVisibility:input.attendeeVisibility,
+    priceText:input.priceText,address:input.address,imageKey:input.imageKey,mapImageKey:input.mapImageKey,mapNote:input.mapNote,attendeeVisibility:input.attendeeVisibility,
     capacity:input.capacity,link:input.link,linkForAttendees:input.linkForAttendees,
     status:input.status,kind:input.kind,format:input.format,level:input.level,intensity:input.intensity,
     tempo:input.tempo,prerequisites:input.prerequisites,partnerRequired:input.partnerRequired,
