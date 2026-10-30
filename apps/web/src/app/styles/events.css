@@ -73,3 +73,13 @@
 .event-map-card img{width:100%;height:auto;border-radius:12px;border:1px solid #d5dbc9}
 .event-map-card figcaption{font-size:16px;line-height:1.6}
 @media(max-width:600px){.event-place-address,.event-map-card{grid-template-columns:1fr}}
+.event-cover-image{display:block;width:100%;height:auto;max-height:420px;object-fit:cover;border-radius:18px;margin:16px 0 8px}
+.event-school{display:inline-flex;align-items:center;gap:12px;text-decoration:none;margin:0 0 20px;min-height:48px}
+.event-school img,.event-school .school-initial{width:48px;height:48px;border-radius:50%;object-fit:contain;background:#fffefa;border:1px solid #d5dbc9;flex:0 0 auto}
+.event-school .school-initial{display:inline-flex;align-items:center;justify-content:center;background:#253b2f;color:#fff;font-weight:600}
+.event-school small{display:block;color:#5b6657}
+.event-school:hover strong{text-decoration:underline}
+.cover-field{display:flex;flex-direction:column;gap:12px;border:1px solid #d5dbc9;border-radius:12px;padding:16px;margin:0;min-width:0}
+.cover-field legend{font-weight:600;padding:0 6px}
+.cover-preview{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.cover-preview img{max-width:100%;height:auto;border-radius:12px;object-fit:cover}

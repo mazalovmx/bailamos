@@ -7,6 +7,7 @@ import {SwingFields} from './swing-fields';
 import {ScheduleFields} from './events/schedule-fields';
 import {EventPlace} from './events/event-place';
 import {MapCardFields} from './events/map-card-fields';
+import {CoverField} from './events/cover-field';
 type Options={id:string;name:string;timezone?:string;lat?:number;lng?:number;countryCode?:string}[];
 type Fields=Record<string,string>;
 async function submit(url:string,method:string,body:unknown) {
@@ -48,6 +49,7 @@ export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools
     {id&&<input type="hidden" name="version" value={initial.version}/>}
     <label>{t('title')}<input name="title" required minLength={3} maxLength={120} defaultValue={initial.title}/></label>
     <label>{t('description')}<textarea name="description" required minLength={10} maxLength={5000} rows={6} defaultValue={initial.description}/></label>
+    <CoverField initialKey={initial.imageKey}/>
     <div data-guide="event-details"><Select name="styleId" label={t('style')} options={styles} value={initial.styleId}/></div>
     {!id&&schools.length>0&&<label>{x('onBehalfOf')}<select name="schoolProfileId" defaultValue={initial.schoolProfileId||''}><option value="">{x('onBehalfOfMe')}</option>{schools.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select><small>{x('onBehalfOfHint')}</small></label>}
     <div data-guide="event-place"><EventPlace cities={cities} cityId={cityId} onCity={setCityId} initial={initial}/></div>

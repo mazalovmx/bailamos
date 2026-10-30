@@ -6,6 +6,7 @@ import {cityLabeler} from '../../../../lib/catalogue/data';
 import {notFound} from 'next/navigation';
 import Link from 'next/link';
 import {EventCard} from '../../../../components/event-card';
+import {cardInclude} from '../../../../lib/events/card';
 import {LocationMap} from '../../../../components/geo/location-map';
 import '../../../styles/geo.css';
 const venueById = cache((id: string) => db.venue.findFirst({where: {id, hiddenAt: null}, include: {city: true}}));
@@ -19,7 +20,7 @@ export default async function VenuePage({params}: {params: Promise<{locale: stri
   const cityLabel = (await cityLabeler(locale))(venue.city.name);
   const sessions = await db.eventOccurrence.findMany({
     where: {cancelled: false, startsAt: {gte: new Date()}, event: {venueId: venue.id, status: 'PUBLISHED', hiddenAt: null}},
-    orderBy: [{startsAt: 'asc'}, {id: 'asc'}], take: 24, include: {event: {include: {city: true, styles: {include: {style: true}}}}}
+    orderBy: [{startsAt: 'asc'}, {id: 'asc'}], take: 24, include: {event: {include: cardInclude}}
   });
   return <main className="detail-page">
     <p className="eyebrow">{t('venueEyebrow')}</p><h1>{venue.name}</h1>

@@ -22,5 +22,10 @@
   "subscribeWebcal": "Открыть в приложении календаря",
   "subscribeGoogle": "Подписаться в Google Календаре",
   "feedName": "Танцевальные события",
-  "feedAll": "все города и стили"
+  "feedAll": "все города и стили",
+  "otherCalendars": "Другие календари",
+  "addApple": "Календарь Apple (.ics)",
+  "addOutlook": "Outlook.com",
+  "addOffice": "Outlook (Microsoft 365)",
+  "addYahoo": "Yahoo Calendar"
 }

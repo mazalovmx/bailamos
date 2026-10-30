@@ -9,6 +9,7 @@ import {currentCity} from '../../../../lib/catalogue/current-city';
 import {isFollowing} from '../../../../lib/catalogue/follows';
 import {currentUser} from '../../../../lib/session';
 import {EventCard} from '../../../../components/event-card';
+import {cardInclude} from '../../../../lib/events/card';
 import {FollowButton} from '../../../../components/catalogue/follow-button';
 import '../../../styles/catalogue.css';
 type Props = {params: Promise<{locale: string; slug: string}>; searchParams: Promise<Record<string, string | string[] | undefined>>};
@@ -26,7 +27,7 @@ export default async function Style({params, searchParams}: Props) {
   const local = city && query.everywhere !== '1' ? city : null;
   const ids = descendantIds(styles, style.id), where = upcomingOccurrences({styles: {some: {styleId: {in: ids}}}, ...(local ? {cityId: local.id} : {})});
   const [occurrences, total, followers, following] = await Promise.all([
-    db.eventOccurrence.findMany({where, orderBy: [{startsAt: 'asc'}, {id: 'asc'}], take: 12, include: {event: {include: {city: true, styles: {include: {style: true}}}}}}),
+    db.eventOccurrence.findMany({where, orderBy: [{startsAt: 'asc'}, {id: 'asc'}], take: 12, include: {event: {include: cardInclude}}}),
     db.eventOccurrence.count({where}), db.follow.count({where: {styleId: style.id}}), isFollowing(user?.id, {styleId: style.id})]);
   const path = ancestors(styles, style.id), children = styles.filter(item => item.parentId === style.id), base = '/' + locale + '/styles/';
   return <main className="catalogue-page">

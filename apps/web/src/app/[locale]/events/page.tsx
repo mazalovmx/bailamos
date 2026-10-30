@@ -3,6 +3,7 @@ import {getTranslations} from 'next-intl/server';
 import Link from 'next/link';
 import {catalogue} from '../../../lib/catalogue';
 import {EventCard} from '../../../components/event-card';
+import {cardInclude} from '../../../lib/events/card';
 import {EventFilters} from '../../../components/event-filters';
 import {eventSearchAll} from '../../../lib/event-search';
 import {first,queryParams} from '../../../lib/search-query';
@@ -15,7 +16,7 @@ export default async function Events({params,searchParams}:{params:Promise<{loca
   const rawPage=Number(first(query.page)),page=Number.isSafeInteger(rawPage)&&rawPage>0?Math.min(rawPage,10000):1;
   const eventWhere=await eventSearchAll(query),dates={cancelled:false,startsAt:discoveryDates(query,zone)},where={...dates,event:eventWhere};
   const [{cities,styles,tags},groups,total]=await Promise.all([catalogue(),db.eventOccurrence.groupBy({by:['eventId'],where,_min:{startsAt:true},orderBy:[{_min:{startsAt:'asc'}},{eventId:'asc'}],skip:(page-1)*12,take:12}),db.event.count({where:{...eventWhere,occurrences:{some:dates}}})]);
-  const events=await db.event.findMany({where:{id:{in:groups.map(g=>g.eventId)}},include:{city:true,styles:{include:{style:true}}}});
+  const events=await db.event.findMany({where:{id:{in:groups.map(g=>g.eventId)}},include:cardInclude});
   const sessions=groups.map(g=>({id:g.eventId,startsAt:g._min.startsAt!,event:events.find(e=>e.id===g.eventId)!}));
   const pageUrl=(n:number)=>'?'+queryParams({...query,page:String(n)});
   return <main><section className="app-hero"><p className="eyebrow">Lindy Hop · Solo Jazz · Swing</p><h1>{t('headline')}</h1><p className="intro">{t('intro')}</p><Link className="button" href={'/'+locale+'/events/new'}>{t('newEvent')} <span aria-hidden="true">↗</span></Link></section>

@@ -4,7 +4,7 @@ import {routing} from '../../i18n/routing';
 import {siteUrl} from '../mail';
 // One query for the event page, its metadata and its preview image.
 export const loadEvent=cache((slug:string)=>db.event.findUnique({where:{slug},include:{
-  city:true,venue:true,styles:{include:{style:true}},tags:{include:{tag:true}},occurrences:{orderBy:{startsAt:'asc'}},
+  city:true,venue:true,school:{select:{handle:true,name:true,avatarKey:true,hiddenAt:true}},styles:{include:{style:true}},tags:{include:{tag:true}},occurrences:{orderBy:{startsAt:'asc'}},
   members:{include:{profile:{select:{id:true,handle:true,name:true,type:true,userId:true,hiddenAt:true}}}}}}));
 export type LoadedEvent=NonNullable<Awaited<ReturnType<typeof loadEvent>>>;
 // The date a visitor is looking at: the one named in ?date=, else the next upcoming one, else the last one.
