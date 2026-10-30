@@ -286,6 +286,12 @@ model Event {
   // Free-text address for places that are not a venue of the directory.
   address String?
   mapNote String?
+  // Seats for people who sign up as "going"; null means no limit. For a series it applies to every date.
+  capacity Int?
+  // A link the organizer leaves for participants: an online class, a sign-up form, materials.
+  link String?
+  // When set, only people signed up as "going" (and the organizers) see the link.
+  linkForAttendees Boolean @default(false)
   attendeeVisibility AttendeeVisibility @default(PUBLIC)
   hiddenAt DateTime? @db.Timestamptz(3)
   tags EventTag[]

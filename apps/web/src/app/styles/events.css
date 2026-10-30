@@ -46,6 +46,10 @@
 .cancelled-notice{background:#fce8e1;border-color:#c88974;color:#7c2815}
 .session-list li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
 .rsvp-count{font-weight:600}
+.seats-left{margin:4px 0 0;font-weight:600}
+.event-link{margin:12px 0}
+.signup-fields{display:flex;flex-direction:column;gap:16px;border:1px solid #d5dbc9;border-radius:12px;padding:16px;margin:0;min-width:0}
+.signup-fields legend{font-weight:600;padding:0 6px}
 .rsvp-panel h3{margin:28px 0 8px;font-size:18px}
 .share-panel{margin-top:40px}
 .share-link label{max-width:560px}

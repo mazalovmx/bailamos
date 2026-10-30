@@ -223,5 +223,18 @@
   "schoolPanel": "School admin panel",
   "schoolTeamHelp": "Managers manage the school and its team. Administrators manage its resources only. Invite their Google email; registration is not required.",
   "schoolInviteSaved": "Access granted to {email}. Share this login link; they must sign in with the same Google email:",
-  "schoolCreatorAccess": "Creating a school automatically gives you management rights. You can manage several schools without changing your platform role."
+  "schoolCreatorAccess": "Creating a school automatically gives you management rights. You can manage several schools without changing your platform role.",
+  "signupTitle": "Sign-up and link",
+  "capacity": "Seat limit",
+  "capacityPlaceholder": "No limit",
+  "capacityHint": "How many people can sign up as “going”. Leave empty for no limit. In a series the limit applies to each date.",
+  "link": "Link for participants",
+  "linkHint": "For example an online class, a registration form or class materials. Only http:// and https:// links.",
+  "linkForAttendees": "Show the link only to people who signed up as “going”",
+  "linkOpen": "Open the link",
+  "linkHidden": "The organizer shares a link with people who signed up as “going”.",
+  "seatsLeft": "{left, plural, one {# seat left} other {# seats left}} of {capacity}",
+  "seatsFull": "No seats left: all {capacity} are taken.",
+  "error_EVENT_FULL": "No seats left. In a series, some dates may still have room: sign up for a single date.",
+  "error_INVALID_LINK": "Enter a full link that starts with http:// or https://."
 }
