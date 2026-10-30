@@ -10,7 +10,7 @@ import {managesSchool} from '../../../../lib/schools/access';
 import {cityLabeler} from '../../../../lib/catalogue/data';
 import {isPublic} from '../../../../lib/events/access';
 import {loadEvent,pickOccurrence,eventLinks} from '../../../../lib/events/page-data';
-import {listAttendees} from '../../../../lib/events/attendees';
+import {listAttendees,seatsLeft} from '../../../../lib/events/attendees';
 import {eventJsonLd,safeJson} from '../../../../lib/events/jsonld';
 import {zoneName} from '../../../../lib/events/time';
 import {RsvpButtons} from '../../../../components/forms';
@@ -56,10 +56,14 @@ export default async function EventPage({params,searchParams}:Props) {
   // A series is answered twice: for all its dates and, optionally, for the selected one. Counters and names
   // follow the selected date; a one-off event has just the one answer.
   const isSeries=event.occurrences.length>1;
-  const {going,interested,visible,series,override,attendees}=await listAttendees(event,user?.profile?.id,isSeries?selected?.id:null,managesSchool(user,event.schoolProfileId));
+  const {going,interested,visible,own,series,override,attendees}=await listAttendees(event,user?.profile?.id,isSeries?selected?.id:null,managesSchool(user,event.schoolProfileId));
   const startsAt=selected?.startsAt||event.startsAt,endsAt=selected?.endsAt||event.endsAt;
   const isPast=(endsAt||startsAt)<now,dateCancelled=!!selected?.cancelled&&event.status!=='CANCELLED';
   const venue=event.venue&&!event.venue.hiddenAt?event.venue:null;
+  // Seats are counted for the selected date, like the counters. A link for participants is shown to whoever
+  // signed up as "going" for the series or for this date, and to the organizers.
+  const left=seatsLeft(event.capacity,going),full=left===0;
+  const showLink=!!event.link&&(!event.linkForAttendees||canManage||own==='GOING'||series==='GOING');
   const people=(roles:string[])=>event.members.filter(m=>roles.includes(m.role)&&!m.profile.hiddenAt).map(m=>m.profile)
     .filter((profile,index,all)=>all.findIndex(other=>other.id===profile.id)===index);
   const organizers=people(['OWNER','CO_ORGANIZER']),artists=people(['ARTIST']);
@@ -88,10 +92,13 @@ export default async function EventPage({params,searchParams}:Props) {
     <section className="rsvp-panel" aria-labelledby="rsvp-title"><h2 id="rsvp-title">{t('rsvpTitle')}</h2>{user&&isPublic(event)&&<Bookmark eventId={event.id} initial={saved}/>}
       {isSeries&&<p className="field-note">{x('countsForDate',{date:date(startsAt)})}</p>}
       <p className="rsvp-count">{t('goingCount',{count:going})} · {t('interestedCount',{count:interested})}</p>
+      {event.capacity&&<p className={full?'notice seats-full':'seats-left'} role="status">{full?x('seatsFull',{capacity:event.capacity}):x('seatsLeft',{left:left??0,capacity:event.capacity})}</p>}
+      {event.link&&<div className="event-link">{showLink?<a className="button secondary" href={event.link} target="_blank" rel="noopener noreferrer nofollow">{x('linkOpen')} ↗</a>
+        :<p className="field-note">{x('linkHidden')}</p>}</div>}
       {event.status==='PUBLISHED'&&!event.hiddenAt&&nextDates.length>0&&(user?.profile?<>
         {isSeries&&<><h3>{x('rsvpSeries')}</h3><p className="field-note">{x('rsvpSeriesHint')}</p></>}
-        <RsvpButtons eventId={event.id} initial={series||''}/>
-        {isSeries&&selected&&!selected.cancelled&&selected.startsAt>=now&&<DateRsvp key={selected.id} eventId={event.id} occurrenceId={selected.id} date={date(startsAt)} series={series||''} override={override||''}/>}
+        <RsvpButtons eventId={event.id} initial={series||''} full={!isSeries&&full}/>
+        {isSeries&&selected&&!selected.cancelled&&selected.startsAt>=now&&<DateRsvp key={selected.id} eventId={event.id} occurrenceId={selected.id} date={date(startsAt)} series={series||''} override={override||''} full={full}/>}
       </>:<Link className="button" href={'/'+locale+(user?'/onboarding':'/login')+'?next='+encodeURIComponent('/'+locale+'/events/'+slug)}>{t(user?'profileRequired':'signInRsvp')}</Link>)}
       <h3>{isSeries?x('attendeesOnDate',{date:date(startsAt)}):x('attendees')}</h3>
       {!visible?<p className="field-note">{x('attendeesHidden_'+event.attendeeVisibility)}</p>:attendees.length===0?<p className="field-note">{x('noAttendees')}</p>:

@@ -5,6 +5,11 @@ import {isBaseKey} from '../media/keys';
 import {mapNoteProblem} from './map-note';
 export const attendeeVisibilities=['PUBLIC','ATTENDEES','ORGANIZERS'] as const;
 export const eventStatuses=['DRAFT','PUBLISHED','CANCELLED'] as const;
+export const MAX_CAPACITY=10000;
+// Only links a browser opens as a page: no javascript:, data: or mail links.
+export function isWebLink(value:string) {
+  try{const url=new URL(value);return (url.protocol==='https:'||url.protocol==='http:')&&!!url.hostname;}catch{return false;}
+}
 const local=z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
 // Full event payload of POST /api/events and PATCH /api/events/[id]. Unknown keys (ownership, coordinates) are dropped.
 export const eventInput=z.object({
@@ -22,6 +27,10 @@ export const eventInput=z.object({
   mapImageKey:z.string().max(200).nullish().transform(value=>value||null).refine(value=>!value||isBaseKey(value),{message:'INVALID_MAP_IMAGE'}),
   mapNote:z.string().trim().max(300).nullish().transform(value=>value||null).refine(value=>!value||!mapNoteProblem(value),{message:'MAP_NOTE_TOO_LONG'}),
   attendeeVisibility:z.enum(attendeeVisibilities).default('PUBLIC'),
+  // Sign-up: a seat limit for "going" (empty = no limit) and a link for participants, optionally only for them.
+  capacity:z.union([z.literal(''),z.null(),z.coerce.number().int().min(1).max(MAX_CAPACITY)]).optional().transform(value=>value===''||value===undefined?null:value),
+  link:z.string().trim().max(500).nullish().transform(value=>value||null).refine(value=>!value||isWebLink(value),{message:'INVALID_LINK'}),
+  linkForAttendees:z.boolean().default(false),
   startsLocal:local,endsLocal:local,
   status:z.enum(eventStatuses),
   kind:z.enum(eventKinds).default('SOCIAL'),format:z.enum(danceFormats).default('UNSPECIFIED'),

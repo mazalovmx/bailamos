@@ -223,5 +223,18 @@
   "schoolPanel": "Panel de la escuela",
   "schoolTeamHelp": "Los gestores gestionan la escuela y su equipo. Los administradores solo gestionan sus recursos. Invita su correo de Google; no necesita registrarse antes.",
   "schoolInviteSaved": "Acceso concedido a {email}. Comparte este enlace; debe iniciar sesión con el mismo correo de Google:",
-  "schoolCreatorAccess": "Al crear una escuela recibes automáticamente permisos para gestionarla. Puedes gestionar varias escuelas sin cambiar tu rol en la plataforma."
+  "schoolCreatorAccess": "Al crear una escuela recibes automáticamente permisos para gestionarla. Puedes gestionar varias escuelas sin cambiar tu rol en la plataforma.",
+  "signupTitle": "Inscripción y enlace",
+  "capacity": "Límite de plazas",
+  "capacityPlaceholder": "Sin límite",
+  "capacityHint": "Cuántas personas pueden apuntarse como «asistiré». Déjalo vacío para no poner límite. En una serie, el límite se aplica a cada fecha.",
+  "link": "Enlace para participantes",
+  "linkHint": "Por ejemplo, una clase en línea, un formulario de inscripción o materiales de la clase. Solo enlaces http:// y https://.",
+  "linkForAttendees": "Mostrar el enlace solo a quienes se apuntaron como «asistiré»",
+  "linkOpen": "Abrir el enlace",
+  "linkHidden": "El organizador comparte un enlace con quienes se apuntaron como «asistiré».",
+  "seatsLeft": "{left, plural, one {Queda # plaza} other {Quedan # plazas}} de {capacity}",
+  "seatsFull": "No quedan plazas: las {capacity} están ocupadas.",
+  "error_EVENT_FULL": "No quedan plazas. En una serie puede haber sitio en algunas fechas: apúntate a una fecha concreta.",
+  "error_INVALID_LINK": "Introduce un enlace completo que empiece por http:// o https://."
 }
