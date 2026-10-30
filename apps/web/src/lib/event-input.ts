@@ -30,6 +30,7 @@ export async function prepareEvent(body:unknown) {
   const fields={title:input.title,description:input.description,cityId:city.id,timezone:city.timezone,...when,
     venueId:venue?.id??null,lat:position.lat,lng:position.lng,placeConfirmed:!!venue||!!input.pin,
     priceText:input.priceText,address:input.address,mapImageKey:input.mapImageKey,mapNote:input.mapNote,attendeeVisibility:input.attendeeVisibility,
+    capacity:input.capacity,link:input.link,linkForAttendees:input.linkForAttendees,
     status:input.status,kind:input.kind,format:input.format,level:input.level,intensity:input.intensity,
     tempo:input.tempo,prerequisites:input.prerequisites,partnerRequired:input.partnerRequired,
     // The same key the importer computes, so an imported copy of this event is recognised as a duplicate.

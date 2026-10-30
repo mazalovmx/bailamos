@@ -19,7 +19,9 @@ export async function GET(request: Request, {params}: Context) {
     return Response.json({id:event.id,version:event.version,slug:event.slug,shortCode:event.shortCode,title:event.title,description:event.description,status:event.status,
       startsAt:event.startsAt,endsAt:event.endsAt,timezone:event.timezone,rrule:event.rrule,city:event.city,venue,priceText:event.priceText,
       kind:event.kind,format:event.format,level:event.level,intensity:event.intensity,tempo:event.tempo,prerequisites:event.prerequisites,
-      partnerRequired:event.partnerRequired,attendeeVisibility:event.attendeeVisibility,styleIds:event.styles.map(s=>s.styleId),
+      partnerRequired:event.partnerRequired,attendeeVisibility:event.attendeeVisibility,capacity:event.capacity,
+      // A link meant for participants only is not part of the public facts.
+      link:event.linkForAttendees?null:event.link,linkForAttendees:event.linkForAttendees,styleIds:event.styles.map(s=>s.styleId),
       tagIds:event.tags.map(t=>t.tagId),occurrences:event.occurrences});
   } catch(error) {return apiError(error);}
 }

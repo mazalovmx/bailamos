@@ -187,6 +187,20 @@ test('event input: recurrence, venue, price and attendee privacy are validated; 
   assert.equal(eventSearch({}).hiddenAt, null);
 });
 
+test('event input: an optional seat limit and a web link for participants', () => {
+  const base = {title: 'Beginner class', description: 'A class for beginners.', cityId: 'madrid', styleId: 'lindy-hop', startsLocal: '2030-06-14T19:00', endsLocal: '2030-06-14T20:00', status: 'DRAFT'};
+  const empty = eventInput.parse({...base, capacity: '', link: ''});
+  assert.deepEqual([empty.capacity, empty.link, empty.linkForAttendees], [null, null, false]);
+  assert.equal(eventInput.parse(base).capacity, null);
+  const set = eventInput.parse({...base, capacity: '12', link: ' https://meet.example.test/class ', linkForAttendees: true});
+  assert.deepEqual([set.capacity, set.link, set.linkForAttendees], [12, 'https://meet.example.test/class', true]);
+  for (const capacity of ['0', '-3', '2.5', '10001', 'many']) assert.equal(eventInput.safeParse({...base, capacity}).success, false, capacity);
+  for (const link of ['javascript:alert(1)', 'data:text/html,hi', 'mailto:a@example.test', 'meet.example.test', 'https://' + 'a'.repeat(500)])
+    assert.equal(eventInput.safeParse({...base, link}).success, false, link);
+  assert.equal(attendees.seatsLeft(null, 5), null);
+  assert.deepEqual([attendees.seatsLeft(3, 1), attendees.seatsLeft(3, 3), attendees.seatsLeft(3, 7)], [2, 0, 0]);
+});
+
 test('short codes are 6–8 base32 characters; short links pick the visitor language', () => {
   const seen = new Set<string>();
   for (let i = 0; i < 500; i++) {
@@ -502,6 +516,49 @@ test('counters and the attendee list are computed per date from effective answer
   await attendees.setRsvp(single, ref(going), 'GOING');
   const once = await attendees.listAttendees(single, going.profileId);
   assert.deepEqual([once.going, once.interested, once.own, once.series, once.override], [1, 0, 'GOING', 'GOING', null]);
+});
+
+test('a seat limit: "going" stops at the limit, per date in a series; held seats survive a lower limit', async () => {
+  const {owner, going, interested, quiet, stranger, co} = people;
+  // A one-off class with two seats. "Interested" takes no seat; changing one's mind frees the seat.
+  const single = await makeEvent({capacity: 2}, 1);
+  await attendees.setRsvp(single, ref(going), 'GOING');
+  await attendees.setRsvp(single, ref(interested), 'INTERESTED');
+  await attendees.setRsvp(single, ref(quiet), 'GOING');
+  await rejects(() => attendees.setRsvp(single, ref(stranger), 'GOING'), 'EVENT_FULL');
+  await attendees.setRsvp(single, ref(stranger), 'INTERESTED');
+  await attendees.setRsvp(single, ref(going), 'GOING');
+  await attendees.setRsvp(single, ref(quiet), 'DECLINED');
+  await attendees.setRsvp(single, ref(stranger), 'GOING');
+  assert.equal((await attendees.listAttendees(single, null)).going, 2);
+  // Concurrent requests for the last seat: exactly one wins.
+  const race = await makeEvent({capacity: 1}, 1);
+  const results = await Promise.allSettled([going, interested, quiet, co].map(p => attendees.setRsvp(race, ref(p), 'GOING')));
+  assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+  assert.ok(results.every(r => r.status === 'fulfilled' || (r.reason instanceof ApiError && r.reason.code === 'EVENT_FULL')));
+  assert.equal(await db.rsvp.count({where: {eventId: race.id, status: 'GOING'}}), 1);
+  // A series of three dates with one seat each: the series answer needs a seat on every upcoming date it counts for.
+  const series = await makeEvent({capacity: 1}, 3), [first, second] = series.occurrences;
+  const soon = new Date(first.startsAt.getTime() - 86400000);
+  await dateRsvp.answerDate(series.id, second.id, ref(quiet), 'GOING', soon);
+  await rejects(() => attendees.setRsvp(series, ref(going), 'GOING'), 'EVENT_FULL');
+  await rejects(() => dateRsvp.answerDate(series.id, second.id, ref(going), 'GOING', soon), 'EVENT_FULL');
+  assert.equal((await dateRsvp.answerDate(series.id, first.id, ref(going), 'GOING', soon)).going, 1);
+  // Skipping the full date frees the series answer from needing a seat there.
+  await dateRsvp.answerDate(series.id, second.id, ref(interested), 'DECLINED', soon);
+  await rejects(() => attendees.setRsvp(series, ref(interested), 'GOING'), 'EVENT_FULL');
+  await dateRsvp.answerDate(series.id, first.id, ref(going), null, soon);
+  await attendees.setRsvp(series, ref(interested), 'GOING');
+  assert.deepEqual(await Promise.all(series.occurrences.map(o => attendees.listAttendees(series, null, o.id).then(r => r.going))), [1, 1, 1]);
+  // The organizer lowers the limit: nobody loses a seat, nobody new gets one, and an existing "going" can be saved again.
+  await db.event.update({where: {id: single.id}, data: {capacity: 1}});
+  await attendees.setRsvp(single, ref(going), 'GOING');
+  await attendees.setRsvp(single, ref(quiet), 'INTERESTED');
+  await rejects(() => attendees.setRsvp(single, ref(quiet), 'GOING'), 'EVENT_FULL');
+  // Without a limit nothing changes.
+  const open = await makeEvent({}, 1);
+  for (const p of [going, interested, quiet, stranger, co, owner]) await attendees.setRsvp(open, ref(p), 'GOING');
+  assert.equal((await attendees.listAttendees(open, null)).going, 6);
 });
 
 test('reminders and single-date cancellations follow the effective answer for that date', async () => {

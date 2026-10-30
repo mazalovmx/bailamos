@@ -1,4 +1,5 @@
-import {db} from '@dance/db';
+import {db,lockEvent,type Prisma} from '@dance/db';
+import {ApiError} from '../api';
 import {notify} from '../notify';
 import {mailLocale} from '../mail';
 export type Visibility='PUBLIC'|'ATTENDEES'|'ORGANIZERS';
@@ -69,17 +70,44 @@ async function announceAttendee(event:EventRef,profile:ProfileRef) {
     await notify(fresh.filter(u=>u.locale===locale).map(u=>u.id),'NEW_ATTENDEE',
       {eventId:event.id,slug:event.slug,title:event.title,name:profile.name,handle:profile.handle,profileId:profile.id},'/'+locale+'/events/'+event.slug);
 }
+// Seats left on one date: null without a limit. Never below zero, even after the organizer lowered the limit.
+export function seatsLeft(capacity:number|null|undefined,going:number) {return capacity?Math.max(capacity-going,0):null;}
+// Throws EVENT_FULL when a "going" answer would take a seat the event no longer has. It runs in the transaction that
+// writes the answer, after locking the event row, so two people cannot take the last seat at the same time.
+// Without `occurrenceId` the answer is for the whole series and needs a seat on every upcoming date it counts for.
+async function claimSeat(tx:Prisma.TransactionClient,eventId:string,profileId:string,occurrenceId:string|null,now=new Date()) {
+  const {capacity}=await lockEvent(tx,eventId);
+  if(!capacity) return;
+  const [series,dates]=await Promise.all([tx.rsvp.findMany({where:{eventId,status:'GOING'},select:{profileId:true}}),
+    tx.eventOccurrence.findMany({where:occurrenceId?{id:occurrenceId,eventId}:{eventId,cancelled:false,startsAt:{gte:now}},
+      select:{rsvps:{select:{profileId:true,status:true}}}})]);
+  for(const date of dates){
+    const overrides=new Map(date.rsvps.map(row=>[row.profileId,row.status]));
+    // On a date answered separately the series answer takes no seat.
+    if(!occurrenceId&&overrides.has(profileId)) continue;
+    const going=new Set(series.map(row=>row.profileId).filter(id=>!overrides.has(id)));
+    for(const [id,status] of overrides) if(status==='GOING') going.add(id);
+    // Whoever already holds a seat keeps it.
+    if(!going.has(profileId)&&going.size>=capacity) throw new ApiError('EVENT_FULL',409);
+  }
+}
 // Records an answer for the whole event. "DECLINED" withdraws it; answers given for single dates stay as they are.
 export async function setRsvp(event:EventRef,profile:ProfileRef,status:Answer) {
   const where={eventId_profileId:{eventId:event.id,profileId:profile.id}};
-  if(status==='DECLINED') await db.rsvp.deleteMany({where:{eventId:event.id,profileId:profile.id}});
-  else await db.rsvp.upsert({where,create:{eventId:event.id,profileId:profile.id,status},update:{status}});
+  await db.$transaction(async tx=>{
+    if(status==='GOING') await claimSeat(tx,event.id,profile.id,null);
+    if(status==='DECLINED') await tx.rsvp.deleteMany({where:{eventId:event.id,profileId:profile.id}});
+    else await tx.rsvp.upsert({where,create:{eventId:event.id,profileId:profile.id,status},update:{status}});
+  });
   if(status==='GOING') await announceAttendee(event,profile);
 }
 // Records an answer for one date of a series; it overrides the series-wide answer for that date only.
 // "DECLINED" means "not this date" and is kept; `null` removes the override, so the series answer counts again.
 export async function setOccurrenceRsvp(event:EventRef,occurrenceId:string,profile:ProfileRef,status:Answer|null) {
-  if(!status) await db.occurrenceRsvp.deleteMany({where:{occurrenceId,profileId:profile.id}});
-  else await db.occurrenceRsvp.upsert({where:{occurrenceId_profileId:{occurrenceId,profileId:profile.id}},create:{occurrenceId,profileId:profile.id,status},update:{status}});
+  await db.$transaction(async tx=>{
+    if(status==='GOING') await claimSeat(tx,event.id,profile.id,occurrenceId);
+    if(!status) await tx.occurrenceRsvp.deleteMany({where:{occurrenceId,profileId:profile.id}});
+    else await tx.occurrenceRsvp.upsert({where:{occurrenceId_profileId:{occurrenceId,profileId:profile.id}},create:{occurrenceId,profileId:profile.id,status},update:{status}});
+  });
   if(status==='GOING') await announceAttendee(event,profile);
 }

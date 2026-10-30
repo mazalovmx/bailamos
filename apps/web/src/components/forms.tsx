@@ -38,7 +38,7 @@ export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools
       if(operationId)sessionStorage.setItem(draftKey,operationId);
       // The exact marker is not optional: without a venue the organizer must have placed one on the map.
       if(!data.get('pin')&&!data.get('venueId')){s.setBusy(false);s.setError('PLACE_REQUIRED');e.currentTarget.querySelector('.event-place')?.scrollIntoView({block:'center'});return;}
-      const body={...values(e.currentTarget),operationId,pin:data.get('pin')?JSON.parse(String(data.get('pin'))):null,tagIds:data.getAll('tagIds'),recurrenceDays:data.getAll('recurrenceDays'),partnerRequired:data.get('partnerRequired')==='on'};
+      const body={...values(e.currentTarget),operationId,pin:data.get('pin')?JSON.parse(String(data.get('pin'))):null,tagIds:data.getAll('tagIds'),recurrenceDays:data.getAll('recurrenceDays'),partnerRequired:data.get('partnerRequired')==='on',linkForAttendees:data.get('linkForAttendees')==='on'};
       const result=await submit('/api/events'+(id?'/'+id:''),id?'PATCH':'POST',body);
       if(!id)sessionStorage.removeItem(draftKey);
       // A new event continues in the editor, where the team, the artists and single dates are managed.
@@ -53,6 +53,11 @@ export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools
     <div data-guide="event-place"><EventPlace cities={cities} cityId={cityId} onCity={setCityId} initial={initial}/></div>
     <MapCardFields initialKey={initial.mapImageKey} initialNote={initial.mapNote}/>
     <label>{x('price')}<input name="priceText" maxLength={120} defaultValue={initial.priceText} placeholder={x('pricePlaceholder')}/><small>{x('priceHint')}</small></label>
+    <fieldset className="signup-fields"><legend>{x('signupTitle')}</legend>
+      <label>{x('capacity')}<input name="capacity" type="number" inputMode="numeric" min={1} max={10000} step={1} defaultValue={initial.capacity} placeholder={x('capacityPlaceholder')}/><small>{x('capacityHint')}</small></label>
+      <label>{x('link')}<input name="link" type="url" maxLength={500} defaultValue={initial.link} placeholder="https://"/><small>{x('linkHint')}</small></label>
+      <label className="checkbox"><input type="checkbox" name="linkForAttendees" defaultChecked={initial.linkForAttendees==='true'}/>{x('linkForAttendees')}</label>
+    </fieldset>
     <SwingFields initial={initial} tags={tags} selectedTags={selectedTags}/>
     <div data-guide="event-schedule"><ScheduleFields initial={initial} zone={cities.find(c=>c.id===cityId)?.timezone}/></div>
     <div className="form-grid"><label>{x('attendeeVisibility')}<select name="attendeeVisibility" defaultValue={initial.attendeeVisibility||'PUBLIC'}>{['PUBLIC','ATTENDEES','ORGANIZERS'].map(value=><option key={value} value={value}>{x('visibility_'+value)}</option>)}</select><small>{x('attendeeVisibilityHint')}</small></label>
@@ -60,13 +65,14 @@ export function EventForm({cities,styles,initial,id,tags,selectedTags=[],schools
     {s.feedback}<button data-guide="event-publish" className="button" disabled={s.busy}>{t(s.busy?'working':'saveEvent')}</button>
   </form>;
 }
-export function RsvpButtons({eventId,initial}:{eventId:string;initial:string}) {
+// `full`: no seat is left, so "going" is offered only to whoever already holds one.
+export function RsvpButtons({eventId,initial,full=false}:{eventId:string;initial:string;full?:boolean}) {
   const t=useTranslations('App'),router=useRouter(),s=useFormStatus();
   const [status,setStatus]=useState(initial==='DECLINED'?'':initial);
   // "Remove RSVP" is only offered once there is an answer to remove.
   const choices=[['GOING','going'],['INTERESTED','interested'],...(status?[['DECLINED','declined']]:[])];
   return <div><div className="rsvp-buttons">{choices.map(([value,label])=>
-    <button key={value} type="button" className={status===value?'button':'button secondary'} aria-pressed={value==='DECLINED'?undefined:status===value} disabled={s.busy} onClick={async()=>{
+    <button key={value} type="button" className={status===value?'button':'button secondary'} aria-pressed={value==='DECLINED'?undefined:status===value} disabled={s.busy||(full&&value==='GOING'&&status!=='GOING')} onClick={async()=>{
       s.setBusy(true);s.setError('');
       try{await submit('/api/events/'+eventId+'/rsvp','PUT',{status:value});setStatus(value==='DECLINED'?'':value);router.refresh();}
       catch(error){s.setError(error instanceof Error?error.message:'GENERIC');}finally{s.setBusy(false);}
