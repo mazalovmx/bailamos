@@ -22,5 +22,10 @@
   "subscribeWebcal": "Open in calendar app",
   "subscribeGoogle": "Subscribe in Google Calendar",
   "feedName": "Dance events",
-  "feedAll": "all cities and styles"
+  "feedAll": "all cities and styles",
+  "otherCalendars": "Other calendars",
+  "addApple": "Apple Calendar (.ics)",
+  "addOutlook": "Outlook.com",
+  "addOffice": "Outlook (Microsoft 365)",
+  "addYahoo": "Yahoo Calendar"
 }

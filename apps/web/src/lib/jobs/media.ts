@@ -24,14 +24,15 @@ export async function sweepRawUploads(now = new Date(), maxAgeMs = RAW_MAX_AGE_M
 /** Base keys ("img/<profile>/<uuid>") out of `keys` that some row still points at. */
 export async function referencedKeys(keys: string[]): Promise<Set<string>> {
   if (!keys.length) return new Set();
-  const [items, avatars, covers, attachments, mapImages] = await Promise.all([
+  const [items, avatars, covers, attachments, mapImages, eventImages] = await Promise.all([
     db.mediaItem.findMany({where: {storageKey: {in: keys}}, select: {storageKey: true}}),
     db.profile.findMany({where: {avatarKey: {in: keys}}, select: {avatarKey: true}}),
     db.profile.findMany({where: {coverKey: {in: keys}}, select: {coverKey: true}}),
     db.message.findMany({where: {attachmentKey: {in: keys}}, select: {attachmentKey: true}}),
-    db.event.findMany({where: {mapImageKey: {in: keys}}, select: {mapImageKey: true}})]);
+    db.event.findMany({where: {mapImageKey: {in: keys}}, select: {mapImageKey: true}}),
+    db.event.findMany({where: {imageKey: {in: keys}}, select: {imageKey: true}})]);
   return new Set([...items.map(row => row.storageKey), ...avatars.map(row => row.avatarKey), ...covers.map(row => row.coverKey),
-    ...attachments.map(row => row.attachmentKey), ...mapImages.map(row => row.mapImageKey)].filter((key): key is string => !!key));
+    ...attachments.map(row => row.attachmentKey), ...mapImages.map(row => row.mapImageKey), ...eventImages.map(row => row.imageKey)].filter((key): key is string => !!key));
 }
 export const PURGE_WINDOW_DAYS = 30, PURGE_BATCH = 200;
 /**

@@ -21,6 +21,7 @@ import {ShareButtons} from '../../../../components/events/share-buttons';
 import {LocationMap} from '../../../../components/geo/location-map';
 import {AddToCalendar} from '../../../../components/calendar/add-to-calendar';
 import {eventLocation} from '../../../../lib/calendar/ics';
+import {mediaUrl} from '../../../../lib/media/url';
 import {EventMedia} from '../../../../components/media/event-media';
 import {EventPosts} from '../../../../components/blog/event-posts';
 import {RoomLink} from '../../../../components/chat/room-link';
@@ -60,6 +61,7 @@ export default async function EventPage({params,searchParams}:Props) {
   const startsAt=selected?.startsAt||event.startsAt,endsAt=selected?.endsAt||event.endsAt;
   const isPast=(endsAt||startsAt)<now,dateCancelled=!!selected?.cancelled&&event.status!=='CANCELLED';
   const venue=event.venue&&!event.venue.hiddenAt?event.venue:null;
+  const school=event.school&&!event.school.hiddenAt?event.school:null;
   // Seats are counted for the selected date, like the counters. A link for participants is shown to whoever
   // signed up as "going" for the series or for this date, and to the organizers.
   const left=seatsLeft(event.capacity,going),full=left===0;
@@ -69,11 +71,16 @@ export default async function EventPage({params,searchParams}:Props) {
   const organizers=people(['OWNER','CO_ORGANIZER']),artists=people(['ARTIST']);
   const saved=user?!!await db.eventBookmark.findUnique({where:{userId_eventId:{userId:user.id,eventId:event.id}}}):false;
   const links=eventLinks(slug,locale,event.shortCode);
-  const jsonLd=eventJsonLd(event,{startsAt,endsAt,cancelled:!!selected?.cancelled},{organizers,artists},{origin:links.origin,url:links.canonical});
+  const jsonLd=eventJsonLd(event,{startsAt,endsAt,cancelled:!!selected?.cancelled},{organizers,artists},{origin:links.origin,url:links.canonical,
+    ...(event.imageKey?{image:new URL(mediaUrl(event.imageKey,1600,'webp'),links.origin).href}:{})});
   return <main className="detail-page event-page"><Link href={'/'+locale+'/events'}>← {t('back')}</Link>
     {isPublic(event)&&<script type="application/ld+json" dangerouslySetInnerHTML={{__html:safeJson(jsonLd)}}/>}
     <div className="tags">{event.styles.map(({style})=><span key={style.id}>{style.name}</span>)}<span>{t('kind_'+event.kind)}</span><span>{t(event.status)}</span>{event.hiddenAt&&<span>{x('hiddenBadge')}</span>}</div>
+    {event.imageKey&&<img className="event-cover-image" src={mediaUrl(event.imageKey,1600)} alt={x('coverAlt')} width={1600} height={900}/>}
     <h1>{event.title}</h1>
+    {school&&<Link className="event-school" href={'/'+locale+'/schools/'+school.handle}>
+      {school.avatarKey?<img src={mediaUrl(school.avatarKey,320)} alt="" width={48} height={48}/>:<span className="school-initial" aria-hidden="true">{school.name.slice(0,1).toUpperCase()}</span>}
+      <span><small>{x('bySchool')}</small><strong>{school.name}</strong></span></Link>}
     {event.status==='CANCELLED'&&<p className="notice cancelled-notice" role="status">{t('cancelledText')}</p>}
     {dateCancelled&&<p className="notice cancelled-notice" role="status">{x('dateCancelledText')}</p>}
     {selected?.originalStartsAt&&!selected.cancelled&&event.status!=='CANCELLED'&&<p className="notice" role="status">{x('dateMovedText',{date:date(selected.originalStartsAt)})}</p>}

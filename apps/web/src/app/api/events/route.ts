@@ -18,6 +18,7 @@ export async function POST(request: Request) {
     // Every event has an exact marker: an event in a park or on a square has no address to fall back on.
     if (!exactPlace) throw new ApiError('PLACE_REQUIRED',400);
     if (fields.mapImageKey && !fields.mapImageKey.startsWith('img/'+user.profile.id+'/')) throw new ApiError('INVALID_MAP_IMAGE',400);
+    if (fields.imageKey && !fields.imageKey.startsWith('img/'+user.profile.id+'/')) throw new ApiError('INVALID_IMAGE',400);
     // An event may be published in a school's name only by someone who manages that school.
     if (schoolProfileId && !managesSchool(user,schoolProfileId)) throw new ApiError('FORBIDDEN',403);
     const school=schoolProfileId&&schoolProfileId!==user.profile.id?[{profileId:schoolProfileId,role:'CO_ORGANIZER' as const}]:[];
